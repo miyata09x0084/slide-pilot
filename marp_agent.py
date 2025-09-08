@@ -36,3 +36,13 @@ SLIDE_FORMAT = os.getenv("SLIDE_FORMAT", "").lower().strip()
 MARP_THEME = os.getenv("MARP_THEME", "default") # default/gaia/gaia-dark/gaia-light
 MARP_PAGING = os.getenv("MARP_PAGING", "true") # true/false
 
+# -------------------
+# LLM クライアント
+# -------------------
+llm = AzureChatOpenAI(
+  azure_endpoint=AZURE_OPENAI_ENDPOINT,
+  api_key=AZURE_OPENAI_API_KEY,
+  api_version=AZURE_OPENAI_API_VERSION,
+  azure_deployment=AZURE_OPENAI_DEPLOYMENT,
+  temperature=0.2,
+)
