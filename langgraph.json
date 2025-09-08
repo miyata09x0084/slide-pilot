@@ -1,0 +1,10 @@
+{
+  "dependencies": ["langgraph==0.5.2"],
+  "graphs": {
+    "poc-aiagent": {
+      "path": "./marp_agent.py:graph",
+      "description": "AI Agent create pdf about AI News"
+    }
+  },
+  "env": ".env"
+}
