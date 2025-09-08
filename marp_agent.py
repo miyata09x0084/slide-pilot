@@ -22,3 +22,8 @@ def _get_env(key: str, default: Optional[str] = None) -> str:
 os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
 os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 
+# Azure OpenAI
+AZURE_OPENAI_ENDPOINT    = _get_env("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_KEY     = _get_env("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_API_VERSION = _get_env("AZURE_OPENAI_API_VERSION", "2024-06-01")
+AZURE_OPENAI_DEPLOYMENT  = _get_env("AZURE_OPENAI_DEPLOYMENT")
