@@ -81,4 +81,16 @@ def _find_json(text: str) -> Optional[str]:
     return m.group(0)
   return None
 
+def _ensure_marp_header(md: str, title: str) -> str:
+  header = (
+     "---\n"
+        "marp: true\n"
+        f"paginate: {MARP_PAGINATE}\n"
+        f"theme: {MARP_THEME}\n"
+        f"title: {title}\n"
+        "---\n\n"
+  )
+
+  body = re.sub(r"^---[\s\S]*?---\s*", "", md.strip(), count=1, flags=re.DOTALL)
+  return header + (body + ("\n" if not body.endswith("\n") else ""))
 
