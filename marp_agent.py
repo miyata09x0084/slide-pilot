@@ -71,3 +71,14 @@ def _slugify_en(text: str, max_length: int = 80) -> str:
   text = re.sub(r"[^a-z0-9]+", "-", text)
   text = re.sub(r"-+", "-", text).strip("-")
   return text[:max_length] or "slide"
+
+def _find_json(text: str) -> Optional[str]:
+  t = text.strip()
+  t = re.sub(r"^```(?:json)?\s*", "", t)
+  t = re.sub(r"\s*```$", "", t)
+  m = re.search(r"\{.*\}\s*$", t, flags=re.DOTALL)
+  if m:
+    return m.group(0)
+  return None
+
+
