@@ -37,7 +37,7 @@ TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
 # Marp 出力（PDF/PNG/HTML）。空なら .md に出力
 SLIDE_FORMAT = os.getenv("SLIDE_FORMAT", "").lower().strip()
 MARP_THEME = os.getenv("MARP_THEME", "default") # default/gaia/gaia-dark/gaia-light
-MARP_PAGING = os.getenv("MARP_PAGING", "true") # true/false
+MARP_PAGINATE = os.getenv("MARP_PAGINATE", "true") # true/false
 
 # -------------------
 # LLM クライアント
