@@ -17,3 +17,8 @@ def _get_env(key: str, default: Optional[str] = None) -> str:
   if value is None:
     raise ValueError(f"missing environment variable: {key}")
   return value
+
+# LangSmith
+os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+
