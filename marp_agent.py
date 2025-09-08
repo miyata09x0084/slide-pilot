@@ -5,6 +5,9 @@
 from dotenv import load_dotenv
 from typing import Optional
 import os
+import re
+from typing import List
+from langchain_openai import AzureChatOpenAI
 
 # -------------------
 # 環境変数読み込み
@@ -46,3 +49,25 @@ llm = AzureChatOpenAI(
   azure_deployment=AZURE_OPENAI_DEPLOYMENT,
   temperature=0.2,
 )
+
+# -------------------
+# ユーティリティ
+# -------------------
+def _log(state: dict, msg: str) -> List[str]:
+  return (state.get("logs") or []) + [msg]
+
+def _strip_bullets(lines: List[str]) -> List[str]:
+  output = []
+  for line in lines:
+    t = line.strip()
+    if not t:
+      continue
+    t = t.lstrip("・-•* \t")
+    output.append(t)
+  return output
+
+def _slugify_en(text: str, max_length: int = 80) -> str:
+  text = (text or "").lower()
+  text = re.sub(r"[^a-z0-9]+", "-", text)
+  text = re.sub(r"-+", "-", text).strip("-")
+  return text[:max_length] or "slide"
