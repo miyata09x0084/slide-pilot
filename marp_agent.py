@@ -156,3 +156,17 @@ def _strip_whole_code_fence(md: str) -> str:
         t = re.sub(r"^```[a-zA-Z0-9_-]*\s*\n?", "", t, flags=re.DOTALL)
         t = re.sub(r"\n?```$", "", t.strip(), flags=re.DOTALL)
     return t
+
+def _clean_title(md: str) -> str:
+    """
+    LLMが『以下のようなタイトル…』など前置きや引用記号を混ぜても
+    1行のタイトルだけにする。
+    """
+    t = (raw or "").strip()
+    # 1行目だけ採用
+    t = t.splitlines()[0]
+    # 日本語引用や英語引用を除去
+    t = re.sub(r"^[「『]*", "", t)
+    # 典型的な前置きを除去
+    t = re.sub(r"^(以下のようなタイトル.*|title:?|suggested:?|案:?)[\s：:]*", "", t, flags=re.IGNORECASE)
+    return t or "AI最新情報"
