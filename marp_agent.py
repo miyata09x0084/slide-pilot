@@ -2,6 +2,7 @@
 # フロー:
 # 0) Tavilyで情報収集 -> 1) アウトライン生成 -> 2) 目次生成 -> 3) スライド(Marp)本文生成 -> 4) 評価(>=8でOK/それ以外は2へループ) -> 5) スライドMarkdown保存(+ marp-cliでpdf/png/html出力)
 
+from pydoc import plain
 from dotenv import load_dotenv
 from typing import Optional
 import os
@@ -94,3 +95,39 @@ def _ensure_marp_header(md: str, title: str) -> str:
   body = re.sub(r"^---[\s\S]*?---\s*", "", md.strip(), count=1, flags=re.DOTALL)
   return header + (body + ("\n" if not body.endswith("\n") else ""))
 
+def _insert_separators(md: str) -> str:
+  """
+  コードブロックを壊さず、H2(## )の直前に1つだけ '---' を入れる。
+  """
+  out = [] # 出力を格納するリスト
+  in_code = False # コードブロック内かどうか
+  fence = None # コードブロックの開始マーカー (``` or ~~~)
+  prev = "" # 直前の行
+
+  def need_sep(prev_line: str) -> bool:
+    pl = prev_line.strip()
+    # 直前がすでに --- なら不要
+    return pl != "---"
+
+  for line in md.splitlines():
+    # コードブロックの検出
+    if line.startswith("```") or line.startswith("~~~"):
+      if not in_code:
+        in_code, fence = True, line[:3]
+      else:
+        if fence and line.startswith(fence):
+          in_code, fence = False, None
+        out.append(line)
+        prev = line
+        continue
+
+    # H2(## )の直前に1つだけ '---' を入れる
+    if not in_code and line.startswith("## "):
+      if need_sep(prev): # 前の行が"---"でなければ
+        out.append("---") # セパレータ挿入
+      out.append(line)
+    else:
+      out.append(line)
+    prev = line
+
+  return "\n".join(out).strip() + "\n"
