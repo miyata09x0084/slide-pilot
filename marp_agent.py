@@ -83,16 +83,24 @@ def _find_json(text: str) -> Optional[str]:
   return None
 
 def _ensure_marp_header(md: str, title: str) -> str:
+  """
+  MarkdownにMarp用のYAMLフロントマターを設定する
+  既存のフロントマターは削除して新しいものに置き換える
+  """
+  # Marp用YAMLフロントマターを構築
   header = (
      "---\n"
-        "marp: true\n"
-        f"paginate: {MARP_PAGINATE}\n"
-        f"theme: {MARP_THEME}\n"
-        f"title: {title}\n"
+        "marp: true\n"                    # Marp処理を有効化
+        f"paginate: {MARP_PAGINATE}\n"     # ページ番号表示設定
+        f"theme: {MARP_THEME}\n"           # テーマ設定
+        f"title: {title}\n"                # スライドタイトル
         "---\n\n"
   )
 
+  # 既存のフロントマター（---...---）を削除して本文のみ抽出
   body = re.sub(r"^---[\s\S]*?---\s*", "", md.strip(), count=1, flags=re.DOTALL)
+
+  # 新ヘッダー + 本文を結合（末尾改行を保証）
   return header + (body + ("\n" if not body.endswith("\n") else ""))
 
 def _insert_separators(md: str) -> str:
