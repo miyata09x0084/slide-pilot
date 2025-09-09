@@ -210,3 +210,10 @@ def _strip_whole_code_fence(md: str) -> str:
   if t.startswith("```"):
     t = re.sub(r"^```[a-zA-Z0-9_-]*\s*\n?", "", t)
     t = re.sub(r"\n?```$", "", t.strip())
+
+def _remove_presenter_lines(md: str) -> str:
+  """タイトルスライド（先頭～最初の'---'まで）から発表者行を除去"""
+  parts = md.split("\n---\n", 1)
+  head = parts[0]
+  head = re.sub(r"^\s*(発表者|Presenter|Speaker)\s*[:：].*$", "", head, flags=re.MULTILINE)
+  head = re.sub(r"\n{3,}", "\n\n", head).strip() + "\n"
