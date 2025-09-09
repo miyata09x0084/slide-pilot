@@ -11,6 +11,7 @@ import re
 from typing import List
 from datetime import datetime
 from langchain_openai import AzureChatOpenAI
+from langchain_core.tools import tool
 
 # -------------------
 # 環境変数読み込み
@@ -159,7 +160,7 @@ def _strip_whole_code_fence(md: str) -> str:
         t = re.sub(r"\n?```$", "", t.strip(), flags=re.DOTALL)
     return t
 
-def _clean_title(md: str) -> str:
+def _clean_title(raw: str) -> str:
     """
     LLMが『以下のようなタイトル…』など前置きや引用記号を混ぜても
     1行のタイトルだけにする。
@@ -192,3 +193,20 @@ def month_en() -> str:
               "July","August","September","October","November","December"]
   dt = now_jst()
   return f"{months[dt.month-1]} {dt.year}"
+
+@tool("get_today_jst", return_direct=True)
+def get_today_jst(fmt: str = "%Y-%m-%d") -> str:
+  """JSTで今日の日付を返す（例: %Y-%m-%d, %Y年%m月 など）"""
+  return datetime.now(JST).strftime(fmt)
+
+def _clean_title(raw: str) -> str:
+  t = (raw or "").strip().splitlines()[0]
+  t = t.strip("「」『』\"' 　:：")
+  t = re.sub(r"^(以下のようなタイトル.*|title:?|suggested:?|案:?)[\s：:]*", "", t, flags=re.IGNORECASE)
+  return t or "[本日の日付] AI最新情報まとめ"
+
+def _strip_whole_code_fence(md: str) -> str:
+  t = md.strip()
+  if t.startswith("```"):
+    t = re.sub(r"^```[a-zA-Z0-9_-]*\s*\n?", "", t)
+    t = re.sub(r"\n?```$", "", t.strip())
