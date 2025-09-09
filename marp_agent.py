@@ -3,11 +3,13 @@
 # 0) Tavilyで情報収集 -> 1) アウトライン生成 -> 2) 目次生成 -> 3) スライド(Marp)本文生成 -> 4) 評価(>=8でOK/それ以外は2へループ) -> 5) スライドMarkdown保存(+ marp-cliでpdf/png/html出力)
 
 from pydoc import plain
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from typing import Optional
 import os
 import re
 from typing import List
+from datetime import datetime
 from langchain_openai import AzureChatOpenAI
 
 # -------------------
@@ -170,3 +172,23 @@ def _clean_title(md: str) -> str:
     # 典型的な前置きを除去
     t = re.sub(r"^(以下のようなタイトル.*|title:?|suggested:?|案:?)[\s：:]*", "", t, flags=re.IGNORECASE)
     return t or "AI最新情報"
+
+# JSTの現在日時を取得
+JST = ZoneInfo("Asia/Tokyo")
+
+def now_jst() -> str:
+  return datetime.now(JST)
+
+def today_iso(fmt: str = "%Y-%m-%d") -> str:
+  return now_jst().strftime(fmt)
+
+def month_ja() -> str:
+  dt = now_jst()
+  # Windowsでも動くように %-m を使わず、0埋めもしない
+  return f"{dt.year}年{dt.month}月"
+
+def month_en() -> str:
+  months = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+  dt = now_jst()
+  return f"{months[dt.month-1]} {dt.year}"
