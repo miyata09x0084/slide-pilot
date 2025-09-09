@@ -138,4 +138,21 @@ def _insert_separators(md: str) -> str:
       out.append(line)
     prev = line
 
-  return "\n".join(out).strip() + "\n"
+    return "\n".join(out).strip() + "\n"
+
+def _double_separators(md: str) -> str:
+    """
+    連続する区切り（---, 空行, --- ...) を1個に圧縮。
+    """
+    # --- の連続や、--- の間の空行を潰す
+    md = re.sub(r"(?:\n*\s*---\s*\n+){2,}", "\n---\n", md)
+    # 先頭の余分な --- を1個に
+    md = re.sub(r"^(?:\s*---\s*\n)+", "---\n", md)
+    return md
+
+def _strip_whole_code_fence(md: str) -> str:
+    t = md.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```[a-zA-Z0-9_-]*\s*\n?", "", t, flags=re.DOTALL)
+        t = re.sub(r"\n?```$", "", t.strip(), flags=re.DOTALL)
+    return t
