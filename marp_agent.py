@@ -283,3 +283,17 @@ def tavily_colletc_context(
       })
       out[qtext] = items
   return out
+
+def context_to_bullets(ctx: List[Dict[str, str]]) -> List[str]:
+  # LLMに渡しやすい、出典付きの短文箇条書きにする
+  bullets = []
+  for q, items in ctx.items():
+    bullets.append(f"### Query: {q}")
+    for it in items:
+      title = it.get("title")
+      url = it.get("url")
+      content = it.get("content").replace("\n", " ")
+      bullets.append(f"- {title} - {content} - [source]({url})")
+    bullets.append("") # 空行で区切る
+  return "\n".join(bullets)
+
