@@ -357,7 +357,7 @@ def collect_info(state: State) -> State:
     ]
 
   # ★ 直近2ヶ月 × 各社のパターンで検索クエリを構成
-  queries = List[Dict[str, Any]] = []
+  queries: List[Dict[str, Any]] = []
   for m in month_labels:
     for domains, patterns in vendors_domains:
       for p in patterns:
