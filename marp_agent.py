@@ -217,3 +217,5 @@ def _remove_presenter_lines(md: str) -> str:
   head = parts[0]
   head = re.sub(r"^\s*(発表者|Presenter|Speaker)\s*[:：].*$", "", head, flags=re.MULTILINE)
   head = re.sub(r"\n{3,}", "\n\n", head).strip() + "\n"
+  return head + ("\n---\n" + parts[1] if len(parts) == 2 else "")
+
