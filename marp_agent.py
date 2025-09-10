@@ -5,9 +5,10 @@
 from pydoc import plain
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, Dict
 import os
 import re
+import requests
 from typing import List
 from datetime import datetime
 from langchain_openai import AzureChatOpenAI
@@ -218,4 +219,28 @@ def _remove_presenter_lines(md: str) -> str:
   head = re.sub(r"^\s*(発表者|Presenter|Speaker)\s*[:：].*$", "", head, flags=re.MULTILINE)
   head = re.sub(r"\n{3,}", "\n\n", head).strip() + "\n"
   return head + ("\n---\n" + parts[1] if len(parts) == 2 else "")
+
+# -------------------
+# Tavily 検索
+# -------------------
+def tavily_search(
+  query: str,
+  max_results: int = 8,
+  include_domains: Optional[List[str]] = None,
+  time_range: str = "month", # day/week/month/year
+  ) -> Dict:
+  endpoint = "https://api.tavily.com/search"
+  payload = {
+    "api_key": TAVILY_API_KEY,
+    "query": query,
+    "search_depth": "advanced",
+    "include_answers": True,
+    "max_results": max_results,
+    "time_range": time_range, # 直近の情報に限定
+  }
+  if include_domains:
+    payload["include_domains"] = include_domains
+  r = requests.post(endpoint, json=payload, timeout=60)
+  r.raise_for_status()
+  return r.json()
 
