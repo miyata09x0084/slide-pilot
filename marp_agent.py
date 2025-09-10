@@ -9,11 +9,14 @@ from dotenv import load_dotenv
 from typing import Optional, Dict, TypedDict, Any, Union
 import os
 import re
+from pydantic.v1.typing import test_type
 import requests
 from typing import List
 from datetime import datetime
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool
+from langsmith import traceable
+from datetime import timedelta
 
 # -------------------
 # 環境変数読み込み
@@ -245,7 +248,7 @@ def tavily_search(
   r.raise_for_status()
   return r.json()
 
-def tavily_colletc_context(
+def tavily_collect_context(
   queries: List[Union[str, Dict[str, Any]]],
   max_per_query: int = 6,
   default_time_range: str = "month",
@@ -322,3 +325,50 @@ class State(TypedDict):
   # 追加
   context_md: str # Tavilyからの要約（箇条書き）
   sources: Dict[str, List[Dict[str, str]]]
+
+# =======================
+# Node 0: Tavily 情報収集 (直近2ヶ月 & 公式ドメイン)
+# =======================
+@traceable(run_name="0_tavily_collect")
+def collect_info(state: State) -> State:
+  topic = state.get("topic") or "AI最新情報"
+
+  # JSTの現在日時 と　月英語表記を取得
+  def month_en_for(dt: datetime) -> str:
+    months = ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"]
+    return f"{months[dt.month-1]} {dt.year}"
+
+  now = now_jst()
+  # 先月は、月末日の1日になる
+  prev_month_dt = now.replace(day=1) - timedelta(days=1)
+  # 直近2ヶ月
+  month_labels = [month_en_for(now), month_en_for(prev_month_dt)]
+
+  # ベンダー毎の公式ドメイン
+  vendors_domains = [
+        (["azure.microsoft.com","news.microsoft.com","learn.microsoft.com"],
+         ["Microsoft AI updates", "Azure OpenAI updates"]),
+        (["openai.com"], ["OpenAI announcements","OpenAI updates"]),
+        (["blog.google","ai.googleblog.com","research.google"], ["Google AI updates", "Gemini updates"]),
+        (["aws.amazon.com"], ["AWS Bedrock updates","Amazon AI updates"]),
+        (["ai.meta.com"], ["Meta AI updates", "Llama updates"]),
+        (["anthropic.com"], ["Anthropic Claude updates","Claude announcements"]),
+    ]
+
+  # ★ 直近2ヶ月 × 各社のパターンで検索クエリを構成
+  queries = List[Dict[str, Any]] = []
+  for m in month_labels:
+    for domains, patterns in vendors_domains:
+      for p in patterns:
+        queries.append({"q": f"{p} {m}", "include_domains": domains, "time_range": "month"})
+  try:
+    sources = tavily_collect_context(queries, max_per_query=6, default_time_range="month")
+    context_md = context_to_bullets(sources)
+    return {
+      "sources": sources,
+      "context_md": context_md,
+      "log": _log(state, f"[tavily] months={month_labels} queries={len(queries)}")
+    }
+  except Exception as e:
+    return {"error": f"tavily_error: {e}", "log": _log(state, f"[tavily] EXCEPTION {e}")}
