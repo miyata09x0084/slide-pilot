@@ -244,3 +244,42 @@ def tavily_search(
   r.raise_for_status()
   return r.json()
 
+def tavily_colletc_context(
+  queries: List[Union[str, Dict[str, Any]]],
+  max_per_query: int = 6,
+  default_time_range: str = "month",
+) -> Dict[str, List[Dict[str, str]]]:
+  """
+  queriesは以下の２形式をサポート:
+    - "plain text"
+    - {"q": "...", "include_domains": ["example.com", ...], "time_range": "week"}
+  """
+  seen = set()
+  out: Dict[str, List[Dict[str, str]]] = {}
+  for q in queries:
+    if isinstance(q, dict):
+      qtext = q.get("q", "")
+      inc = q.get("include_domains")
+      tr = q.get("time_range", default_time_range)
+    else:
+      qtext = q
+      inc = None
+      tr = default_time_range
+
+    if not qtext:
+      continue
+
+    data = tavily_search(qtext, max_results=max_per_query, include_domains=inc, time_range=tr)
+    items = []
+    for r in data.get("results", []):
+      url = r.get("url")
+      if not url or url in seen:
+        continue
+      seen.add(url)
+      items.append({
+        "title": (r.get("title") or "")[:160],
+        "url": url,
+        "content": r.get("content" or "").replace("\n", " ")[:600],
+      })
+      out[qtext] = items
+  return out
