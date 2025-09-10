@@ -3,9 +3,10 @@
 # 0) Tavilyで情報収集 -> 1) アウトライン生成 -> 2) 目次生成 -> 3) スライド(Marp)本文生成 -> 4) 評価(>=8でOK/それ以外は2へループ) -> 5) スライドMarkdown保存(+ marp-cliでpdf/png/html出力)
 
 from pydoc import plain
+from turtle import title
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from typing import Optional, Dict
+from typing import Optional, Dict, TypedDict, Any, Union
 import os
 import re
 import requests
@@ -297,3 +298,27 @@ def context_to_bullets(ctx: List[Dict[str, str]]) -> List[str]:
     bullets.append("") # 空行で区切る
   return "\n".join(bullets)
 
+
+# -------------------
+# State
+# -------------------
+class State(TypedDict):
+  topic: str
+  outline: List[str]
+  toc: List[str]
+  slide_md: str
+  score: float
+  subscores: Dict[str, float]
+  reasons: Dict[str, str]
+  suggestions: List[str]
+  risk_flags: List[str]
+  passed: bool
+  feedback: str
+  title: str
+  slide_path: str
+  attempts: int
+  error: str
+  log: List[str]
+  # 追加
+  context_md: str # Tavilyからの要約（箇条書き）
+  sources: Dict[str, List[Dict[str, str]]]
