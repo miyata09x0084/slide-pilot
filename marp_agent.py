@@ -66,6 +66,7 @@ def _log(state: dict, msg: str) -> List[str]:
     return (state.get("logs") or []) + [msg]
 
 def _strip_bullets(lines: List[str]) -> List[str]:
+    """箇条書きから不要な記号を除去"""
     output = []
     for line in lines:
       t = line.strip()
@@ -327,9 +328,9 @@ class State(TypedDict):
   sources: Dict[str, List[Dict[str, str]]]
 
 # =======================
-# Node 0: Tavily 情報収集 (直近2ヶ月 & 公式ドメイン)
+# Node A: Tavily 情報収集 (直近2ヶ月 & 公式ドメイン)
 # =======================
-@traceable(run_name="0_tavily_collect")
+@traceable(run_name="a_tavily_collect")
 def collect_info(state: State) -> State:
   topic = state.get("topic") or "AI最新情報"
 
@@ -372,3 +373,24 @@ def collect_info(state: State) -> State:
     }
   except Exception as e:
     return {"error": f"tavily_error: {e}", "log": _log(state, f"[tavily] EXCEPTION {e}")}
+
+# -------------------
+# Node B: アウトライン生成
+# -------------------
+@traceable(run_name="b_generate_outline")
+def generate_outline(state: State) -> Dict:
+  topic = state.get("topic") or "AI最新情報"
+  ctx = state.get("context_md") or ""
+  prompt = [
+    ("system", "あなたはSolution Engineerです。これからMarpスライドでAI最新情報を発表します。"),
+      ("user",
+        "以下の“最新情報サマリ（出典付き）”を参考に、発表の重要ポイントを各社5個、"
+        "短い箇条書きで。URLも含めてください。\n\n"
+        f"[最新情報サマリ]\n{ctx}\n\n[トピック]\n{topic}")
+  ]
+  try:
+    msg = llm.invoke(prompt)
+    bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()] # 箇条書きが取れなかったら、せめて元の文章をそのまま使う。
+    return {"outline": bullets, "log": _log(state, f"[outline] {bullets}")}
+  except Exception as e:
+    return {"error": f"outline_error: {e}", "log": _log(state, f"[outline] EXCEPTION {e}")}
