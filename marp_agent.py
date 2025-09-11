@@ -17,6 +17,7 @@ from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool
 from langsmith import traceable
 from datetime import timedelta
+import json
 
 # -------------------
 # 環境変数読み込み
@@ -394,3 +395,28 @@ def generate_outline(state: State) -> Dict:
     return {"outline": bullets, "log": _log(state, f"[outline] {bullets}")}
   except Exception as e:
     return {"error": f"outline_error: {e}", "log": _log(state, f"[outline] EXCEPTION {e}")}
+
+# -------------------
+# Node C: 目次生成
+# -------------------
+@traceable(run_name="c_generate_toc")
+def generate_toc(state: State) -> Dict:
+  outline = state.get("outline") or []
+  prompt = [
+        ("system", "あなたはSolution Engineerです。Marpスライドの構成（目次）を作ります。"),
+        ("user",
+         "以下のアウトラインから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
+         "アウトライン:\n- " + "\n- ".join(outline))
+  ]
+  try:
+    msg = llm.invoke(prompt)
+    try:
+      data = json.loads(_find_json(msg.content) or msg.content)
+      toc = [s.strip() for s in data.get("toc", []) if s.strip()]
+    except Exception as e:
+      toc = _strip_bullets(msg.content.splitlines())
+      toc = toc[:8] or ["はじめに", "背景", "実装手順", "評価と改善", "公開・運用", "まとめ"]
+      return {"toc": toc, "error": "", "log": _log(state, f"[toc] {toc}")}
+  except Exception as e:
+     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
+
