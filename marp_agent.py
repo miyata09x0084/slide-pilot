@@ -94,8 +94,8 @@ def _find_json(text: str) -> Optional[str]:
 
 def _ensure_marp_header(md: str, title: str) -> str:
     """
-    MarkdownにMarp用のYAMLフロントマターを設定する
-    既存のフロントマターは削除して新しいものに置き換える
+    MarkdownにMarp用のYAMLフロントマター（スライド設定のヘッダー部分）を設定する。
+    既存のフロントマターは削除し、新しいテーマ・ページ番号設定等で置き換える。
     """
     # Marp用YAMLフロントマターを構築
     header = (
