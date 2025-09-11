@@ -420,3 +420,53 @@ def generate_toc(state: State) -> Dict:
   except Exception as e:
      return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
+# -------------------
+# Node D: スライド本文（Marp）生成
+# -------------------
+@traceable(run_name="d_generate_slide_md")
+def write_slides(state: State) -> Dict:
+  ctx = state.get("context_md") or "" # Tavilyからの要約（箇条書き）
+  sources = state.get("sources") or {}
+
+  # 参考リンク
+  refs = []
+  for q, items in sources.items():
+    for it in items[:2]:
+      refs.append(f"- **{it['title']}** — {it['url']}")
+    refs_md = "\n".join(refs)
+
+    # タイトルはLLMに任せず、当月で固定
+    ja_title = f"{month_ja()} AI最新情報まとめ"
+
+    prompt = [
+      ("system",
+        "あなたはSolution Engineerで、Marp形式のスライドを作ります。"
+        "出力はコードブロックで囲まず、スライド区切り（---）は入れないでください。"
+        "各スライドは必ず H2 見出し（## ）で開始。タイトルスライドに発表者名は書かないでください。"
+        "重要: 以下の“最新情報サマリ”の範囲内の事実のみに基づいて作成し、サマリに無い情報は書かないでください。"),
+      ("user",
+        "最新情報サマリ（出典付き）:\n"
+        f"{ctx}\n\n"
+        "要件:\n"
+        f"- タイトル（表紙の大見出し）: {ja_title}\n"
+        "- 1ページ目は # 見出しと短いサブタイトルのみ（発表者名は書かない）\n"
+        "- 2ページ目は Agenda（章立てを列挙）\n"
+        "- 以降は各社ごとのAI最新情報を簡潔に。各項目にURLを含める\n"
+        "- 各章は必ず H2（## ）で始める")
+    ]
+
+  try:
+    msg = llm.invoke(prompt)
+    slide_md = msg.content.strip()
+
+    # 各種整形（コードブロックの除去、セパレータの挿入、重複セパレータの圧縮、ヘッダーの設定、発表者行の除去）
+    slide_md = _strip_whole_code_fence(slide_md)
+    slide_md = _insert_separators(slide_md)
+    slide_md = _double_separators(slide_md)
+    slide_md = _ensure_marp_header(slide_md, _clean_title(ja_title))
+    slide_md = _remove_presenter_lines(slide_md)
+    return {"slide_md": slide_md, "title": ja_title,
+                "error": "", "log": _log(state, f"[slides] generated ({len(slide_md)} chars)")}
+  except Exception as e:
+    return {"error": f"slides_error: {e}", "log": _log(state, f"[slides] EXCEPTION {e}")}
+
