@@ -314,7 +314,7 @@ def context_to_bullets(ctx: List[Dict[str, str]]) -> List[str]:
 # -------------------
 class State(TypedDict):
   topic: str
-  outline: List[str]
+  key_points: List[str]  # AI最新情報の重要ポイント（旧: outline）
   toc: List[str]
   slide_md: str
   score: float
@@ -381,10 +381,10 @@ def collect_info(state: State) -> State:
     return {"error": f"tavily_error: {e}", "log": _log(state, f"[tavily] EXCEPTION {e}")}
 
 # -------------------
-# Node B: アウトライン生成
+# Node B: 重要ポイント生成
 # -------------------
-@traceable(run_name="b_generate_outline")
-def generate_outline(state: State) -> Dict:
+@traceable(run_name="b_generate_key_points")
+def generate_key_points(state: State) -> Dict:
   topic = state.get("topic") or "AI最新情報"
   ctx = state.get("context_md") or ""
   prompt = [
@@ -397,21 +397,21 @@ def generate_outline(state: State) -> Dict:
   try:
     msg = llm.invoke(prompt)
     bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()] # 箇条書きが取れなかったら、せめて元の文章をそのまま使う。
-    return {"outline": bullets, "log": _log(state, f"[outline] {bullets}")}
+    return {"key_points": bullets, "log": _log(state, f"[key_points] {bullets}")}
   except Exception as e:
-    return {"error": f"outline_error: {e}", "log": _log(state, f"[outline] EXCEPTION {e}")}
+    return {"error": f"key_points_error: {e}", "log": _log(state, f"[key_points] EXCEPTION {e}")}
 
 # -------------------
 # Node C: 目次生成
 # -------------------
 @traceable(run_name="c_generate_toc")
 def generate_toc(state: State) -> Dict:
-  outline = state.get("outline") or []
+  key_points = state.get("key_points") or []
   prompt = [
         ("system", "あなたはSolution Engineerです。Marpスライドの構成（目次）を作ります。"),
         ("user",
-         "以下のアウトラインから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
-         "アウトライン:\n- " + "\n- ".join(outline))
+         "以下の重要ポイントから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
+         "重要ポイント:\n- " + "\n- ".join(key_points))
   ]
   try:
     msg = llm.invoke(prompt)
@@ -605,22 +605,22 @@ def save_and_render(state: State) -> Dict:
 # -------------------
 graph_builder = StateGraph(State)
 graph_builder.add_node("collect_info", collect_info)
-graph_builder.add_node("generate_outline", generate_outline)
+graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides", write_slides)
 graph_builder.add_node("evaluate_slides", evaluate_slides)
 graph_builder.add_node("save_and_render", save_and_render)
 
 graph_builder.add_edge(START, "collect_info")
-graph_builder.add_edge("collect_info", "generate_outline")
-graph_builder.add_edge("generate_outline", "generate_toc")
+graph_builder.add_edge("collect_info", "generate_key_points")
+graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides")
 graph_builder.add_edge("write_slides", "evaluate_slides")
 
 graph_builder.add_conditional_edges(
   "evaluate_slides",
   route_after_eval,
-  {"retry": "generate_outline", "ok": "save_and_render"}
+  {"retry": "generate_key_points", "ok": "save_and_render"}
 )
 
 graph_builder.add_edge("save_and_render", END)
