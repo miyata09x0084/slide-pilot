@@ -18,6 +18,9 @@ from langchain_core.tools import tool
 from langsmith import traceable
 from datetime import timedelta
 import json
+from pathlib import Path
+import shutil
+import subprocess
 
 # -------------------
 # 環境変数読み込み
@@ -542,3 +545,55 @@ def route_after_eval(state: State) -> str:
     if (state.get("attempts") or 0) >= MAX_ATTEMPTS:
         return "ok"
     return "ok" if state.get("passed") else "retry"
+
+# -------------------
+# Node F: 保存 & Marpレンダリング
+# -------------------
+@traceable(run_name="f_save_and_render")
+def save_and_render(state: State) -> Dict:
+  if state.get("error"):
+    return {}
+  slide_md = state.get("slide_md") or ""
+  title = state.get("title") or "AIスライド"
+
+  # スライドファイル名の英語表記を生成
+  slug_prompt = [
+        ("system", "You create concise English slugs for filenames."),
+        ("user",
+         "Convert the following Japanese title into a short English filename base (<=6 words). "
+         "Only letters and spaces; no punctuation or numbers.\n\n"
+         f"Title: {title}")
+    ]
+  emsg = llm.invoke(slug_prompt)
+  file_stem = _slugify_en(emsg.content.strip()) or _slugify_en(title)
+
+  slide_dir = Path("slides")
+  slide_dir.mkdir(parents=True, exist_ok=True)
+  slide_md_path = slide_dir / f"{file_stem}_slides.md"
+  slide_md_path.write_text(slide_md, encoding="utf-8")
+
+  marp = shutil.which("marp")
+  out_path = str(slide_md_path)
+  if marp and SLIDE_FORMAT in ["pdf", "png", "html"]:
+    ext = SLIDE_FORMAT
+    out_file = slide_dir / f"{file_stem}.{ext}"
+    try:
+      subprocess.run(
+                [marp, str(slide_md_path), f"--{ext}", "-o", str(out_file)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+      out_path = str(out_file)
+      log_msg = f"[marp] generated {ext} -> {out_file}"
+    except subprocess.CalledProcessError as e:
+      log_msg = f"[marp] marp-cli failed: {e}"
+  else:
+    if not marp and SLIDE_FORMAT:
+      log_msg = "[marp] marp-cli not found – skipped rendering (left .md)."
+    else:
+      log_msg = "[marp] rendering skipped (SLIDE_FORMAT not set)."
+  return {
+    "slide_path": out_path,
+    "log": _log(state, log_msg)
+  }
