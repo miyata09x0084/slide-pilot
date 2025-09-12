@@ -2,14 +2,11 @@
 # フロー:
 # 0) Tavilyで情報収集 -> 1) アウトライン生成 -> 2) 目次生成 -> 3) スライド(Marp)本文生成 -> 4) 評価(>=8でOK/それ以外は2へループ) -> 5) スライドMarkdown保存(+ marp-cliでpdf/png/html出力)
 
-from pydoc import plain
-from turtle import title
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from typing import Optional, Dict, TypedDict, Any, Union
 import os
 import re
-from pydantic.v1.typing import test_type
 import requests
 from typing import List
 from datetime import datetime
