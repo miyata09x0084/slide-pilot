@@ -15,6 +15,7 @@ from typing import List
 from datetime import datetime
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool
+from langchain_core.runnables import RunnableConfig
 from langsmith import traceable
 from langgraph.graph import StateGraph
 from langgraph.graph.message import START, END
@@ -627,3 +628,40 @@ graph_builder.add_edge("save_and_render", END)
 
 graph = graph_builder.compile()
 
+# -------------------
+# 実行
+# -------------------
+if __name__ == "__main__":
+  print("LangSmith Tracing:", os.getenv("LANGCHAIN_TRACING_V2"),
+      "| Project:", os.getenv("LANGCHAIN_PROJECT"))
+  init: State = {
+    "topic": "LangGraph × LangSmith × Azure OpenAI × Tavilyで作る：最新AI動向スライド",
+    "key_points": [], "toc": [], "slide_md": "",
+    "score": 0.0,
+    "subscores": {}, "reasons": {},
+    "suggestions": [], "risk_flags": [],
+    "passed": False, "feedback": "",
+    "title": "", "slide_path": "",
+    "attempts": 0, "error": "", "log": [],
+    "context_md": "", "sources": {}
+  }
+
+  config: RunnableConfig = {
+    "run_name": "tavily_marp_agent",
+    "tags": ["marp", "langgraph", "langsmith", "azure-openai", "tavily"],
+    "metadata": {"env": "dev", "date": datetime.now(datetime.timezone.utc).isoformat()},
+    "recursive_limit": 60,
+  }
+  out = graph.invoke(init, config=config)
+
+  print("\n=== RESULT ===")
+  if out.get("error"):
+    print("ERROR:", out["error"])
+  else:
+    print("Title    :", out.get("title"))
+    print("Slide    :", out.get("slide_path"))
+    print("Score    :", out.get("score"))
+    print("Passed   :", out.get("passed"))
+  print("\n=== LOGS ===")
+  for line in out.get("log", []):
+    print(line)
