@@ -13,7 +13,7 @@ from pydantic.v1.typing import test_type
 import requests
 from typing import List
 from datetime import datetime
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 from langsmith import traceable
@@ -41,11 +41,10 @@ def _get_env(key: str, default: Optional[str] = None) -> str:
 os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
 os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 
-# Azure OpenAI
-AZURE_OPENAI_ENDPOINT    = _get_env("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_KEY     = _get_env("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_API_VERSION = _get_env("AZURE_OPENAI_API_VERSION", "2024-06-01")
-AZURE_OPENAI_DEPLOYMENT  = _get_env("AZURE_OPENAI_DEPLOYMENT")
+# OpenAI API
+# API キーは環境変数 OPENAI_API_KEY から自動読み込み
+# 明示的に読み込む場合のみ以下を使用
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Tavily
 TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
@@ -58,12 +57,11 @@ MARP_PAGINATE = os.getenv("MARP_PAGINATE", "true") # true/false
 # -------------------
 # LLM クライアント
 # -------------------
-llm = AzureChatOpenAI(
-  azure_endpoint=AZURE_OPENAI_ENDPOINT,
-  api_key=AZURE_OPENAI_API_KEY,
-  api_version=AZURE_OPENAI_API_VERSION,
-  azure_deployment=AZURE_OPENAI_DEPLOYMENT,
+llm = ChatOpenAI(
+  model="gpt-4o",  # 最新のGPT-4 Omniモデル（または "gpt-3.5-turbo" でコスト削減）
   temperature=0.2,
+  max_retries=2,    # リトライ回数
+  # api_key は環境変数 OPENAI_API_KEY から自動読み込み
 )
 
 # -------------------
@@ -635,7 +633,7 @@ if __name__ == "__main__":
   print("LangSmith Tracing:", os.getenv("LANGCHAIN_TRACING_V2"),
       "| Project:", os.getenv("LANGCHAIN_PROJECT"))
   init: State = {
-    "topic": "LangGraph × LangSmith × Azure OpenAI × Tavilyで作る：最新AI動向スライド",
+    "topic": "LangGraph × LangSmith × OpenAI × Tavilyで作る：最新AI動向スライド",
     "key_points": [], "toc": [], "slide_md": "",
     "score": 0.0,
     "subscores": {}, "reasons": {},
@@ -648,7 +646,7 @@ if __name__ == "__main__":
 
   config: RunnableConfig = {
     "run_name": "tavily_marp_agent",
-    "tags": ["marp", "langgraph", "langsmith", "azure-openai", "tavily"],
+    "tags": ["marp", "langgraph", "langsmith", "openai", "tavily"],
     "metadata": {"env": "dev", "date": datetime.now(datetime.timezone.utc).isoformat()},
     "recursive_limit": 60,
   }
