@@ -16,6 +16,8 @@ from datetime import datetime
 from langchain_openai import AzureChatOpenAI
 from langchain_core.tools import tool
 from langsmith import traceable
+from langgraph.graph import StateGraph
+from langgraph.graph.message import START, END
 from datetime import timedelta
 import json
 from pathlib import Path
@@ -597,3 +599,31 @@ def save_and_render(state: State) -> Dict:
     "slide_path": out_path,
     "log": _log(state, log_msg)
   }
+
+# -------------------
+# グラフ構築
+# -------------------
+graph_builder = StateGraph(State)
+graph_builder.add_node("collect_info", collect_info)
+graph_builder.add_node("generate_outline", generate_outline)
+graph_builder.add_node("generate_toc", generate_toc)
+graph_builder.add_node("write_slides", write_slides)
+graph_builder.add_node("evaluate_slides", evaluate_slides)
+graph_builder.add_node("save_and_render", save_and_render)
+
+graph_builder.add_edge(START, "collect_info")
+graph_builder.add_edge("collect_info", "generate_outline")
+graph_builder.add_edge("generate_outline", "generate_toc")
+graph_builder.add_edge("generate_toc", "write_slides")
+graph_builder.add_edge("write_slides", "evaluate_slides")
+
+graph_builder.add_conditional_edges(
+  "evaluate_slides",
+  route_after_eval,
+  {"retry": "generate_outline", "ok": "save_and_render"}
+)
+
+graph_builder.add_edge("save_and_render", END)
+
+graph = graph_builder.compile()
+
