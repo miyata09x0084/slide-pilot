@@ -175,3 +175,7 @@ config.yml
 config.yaml
 !config.example.yml
 !config.example.yaml
+
+# LangGraph runtime files
+.langgraph_api/
+*.pckl
