@@ -117,6 +117,9 @@ def _insert_separators(md: str) -> str:
     """
     コードブロックを壊さず、H2(## )の直前に1つだけ '---' を入れる。
     """
+    if not md or md is None:
+        return ""
+
     out = [] # 出力を格納するリスト
     in_code = False # コードブロック内かどうか
     fence = None # コードブロックの開始マーカー (``` or ~~~)
@@ -154,6 +157,9 @@ def _double_separators(md: str) -> str:
     """
     連続する区切り（---, 空行, --- ...) を1個に圧縮。
     """
+    if not md or md is None:
+        return ""
+
     # --- の連続や、--- の間の空行を潰す
     md = re.sub(r"(?:\n*\s*---\s*\n+){2,}", "\n---\n", md)
     # 先頭の余分な --- を1個に
@@ -220,6 +226,9 @@ def _strip_whole_code_fence(md: str) -> str:
 
 def _remove_presenter_lines(md: str) -> str:
   """タイトルスライド（先頭～最初の'---'まで）から発表者行を除去"""
+  if not md or md is None:
+    return ""
+
   parts = md.split("\n---\n", 1)
   head = parts[0]
   head = re.sub(r"^\s*(発表者|Presenter|Speaker)\s*[:：].*$", "", head, flags=re.MULTILINE)
@@ -457,14 +466,42 @@ def write_slides(state: State) -> Dict:
 
   try:
     msg = llm.invoke(prompt)
-    slide_md = msg.content.strip()
+
+    # Null値チェックと処理
+    if msg.content is None:
+        print(f"[WARNING] write_slides: msg.content is None, using fallback")
+        # フォールバックスライドを生成
+        slide_md = f"""# {ja_title}
+
+## Agenda
+- Microsoft AI 最新情報
+- Azure OpenAI 最新情報
+- OpenAI 最新情報
+- Google AI 最新情報
+- まとめ
+
+---
+
+## Microsoft AI 最新情報
+
+最新情報を取得中にエラーが発生しました。
+
+---
+
+## まとめ
+
+AI技術の最新動向をお伝えしました。
+"""
+    else:
+        slide_md = msg.content.strip()
 
     # 各種整形（コードブロックの除去、セパレータの挿入、重複セパレータの圧縮、ヘッダーの設定、発表者行の除去）
-    slide_md = _strip_whole_code_fence(slide_md)
-    slide_md = _insert_separators(slide_md)
-    slide_md = _double_separators(slide_md)
-    slide_md = _ensure_marp_header(slide_md, _clean_title(ja_title))
-    slide_md = _remove_presenter_lines(slide_md)
+    if slide_md:
+        slide_md = _strip_whole_code_fence(slide_md)
+        slide_md = _insert_separators(slide_md)
+        slide_md = _double_separators(slide_md)
+        slide_md = _ensure_marp_header(slide_md, _clean_title(ja_title))
+        slide_md = _remove_presenter_lines(slide_md)
     return {"slide_md": slide_md, "title": ja_title,
                 "error": "", "log": _log(state, f"[slides] generated ({len(slide_md)} chars)")}
   except Exception as e:
@@ -552,6 +589,10 @@ def save_and_render(state: State) -> Dict:
     return {}
   slide_md = state.get("slide_md") or ""
   title = state.get("title") or "AIスライド"
+
+  # スライド内容が空の場合のエラーハンドリング
+  if not slide_md.strip():
+    return {"error": "slide_md is empty", "log": _log(state, "[save] ERROR: slide_md is empty")}
 
   # スライドファイル名の英語表記を生成
   slug_prompt = [
