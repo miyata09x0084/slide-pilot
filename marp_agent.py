@@ -429,20 +429,20 @@ def write_slides(state: State) -> Dict:
   ja_title = f"{month_ja()} AI最新情報まとめ"
 
   prompt = [
-    ("system",
-      "あなたはSolution Engineerで、Marp形式のスライドを作ります。"
-      "出力はコードブロックで囲まず、スライド区切り（---）は入れないでください。"
-      "各スライドは必ず H2 見出し（## ）で開始。タイトルスライドに発表者名は書かないでください。"
-      "重要: 以下の"最新情報サマリ"の範囲内の事実のみに基づいて作成し、サマリに無い情報は書かないでください。"),
-    ("user",
-      "最新情報サマリ（出典付き）:\n"
-      f"{ctx}\n\n"
-      "要件:\n"
-      f"- タイトル（表紙の大見出し）: {ja_title}\n"
-      "- 1ページ目は # 見出しと短いサブタイトルのみ（発表者名は書かない）\n"
-      "- 2ページ目は Agenda（章立てを列挙）\n"
-      "- 以降は各社ごとのAI最新情報を簡潔に。各項目にURLを含める\n"
-      "- 各章は必ず H2（## ）で始める")
+      ("system",
+        "あなたはMicrosoftのSolution Engineerで、Marp形式のスライドを作ります。"
+        "出力はコードブロックで囲まず、スライド区切り（---）は入れないでください。"
+        "各スライドは必ず H2 見出し（## ）で開始。タイトルスライドに発表者名は書かないでください。"
+        "重要: 以下の“最新情報サマリ”の範囲内の事実のみに基づいて作成し、サマリに無い情報は書かないでください。"),
+      ("user",
+        "最新情報サマリ（出典付き）:\n"
+        f"{ctx}\n\n"
+        "要件:\n"
+        f"- タイトル（表紙の大見出し）: {ja_title}\n"
+        "- 1ページ目は # 見出しと短いサブタイトルのみ（発表者名は書かない）\n"
+        "- 2ページ目は Agenda（章立てを列挙）\n"
+        "- 以降は各社ごとのAI最新情報を簡潔に。各項目にURLを含める\n"
+        "- 各章は必ず H2（## ）で始める")
   ]
 
   try:
@@ -632,16 +632,13 @@ graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides")
-# 評価ノードをスキップして直接save_and_renderへ
-graph_builder.add_edge("write_slides", "save_and_render")
+graph_builder.add_edge("write_slides", "evaluate_slides")
 
-# 評価関連のエッジをコメントアウト
-# graph_builder.add_edge("write_slides", "evaluate_slides")
-# graph_builder.add_conditional_edges(
-#   "evaluate_slides",
-#   route_after_eval,
-#   {"retry": "generate_key_points", "ok": "save_and_render"}
-# )
+graph_builder.add_conditional_edges(
+  "evaluate_slides",
+  route_after_eval,
+  {"retry": "generate_key_points", "ok": "save_and_render"}
+)
 
 graph_builder.add_edge("save_and_render", END)
 
