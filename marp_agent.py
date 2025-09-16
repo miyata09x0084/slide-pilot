@@ -632,13 +632,16 @@ graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides")
-graph_builder.add_edge("write_slides", "evaluate_slides")
+# 評価ノードをスキップして直接save_and_renderへ
+graph_builder.add_edge("write_slides", "save_and_render")
 
-graph_builder.add_conditional_edges(
-  "evaluate_slides",
-  route_after_eval,
-  {"retry": "generate_key_points", "ok": "save_and_render"}
-)
+# 評価関連のエッジをコメントアウト
+# graph_builder.add_edge("write_slides", "evaluate_slides")
+# graph_builder.add_conditional_edges(
+#   "evaluate_slides",
+#   route_after_eval,
+#   {"retry": "generate_key_points", "ok": "save_and_render"}
+# )
 
 graph_builder.add_edge("save_and_render", END)
 
