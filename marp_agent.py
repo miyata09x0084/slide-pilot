@@ -298,25 +298,37 @@ def context_to_bullets(ctx: List[Dict[str, str]]) -> List[str]:
 # State
 # -------------------
 class State(TypedDict):
-  topic: str
-  key_points: List[str]  # AI最新情報の重要ポイント（旧: outline）
-  toc: List[str]
-  slide_md: str
-  score: float
-  subscores: Dict[str, float]
-  reasons: Dict[str, str]
-  suggestions: List[str]
-  risk_flags: List[str]
-  passed: bool
-  feedback: str
-  title: str
-  slide_path: str
-  attempts: int
-  error: str
-  log: List[str]
-  # 追加
-  context_md: str # Tavilyからの要約（箇条書き）
-  sources: Dict[str, List[Dict[str, str]]]
+  """LangGraphワークフローの状態管理"""
+
+  # 入力
+  topic: str                                    # スライドの主題
+
+  # 情報収集 (Node A)
+  sources: Dict[str, List[Dict[str, str]]]      # Tavily検索結果
+  context_md: str                               # 検索結果のMarkdown
+
+  # コンテンツ生成 (Node B-D)
+  key_points: List[str]                         # 重要ポイント5個
+  toc: List[str]                                # 目次5-8項目
+  slide_md: str                                 # Marpスライド本文
+  title: str                                    # スライドタイトル
+
+  # 評価 (Node E)
+  score: float                                  # 総合スコア (0-10)
+  subscores: Dict[str, float]                   # 項目別スコア
+  reasons: Dict[str, str]                       # 評価理由
+  suggestions: List[str]                        # 改善提案
+  risk_flags: List[str]                         # リスク事項
+  passed: bool                                  # 合格判定 (>=8.0)
+  feedback: str                                 # 総合フィードバック
+  attempts: int                                 # リトライ回数 (最大3)
+
+  # 出力 (Node F)
+  slide_path: str                               # 保存ファイルパス
+
+  # システム
+  error: str                                    # エラーメッセージ
+  log: List[str]                                # 実行ログ
 
 # =======================
 # Node A: Tavily 情報収集 (直近2ヶ月 & 公式ドメイン)
@@ -454,25 +466,25 @@ def write_slides(state: State) -> Dict:
         # フォールバックスライドを生成
         slide_md = f"""# {ja_title}
 
-## Agenda
-- Microsoft AI 最新情報
-- Azure OpenAI 最新情報
-- OpenAI 最新情報
-- Google AI 最新情報
-- まとめ
+                    ## Agenda
+                    - Microsoft AI 最新情報
+                    - Azure OpenAI 最新情報
+                    - OpenAI 最新情報
+                    - Google AI 最新情報
+                    - まとめ
 
----
+                    ---
 
-## Microsoft AI 最新情報
+                    ## Microsoft AI 最新情報
 
-最新情報を取得中にエラーが発生しました。
+                    最新情報を取得中にエラーが発生しました。
 
----
+                    ---
 
-## まとめ
+                    ## まとめ
 
-AI技術の最新動向をお伝えしました。
-"""
+                    AI技術の最新動向をお伝えしました。
+                    """
     else:
         slide_md = msg.content.strip()
 
