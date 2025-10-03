@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>LangGraph Test</title>
+</head>
+<body>
+  <h1>LangGraph API Test</h1>
+  <button onclick="testApi()">アシスタント情報を取得</button>
+  <pre id="result"></pre>
+
+  <hr>
+  <h2>Step 2: スレッド作成</h2>
+  <input id="topic" type="text" placeholder="トピックを入力" value="AI最新情報">
+  <button onclick="createThread()">スレッド作成</button>
+  <div id="thread-info"></div>
+
+  <hr>
+  <h2>Step 3: エージェント実行（ストリーミング）</h2>
+  <button onclick="runAgent()">実行</button>
+  <ul id="progress"></ul>
+  <div id="status"></div>
+
+  <script>
+    let threadId = null;  // グローバル変数で保持
+
+    async function testApi() {
+      try {
+        const res = await fetch('http://localhost:2024/assistants/search', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({limit: 10})
+        });
+        const data = await res.json();
+        document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        document.getElementById('result').textContent = 'ERROR: ' + error.message;
+      }
+    }
+
+    async function createThread() {
+      try {
+        const res = await fetch('http://localhost:2024/threads', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        threadId = data.thread_id;  // 保存
+        document.getElementById('thread-info').innerHTML =
+          `✅ Thread created: <code>${threadId}</code>`;
+      } catch (error) {
+        document.getElementById('thread-info').textContent = '❌ ERROR: ' + error.message;
+      }
+    }
+
+    async function runAgent() {
+      if (!threadId) {
+        alert('まずスレッドを作成してください');
+        return;
+      }
+
+      const topic = document.getElementById('topic').value;
+      const statusEl = document.getElementById('status');
+      const progressEl = document.getElementById('progress');
+
+      statusEl.textContent = '⏳ Running...';
+      progressEl.innerHTML = '';
+
+      try {
+        // 1. assistant_idを取得
+        const assistantRes = await fetch('http://localhost:2024/assistants/search', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({limit: 1})
+        });
+        const assistants = await assistantRes.json();
+        const assistantId = assistants[0].assistant_id;
+
+        // 2. ストリーミング開始
+        const response = await fetch(`http://localhost:2024/threads/${threadId}/runs/stream`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            assistant_id: assistantId,
+            input: {topic: topic},
+            stream_mode: ['updates']  // 'updates' = ノードの更新のみ
+          })
+        });
+
+        // 3. ストリームを読む
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, {stream: true});
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';  // 最後の不完全な行を保持
+
+          // 4. SSE形式をパース
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const json = JSON.parse(line.slice(6));
+                console.log('受信データ:', json);  // デバッグ用
+
+                // ノード名を抽出して表示（詳細は省略）
+                const nodeNames = Object.keys(json);
+                const li = document.createElement('li');
+                li.textContent = `✓ ${nodeNames.join(', ')}`;
+                progressEl.appendChild(li);
+              } catch (e) {
+                console.warn('Parse error:', e, line);
+              }
+            } else if (line.startsWith('event: ')) {
+              const event = line.slice(7);
+              console.log('イベント:', event);
+            }
+          }
+        }
+
+        statusEl.textContent = '✅ Complete!';
+      } catch (error) {
+        statusEl.textContent = '❌ ERROR: ' + error.message;
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>
