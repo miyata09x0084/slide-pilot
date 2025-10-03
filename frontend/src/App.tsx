@@ -1,13 +1,13 @@
 import { useState } from 'react';
 
-// Phase 6.1: ノード名と絵文字のマッピング
+// Phase 6.1: ノード名マッピング
 const nodeNames: Record<string, string> = {
-  collect_info: '🔍 情報収集中...',
-  generate_key_points: '📝 キーポイント抽出中...',
-  generate_toc: '📋 目次生成中...',
-  write_slides: '✍️ スライド生成中...',
-  evaluate_slides: '⭐ 評価中...',
-  save_and_render: '💾 保存中...'
+  collect_info: '情報収集中...',
+  generate_key_points: 'キーポイント抽出中...',
+  generate_toc: '目次生成中...',
+  write_slides: 'スライド生成中...',
+  evaluate_slides: '評価中...',
+  save_and_render: '保存中...'
 };
 
 function App() {
@@ -114,7 +114,7 @@ function App() {
   return (
     <div style={{padding: '20px', maxWidth: '900px', margin: '0 auto', fontFamily: 'Arial, sans-serif'}}>
       <h1 style={{color: '#333', borderBottom: '3px solid #007bff', paddingBottom: '10px'}}>
-        🎨 SlidePilot - AI スライド生成
+        SlidePilot - AI スライド生成
       </h1>
 
       <div style={{marginTop: '30px'}}>
@@ -179,14 +179,14 @@ function App() {
           onMouseOver={(e) => { if (threadId) e.currentTarget.style.background = '#218838'; }}
           onMouseOut={(e) => { if (threadId) e.currentTarget.style.background = '#28a745'; }}
         >
-          🚀 スライド生成開始
+          スライド生成開始
         </button>
       </div>
 
       {/* Phase 6.1: 進捗表示 */}
       {progress.length > 0 && (
         <div style={{marginTop: '30px'}}>
-          <h3 style={{color: '#555'}}>📊 進捗状況</h3>
+          <h3 style={{color: '#555'}}>進捗状況</h3>
           <ul style={{
             listStyle: 'none',
             padding: '15px',
@@ -230,7 +230,7 @@ function App() {
             onMouseOver={(e) => e.currentTarget.style.background = '#0056b3'}
             onMouseOut={(e) => e.currentTarget.style.background = '#007bff'}
           >
-            📥 スライドをダウンロード
+            スライドをダウンロード
           </a>
           {slideData.title && (
             <p style={{marginTop: '10px', color: '#666'}}>
