@@ -4,7 +4,8 @@
 
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from typing import Optional, Dict, TypedDict, Any, Union
+from typing import Optional, Dict, Any, Union
+from typing_extensions import TypedDict
 import os
 import re
 import requests
