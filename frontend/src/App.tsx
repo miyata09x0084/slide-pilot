@@ -1,4 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { CredentialResponse } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+import Login from './components/Login';
+
+// ユーザー情報の型定義
+interface UserInfo {
+  name: string;
+  email: string;
+  picture: string;
+}
 
 // Phase 6.1: ノード名マッピング
 const nodeNames: Record<string, string> = {
@@ -11,6 +21,10 @@ const nodeNames: Record<string, string> = {
 };
 
 function App() {
+  // 認証状態
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  // 既存の状態
   const [threadId, setThreadId] = useState<string | null>(null);
   const [topic, setTopic] = useState('AI最新情報');
   const [progress, setProgress] = useState<string[]>([]);
@@ -20,6 +34,39 @@ function App() {
     slide_path?: string;
     title?: string;
   }>({});
+
+  // ログイン成功時の処理
+  const handleLoginSuccess = (credentialResponse: CredentialResponse) => {
+    if (credentialResponse.credential) {
+      const decoded: any = jwtDecode(credentialResponse.credential);
+      const userInfo: UserInfo = {
+        name: decoded.name,
+        email: decoded.email,
+        picture: decoded.picture
+      };
+      setUser(userInfo);
+      localStorage.setItem('user', JSON.stringify(userInfo));
+    }
+  };
+
+  // ログアウト処理
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+  };
+
+  // ページロード時にlocalStorageから復元
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  // ログインしていない場合はログイン画面を表示
+  if (!user) {
+    return <Login onSuccess={handleLoginSuccess} />;
+  }
 
   const createThread = async () => {
     try {
@@ -113,6 +160,45 @@ function App() {
 
   return (
     <div style={{padding: '20px', maxWidth: '900px', margin: '0 auto', fontFamily: 'Arial, sans-serif'}}>
+      {/* ユーザーヘッダー */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+        padding: '10px',
+        background: '#f8f9fa',
+        borderRadius: '5px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img
+            src={user.picture}
+            alt={user.name}
+            style={{ width: '40px', height: '40px', borderRadius: '50%' }}
+          />
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{user.name}</div>
+            <div style={{ fontSize: '12px', color: '#666' }}>{user.email}</div>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: '8px 16px',
+            background: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = '#c82333'}
+          onMouseOut={(e) => e.currentTarget.style.background = '#dc3545'}
+        >
+          ログアウト
+        </button>
+      </div>
+
       <h1 style={{color: '#333', borderBottom: '3px solid #007bff', paddingBottom: '10px'}}>
         SlidePilot - AI スライド生成
       </h1>
