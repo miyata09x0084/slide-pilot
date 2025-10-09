@@ -28,6 +28,7 @@ function Login({ onSuccess }: LoginProps) {
         <p style={{ marginBottom: '30px', color: '#666' }}>
           AIスライド生成ツール
         </p>
+        {/* Note: Gmail scope は Google Cloud Console の OAuth consent screen で設定が必要 */}
         <GoogleLogin
           onSuccess={onSuccess}
           onError={() => {
