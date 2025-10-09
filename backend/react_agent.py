@@ -75,10 +75,11 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 # create_react_agent: LangGraphのビルトイン関数
 # - 自動的にReActループを構築
 # - 思考 → ツール選択 → 実行 → 観察 を繰り返す
+# システムプロンプトはprompt引数で渡す
 graph = create_react_agent(
     llm,
     tools,
-    state_modifier=SYSTEM_PROMPT  # システムプロンプトを注入
+    prompt=SYSTEM_PROMPT
 )
 
 # グラフの説明（LangGraph Studio用）
