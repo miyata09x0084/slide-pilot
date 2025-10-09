@@ -179,3 +179,9 @@ config.yaml
 # LangGraph runtime files
 .langgraph_api/
 *.pckl
+# Generated slides (Issue #6)
+backend/slides/*.md
+backend/slides/*.pdf
+backend/slides/*.png
+backend/slides/*.html
+!backend/slides/.gitkeep
