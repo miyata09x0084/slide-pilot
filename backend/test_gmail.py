@@ -9,7 +9,7 @@
 注意: 実際にメールが送信されます
 """
 
-from gmail_tool import send_gmail
+from tools.gmail_tool import send_gmail
 
 # テストメール送信
 # 送信先: 自分のメールアドレス

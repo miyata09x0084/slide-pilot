@@ -15,7 +15,7 @@ from langgraph.graph import MessagesState
 from langsmith import traceable
 
 # ツールのインポート
-from gmail_tool import send_gmail
+from tools.gmail_tool import send_gmail
 from tools.slide_generator import generate_slides
 
 # 環境変数読み込み
