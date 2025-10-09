@@ -12,8 +12,8 @@
 from gmail_tool import send_gmail
 
 # テストメール送信
-# TODO: 送信先を自分のメールアドレスに変更してください
-TEST_EMAIL = "your-email@example.com"
+# 送信先: 自分のメールアドレス
+TEST_EMAIL = "miyata09x0084@gmail.com"
 
 def test_simple_email():
     """シンプルなテキストメール送信テスト"""
