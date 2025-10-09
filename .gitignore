@@ -185,3 +185,7 @@ backend/slides/*.pdf
 backend/slides/*.png
 backend/slides/*.html
 !backend/slides/.gitkeep
+
+# Gmail API credentials (Issue #6)
+backend/credentials.json
+backend/token.json
