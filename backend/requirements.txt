@@ -11,3 +11,8 @@ langsmith>=0.1.0,<0.2.0
 # ---Compatibility helpers---
 typing-extensions>=4.8.0
 backports.zoneinfo; python_version < "3.9"
+
+# ---Gmail API (Issue #6)---
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.108.0

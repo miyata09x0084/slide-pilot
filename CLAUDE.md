@@ -16,6 +16,9 @@ SlidePilot is an AI-powered presentation slide generation system that automatica
 ### Backend Development
 
 ```bash
+# Navigate to backend directory
+cd backend
+
 # Activate virtual environment
 source venv/bin/activate
 
@@ -52,7 +55,7 @@ npm run preview
 
 ## Architecture
 
-### LangGraph Workflow (marp_agent.py)
+### LangGraph Workflow (backend/marp_agent.py)
 
 The backend is a **stateful LangGraph agent** with 6 sequential nodes:
 
@@ -76,7 +79,7 @@ START → collect_info → generate_key_points → generate_toc → write_slides
 
 ### State Flow
 
-The `State` TypedDict (lines 301-332 in marp_agent.py) flows through all nodes:
+The `State` TypedDict (lines 301-332 in backend/marp_agent.py) flows through all nodes:
 
 ```python
 State = {
@@ -123,7 +126,7 @@ State = {
 
 ## Configuration
 
-### Backend Environment Variables (.env)
+### Backend Environment Variables (backend/.env)
 
 ```bash
 OPENAI_API_KEY=sk-...           # Required: OpenAI API key
@@ -144,7 +147,7 @@ VITE_GOOGLE_CLIENT_ID=...       # Required: Google OAuth 2.0 Client ID
 
 Get OAuth credentials from: https://console.cloud.google.com/apis/credentials
 
-### LangGraph Configuration (langgraph.json)
+### LangGraph Configuration (backend/langgraph.json)
 
 - Defines the graph export path: `marp_agent.py:graph`
 - Graph ID: `poc-aiagent`
