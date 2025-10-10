@@ -7,12 +7,19 @@ import type { ThinkingStep } from '../components/ThinkingIndicator';
 
 const API_BASE_URL = 'http://localhost:2024';
 
+// スライドデータの型定義
+export interface SlideData {
+  path?: string;    // スライドファイルパス
+  title?: string;   // スライドタイトル
+}
+
 export function useReactAgent() {
   const [messages, setMessages] = useState<Message[]>([]);        // チャット履歴
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);  // 思考過程
   const [isThinking, setIsThinking] = useState(false);            // 思考中フラグ
   const [threadId, setThreadId] = useState<string | null>(null);  // スレッドID
   const [error, setError] = useState<string | null>(null);        // エラー状態
+  const [slideData, setSlideData] = useState<SlideData>({});      // スライドデータ
 
   // スレッド作成
   const createThread = useCallback(async () => {
@@ -125,6 +132,25 @@ export function useReactAgent() {
                       type: 'observation',
                       content: msg.content || '実行完了'
                     }]);
+
+                    // スライド生成ツールの結果からファイルパスを抽出
+                    if (msg.name === 'generate_slides' && msg.content) {
+                      try {
+                        // ツール結果をパース（JSON文字列の場合）
+                        const result = typeof msg.content === 'string'
+                          ? JSON.parse(msg.content)
+                          : msg.content;
+
+                        if (result.slide_path || result.path) {
+                          setSlideData({
+                            path: result.slide_path || result.path,
+                            title: result.title || 'スライド'
+                          });
+                        }
+                      } catch (e) {
+                        console.warn('Failed to parse slide data:', e);
+                      }
+                    }
                   }
                 });
               }
@@ -206,6 +232,7 @@ export function useReactAgent() {
     setIsThinking(false);
     setThreadId(null);
     setError(null);
+    setSlideData({});
   }, []);
 
   return {
@@ -214,6 +241,7 @@ export function useReactAgent() {
     isThinking,
     threadId,
     error,
+    slideData,
     createThread,
     sendMessage,
     resetChat

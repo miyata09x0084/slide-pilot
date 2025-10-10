@@ -27,6 +27,7 @@ function App() {
     isThinking,
     threadId,
     error,
+    slideData,
     createThread,
     sendMessage,
     resetChat
@@ -213,6 +214,55 @@ function App() {
         {/* 思考過程インジケーター */}
         <ThinkingIndicator steps={thinkingSteps} isActive={isThinking} />
 
+        {/* スライドダウンロード */}
+        {slideData.path && (
+          <div style={{
+            margin: '16px 0',
+            padding: '16px',
+            background: '#d4edda',
+            borderRadius: '12px',
+            border: '1px solid #c3e6cb',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: 'bold',
+              color: '#155724',
+              marginBottom: '12px'
+            }}>
+              ✅ スライド生成完了
+            </div>
+            {slideData.title && (
+              <div style={{
+                fontSize: '14px',
+                color: '#155724',
+                marginBottom: '12px'
+              }}>
+                タイトル: {slideData.title}
+              </div>
+            )}
+            <a
+              href={`/${slideData.path}`}
+              download
+              style={{
+                display: 'inline-block',
+                padding: '10px 24px',
+                background: '#28a745',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                transition: 'background 0.2s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = '#218838'}
+              onMouseOut={(e) => e.currentTarget.style.background = '#28a745'}
+            >
+              📥 スライドをダウンロード
+            </a>
+          </div>
+        )}
+
         {/* エラー表示 */}
         {error && (
           <div style={{
@@ -243,6 +293,41 @@ function App() {
             : 'メッセージを入力...'
         }
       />
+
+      {/* レスポンシブ対応のCSS */}
+      <style>{`
+        @media (max-width: 768px) {
+          /* ヘッダーのレスポンシブ対応 */
+          h1 {
+            font-size: 18px !important;
+          }
+
+          /* ボタンサイズ調整 */
+          button {
+            font-size: 12px !important;
+            padding: 5px 10px !important;
+          }
+
+          /* ユーザー名を非表示（スペース節約） */
+          .user-name {
+            display: none !important;
+          }
+
+          /* チャットエリアのパディング調整 */
+          .chat-area {
+            padding: 16px !important;
+          }
+
+          /* ウェルカム画面のテキストサイズ調整 */
+          .welcome-title {
+            font-size: 20px !important;
+          }
+
+          .welcome-text {
+            font-size: 14px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
