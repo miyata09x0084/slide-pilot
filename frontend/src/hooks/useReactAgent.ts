@@ -105,10 +105,8 @@ export function useReactAgent() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            console.log('📥 Raw SSE line:', line);
             try {
               const json = JSON.parse(line.slice(6));
-              console.log('📦 Parsed JSON:', json);
 
               // LangGraphは配列を直接返す (messages mode)
               if (Array.isArray(json)) {
@@ -116,6 +114,11 @@ export function useReactAgent() {
                   if (msg.type === 'ai' && msg.content) {
                     // AIメッセージの最終contentを保存
                     assistantResponse = msg.content;
+
+                    // デバッグ: 最終メッセージのみログ出力
+                    if (msg.response_metadata?.finish_reason === 'stop') {
+                      console.log('✅ AI応答完了:', msg.content);
+                    }
 
                     // ツール呼び出しがあれば思考ステップに追加
                     if (msg.tool_calls && msg.tool_calls.length > 0) {

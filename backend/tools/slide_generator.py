@@ -6,10 +6,11 @@ ReActエージェントから呼び出してAI最新情報スライドを生成�
 
 from langchain_core.tools import tool
 from typing import Optional
+import json
+from pathlib import Path
 
 # 既存のmarp_agentをインポート
 import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from marp_agent import graph, State
@@ -65,21 +66,31 @@ def generate_slides(topic: str = "AI最新情報") -> str:
 
         # エラーチェック
         if result.get("error"):
-            return f"❌ スライド生成エラー: {result['error']}"
+            return json.dumps({
+                "status": "error",
+                "message": f"❌ スライド生成エラー: {result['error']}"
+            }, ensure_ascii=False)
 
         # 成功時の情報を返す
         title = result.get("title", "AI最新情報スライド")
         slide_path = result.get("slide_path", "")
-        score = result.get("score", 0.0)
-        passed = result.get("passed", False)
+        # score = result.get("score", 0.0)
+        # passed = result.get("passed", False)
 
-        return (
-            f"✅ スライド生成完了\n"
-            f"タイトル: {title}\n"
-            f"ファイル: {slide_path}\n"
-            f"評価スコア: {score:.1f}/10.0\n"
-            f"合格: {'はい' if passed else 'いいえ'}"
-        )
+        # 絶対パスから相対パスに変換（frontend/publicからアクセス可能にする）
+        relative_path = str(Path(slide_path).relative_to(Path(__file__).parent.parent))
+
+        # JSON形式で返す（フロントエンドがパース可能）
+        return json.dumps({
+            "status": "success",
+            "message": "✅ スライド生成完了",
+            "title": title,
+            "slide_path": relative_path
+        }, ensure_ascii=False)
 
     except Exception as e:
-        return f"❌ スライド生成例外: {str(e)}"
+        # エラー時もJSON形式で返す
+        return json.dumps({
+            "status": "error",
+            "message": f"❌ スライド生成例外: {str(e)}"
+        }, ensure_ascii=False)
