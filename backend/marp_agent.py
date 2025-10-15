@@ -293,6 +293,138 @@ def context_to_bullets(ctx: List[Dict[str, str]]) -> List[str]:
     bullets.append("") # 空行で区切る
   return "\n".join(bullets)
 
+# -------------------
+# Slidev Test Tool (Phase 0: MVP)
+# -------------------
+@tool("generate_slidev_test")
+def generate_slidev_test(topic: str = "AI最新情報") -> str:
+  """Slidevで簡易スライドを生成（テスト用・ハードコード）"""
+
+  # ハードコードされたSlidevマークダウン
+  slide_content = f"""---
+theme: apple-basic
+layout: cover
+background: #ffffff
+---
+
+# {topic}
+2025年10月版
+
+---
+layout: intro
+---
+
+## Agenda
+- Microsoft AI 最新情報
+- OpenAI の動向
+- Google Gemini アップデート
+- まとめ
+
+---
+
+## Microsoft AI
+
+- **Azure OpenAI Service**: GPT-4 Turbo対応
+- **Copilot Studio**: ノーコードAI開発
+- **Semantic Kernel**: エージェント開発フレームワーク
+
+---
+layout: two-cols
+---
+
+## OpenAI 最新情報
+
+::left::
+
+### GPT-4 Turbo
+- コスト削減
+- 128K context window
+- JSON mode
+
+::right::
+
+### DALL-E 3
+- より高精度な画像生成
+- プロンプト理解向上
+
+---
+
+## Google Gemini
+
+- **Gemini Pro**: マルチモーダルAI
+- **Vertex AI統合**: エンタープライズ向け
+- **Duet AI**: Google Workspace連携
+
+---
+layout: end
+---
+
+# まとめ
+
+AI技術は急速に進化中
+各社の最新情報をキャッチアップしましょう
+
+"""
+
+  # ファイル保存
+  slide_dir = Path(__file__).parent / "slides"
+  slide_dir.mkdir(parents=True, exist_ok=True)
+
+  # ファイル名生成
+  slug = _slugify_en(topic) or "test"
+  md_path = slide_dir / f"{slug}_slidev_test.md"
+  md_path.write_text(slide_content, encoding="utf-8")
+
+  # Slidev PDF出力
+  pdf_path = slide_dir / f"{slug}_slidev_test.pdf"
+
+  slidev = shutil.which("slidev")
+  if slidev:
+    try:
+      # Slidev export コマンド
+      subprocess.run(
+        ["slidev", "export", str(md_path),
+         "--output", str(pdf_path),
+         "--format", "pdf",
+         "--timeout", "60000"],  # 60秒タイムアウト
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=90  # プロセス全体のタイムアウト
+      )
+      return json.dumps({
+        "status": "success",
+        "slide_path": str(pdf_path.relative_to(slide_dir.parent)),
+        "title": topic,
+        "message": f"Slidevスライドを生成しました: {pdf_path.name}"
+      }, ensure_ascii=False)
+    except subprocess.TimeoutExpired:
+      return json.dumps({
+        "status": "error",
+        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "title": topic,
+        "error": "PDF生成がタイムアウトしました（90秒超過）",
+        "message": "Markdownファイルのみ保存しました"
+      }, ensure_ascii=False)
+    except subprocess.CalledProcessError as e:
+      # PDF生成失敗時はMDのみ返す
+      error_msg = e.stderr.decode() if e.stderr else str(e)
+      return json.dumps({
+        "status": "partial",
+        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "title": topic,
+        "error": f"PDF生成失敗: {error_msg}",
+        "message": "Markdownファイルのみ保存しました"
+      }, ensure_ascii=False)
+  else:
+    # slidev未インストール時
+    return json.dumps({
+      "status": "md_only",
+      "slide_path": str(md_path.relative_to(slide_dir.parent)),
+      "title": topic,
+      "message": "slidevが見つかりません。Markdownのみ保存しました"
+    }, ensure_ascii=False)
+
 
 # -------------------
 # State

@@ -17,6 +17,7 @@ from langsmith import traceable
 # ツールのインポート
 from tools.gmail_tool import send_gmail
 from tools.slide_generator import generate_slides
+from tools.slidev_tool import generate_slidev_test
 
 # 環境変数読み込み
 load_dotenv()
@@ -33,7 +34,7 @@ llm = ChatOpenAI(
 )
 
 # ツールリスト
-tools = [send_gmail, generate_slides]
+tools = [send_gmail, generate_slides, generate_slidev_test]
 
 # システムプロンプト
 # LLMにエージェントの役割と振る舞いを指示
@@ -41,12 +42,14 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 
 ユーザーの要望に応じて、以下のツールを使用できます:
 - **send_gmail**: メール送信（添付ファイル対応）
-- **generate_slides**: AI最新情報のスライドを自動生成
+- **generate_slides**: AI最新情報のスライドを自動生成（Marp形式）
+- **generate_slidev_test**: Slidevテストスライドを生成（ハードコード版・検証用）
 
 ## 重要な指示
 
 1. **ツールの使い分け**
-   - スライド作成を求められたら → generate_slides
+   - 通常のスライド作成 → generate_slides
+   - Slidevテストスライド作成 → generate_slidev_test
    - メール送信を求められたら → send_gmail
    - 両方なら → 順番に実行
 
