@@ -18,6 +18,7 @@ from langsmith import traceable
 from tools.gmail_tool import send_gmail
 from tools.slide_generator import generate_slides
 from tools.slidev_tool import generate_slidev_test
+from tools.slidev_dynamic_mvp1 import generate_slidev_mvp1
 
 # 環境変数読み込み
 load_dotenv()
@@ -34,7 +35,7 @@ llm = ChatOpenAI(
 )
 
 # ツールリスト
-tools = [send_gmail, generate_slides, generate_slidev_test]
+tools = [send_gmail, generate_slides, generate_slidev_test, generate_slidev_mvp1]
 
 # システムプロンプト
 # LLMにエージェントの役割と振る舞いを指示
@@ -44,6 +45,9 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 - **send_gmail**: メール送信（添付ファイル対応）
 - **generate_slides**: AI最新情報のスライドを自動生成（Marp形式）
 - **generate_slidev_test**: Slidevテストスライドを生成（ハードコード版・検証用）
+- **generate_slidev_mvp1**: Slidev動的スライド生成（推奨）
+  - デフォルト: 全6社（Microsoft, OpenAI, Google, AWS, Meta, Anthropic）のAI Industry Report
+  - multi_vendor=False: Microsoft AIのみのレポート
 
 ## 重要な指示
 

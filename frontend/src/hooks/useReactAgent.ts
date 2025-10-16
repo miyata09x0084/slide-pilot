@@ -137,7 +137,7 @@ export function useReactAgent() {
                     }]);
 
                     // スライド生成ツールの結果からファイルパスを抽出
-                    if ((msg.name === 'generate_slides' || msg.name === 'generate_slidev_test') && msg.content) {
+                    if ((msg.name === 'generate_slides' || msg.name === 'generate_slidev_test' || msg.name === 'generate_slidev_mvp1') && msg.content) {
                       try {
                         // ツール結果をパース（JSON文字列の場合）
                         const result = typeof msg.content === 'string'
