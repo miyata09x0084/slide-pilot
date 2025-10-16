@@ -217,6 +217,250 @@ def _remove_presenter_lines(md: str) -> str:
   return head + ("\n---\n" + parts[1] if len(parts) == 2 else "")
 
 # -------------------
+# Slidev用ヘルパー関数 (Phase 1 - MVP-4)
+# -------------------
+def _get_all_vendors_info() -> List[Dict]:
+  """全6社のベンダー情報を返す（Slidev用）"""
+  return [
+    {
+      "name": "Microsoft AI",
+      "emoji": "🏢",
+      "domains": ["azure.microsoft.com", "news.microsoft.com", "learn.microsoft.com"],
+      "queries": ["Microsoft AI updates", "Azure OpenAI updates"],
+      "gradient": "linear-gradient(135deg, #0078d4 0%, #00bcf2 100%)",
+    },
+    {
+      "name": "OpenAI",
+      "emoji": "🤖",
+      "domains": ["openai.com"],
+      "queries": ["OpenAI announcements", "OpenAI updates"],
+      "gradient": "linear-gradient(135deg, #10a37f 0%, #1a7f64 100%)",
+    },
+    {
+      "name": "Google Gemini",
+      "emoji": "🌟",
+      "domains": ["blog.google", "ai.googleblog.com", "research.google"],
+      "queries": ["Google AI updates", "Gemini updates"],
+      "gradient": "linear-gradient(135deg, #4285f4 0%, #34a853 100%)",
+    },
+    {
+      "name": "AWS Bedrock",
+      "emoji": "☁️",
+      "domains": ["aws.amazon.com"],
+      "queries": ["AWS Bedrock updates", "Amazon AI updates"],
+      "gradient": "linear-gradient(135deg, #ff9900 0%, #f90 100%)",
+    },
+    {
+      "name": "Meta AI",
+      "emoji": "🦙",
+      "domains": ["ai.meta.com"],
+      "queries": ["Meta AI updates", "Llama updates"],
+      "gradient": "linear-gradient(135deg, #0668e1 0%, #0a7cff 100%)",
+    },
+    {
+      "name": "Anthropic",
+      "emoji": "🧠",
+      "domains": ["anthropic.com"],
+      "queries": ["Anthropic Claude updates", "Claude announcements"],
+      "gradient": "linear-gradient(135deg, #d4a574 0%, #c49a6c 100%)",
+    },
+  ]
+
+def _create_llm_summarized_bullets(results: List[Dict], vendor_name: str = "Microsoft AI", num_bullets: int = 3) -> List[str]:
+  """検索結果をLLMで要約して箇条書きを生成（Slidev用）
+
+  Args:
+    results: Tavily検索結果のリスト
+    vendor_name: ベンダー名
+    num_bullets: 生成する箇条書きの数
+
+  Returns:
+    箇条書きのリスト
+  """
+  # 検索結果をテキストに整形
+  results_text = ""
+  for i, result in enumerate(results[:5], 1):
+    title = result.get("title", "")
+    content = result.get("content", "")[:300]
+    url = result.get("url", "")
+    results_text += f"\n### 記事 {i}\n"
+    results_text += f"タイトル: {title}\n"
+    results_text += f"内容: {content}\n"
+    results_text += f"URL: {url}\n"
+
+  if not results_text.strip():
+    return [
+      "- **検索結果が見つかりませんでした**",
+      "- 後でもう一度お試しください"
+    ]
+
+  # LLMで箇条書きに要約
+  prompt = [
+    ("system", "あなたはAI技術のエキスパートです。検索結果から重要なポイントを抽出します。"),
+    ("user",
+     f"以下の{vendor_name}に関する検索結果から、重要なポイントを{num_bullets}つの箇条書きで簡潔にまとめてください。\n"
+     f"各箇条書きは1-2文で、技術的に正確かつ分かりやすく記述してください。\n\n"
+     f"{results_text}\n\n"
+     f"出力形式:\n" + "\n".join([f"- ポイント{i+1}" for i in range(num_bullets)]))
+  ]
+
+  try:
+    msg = llm.invoke(prompt)
+    lines = msg.content.strip().split("\n")
+    bullets = [line.strip() for line in lines if line.strip().startswith("-")][:num_bullets]
+
+    # 指定数に満たない場合はパディング
+    while len(bullets) < num_bullets:
+      bullets.append("- （情報が不足しています）")
+
+    return bullets
+
+  except Exception as e:
+    # LLM失敗時はシンプル版にフォールバック
+    fallback = []
+    for result in results[:num_bullets]:
+      title = result.get("title", "")[:80]
+      if title:
+        fallback.append(f"- **{title}**")
+
+    while len(fallback) < num_bullets:
+      fallback.append("- （情報が不足しています）")
+
+    return fallback[:num_bullets]
+
+def _generate_multi_vendor_slides_integrated(topic: str, sources: Dict[str, List[Dict]], mvp_version: str = "AI Industry Report") -> str:
+  """全ベンダーのSlidevマークダウンを生成（marp_agent統合版）
+
+  Args:
+    topic: スライドのトピック
+    sources: collect_info()で取得したTavily検索結果
+    mvp_version: バージョン表記
+
+  Returns:
+    Slidevマークダウン文字列
+  """
+  vendors = _get_all_vendors_info()
+  vendor_bullets = []
+
+  # 各ベンダーの検索結果から箇条書きを生成
+  for vendor in vendors:
+    # sourcesから該当するベンダーの検索結果を抽出
+    vendor_results = []
+    for query, items in sources.items():
+      # クエリに該当するベンダーのドメインが含まれているか確認
+      for domain in vendor["domains"]:
+        if domain in str(items):
+          vendor_results.extend(items)
+          break
+
+    # 重複除去
+    seen_urls = set()
+    unique_results = []
+    for item in vendor_results:
+      url = item.get("url", "")
+      if url and url not in seen_urls:
+        seen_urls.add(url)
+        unique_results.append(item)
+
+    # LLMで箇条書きに要約
+    bullets = _create_llm_summarized_bullets(unique_results[:5], vendor["name"], num_bullets=3)
+
+    vendor_bullets.append({
+      "name": vendor["name"],
+      "emoji": vendor["emoji"],
+      "bullets": bullets,
+      "gradient": vendor["gradient"],
+    })
+
+  # Slidevマークダウン生成
+  slide_content = f"""---
+theme: apple-basic
+highlighter: shiki
+class: text-center
+drawings:
+  persist: false
+fonts:
+  sans: 'Inter'
+  serif: 'Roboto Slab'
+  mono: 'Fira Code'
+---
+
+# 🚀 {topic}
+## {mvp_version}
+
+<div class="pt-12">
+  <span class="px-2 py-1 rounded" style="background: #6366f1; color: white;">
+    {month_ja()}
+  </span>
+</div>
+
+---
+layout: intro
+class: text-left
+---
+
+## 📋 Agenda
+
+<v-clicks>
+
+"""
+
+  # アジェンダ項目
+  for vb in vendor_bullets:
+    slide_content += f"- {vb['emoji']} **{vb['name']}** - 最新アップデート\n"
+
+  slide_content += "\n</v-clicks>\n\n"
+
+  # 各ベンダーのスライド
+  for vb in vendor_bullets:
+    slide_content += f"""---
+layout: two-cols
+class: px-2
+---
+
+## {vb['emoji']} {vb['name']}
+
+<v-clicks>
+
+{chr(10).join(vb['bullets'])}
+
+</v-clicks>
+
+::right::
+
+<div class="flex items-center justify-center h-full">
+  <div style="width: 280px; height: 180px; background: {vb['gradient']}; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+    {vb['name']}
+  </div>
+</div>
+
+"""
+
+  # まとめスライド
+  slide_content += f"""---
+layout: end
+class: text-center
+---
+
+# ✨ まとめ
+
+<div class="mt-8">
+
+## 完了 🎉
+
+全6社のAI最新情報を統合しました
+
+</div>
+
+<div style="position: absolute; bottom: 1.5rem; right: 1.5rem; font-size: 0.875rem; opacity: 0.5;">
+  Generated by SlidePilot AI ({mvp_version})
+</div>
+
+"""
+
+  return slide_content
+
+# -------------------
 # Tavily 検索
 # -------------------
 def tavily_search(
@@ -633,6 +877,67 @@ def write_slides(state: State) -> Dict:
     return {"error": f"slides_error: {e}", "log": _log(state, f"[slides] EXCEPTION {e}")}
 
 # -------------------
+# Node D-Slidev: スライド本文（Slidev）生成 (Phase 1 - MVP-1)
+# -------------------
+@traceable(run_name="d_generate_slide_slidev")
+def write_slides_slidev(state: State) -> Dict:
+  """Slidev形式のスライドを生成（全6社対応）"""
+  sources = state.get("sources") or {}
+  topic = state.get("topic") or "AI最新情報"
+
+  # タイトルは当月で固定
+  ja_title = f"{month_ja()} AI最新情報まとめ"
+
+  try:
+    # Slidevマークダウン生成
+    slide_md = _generate_multi_vendor_slides_integrated(
+      topic=ja_title,
+      sources=sources,
+      mvp_version="AI Industry Report 2025"
+    )
+
+    return {
+      "slide_md": slide_md,
+      "title": ja_title,
+      "error": "",
+      "log": _log(state, f"[slides_slidev] generated ({len(slide_md)} chars, 6 vendors)")
+    }
+
+  except Exception as e:
+    # エラー時はフォールバックスライドを生成
+    fallback_md = f"""---
+theme: apple-basic
+highlighter: shiki
+class: text-center
+---
+
+# 🚀 {ja_title}
+## エラーが発生しました
+
+<div class="pt-12">
+  <span class="px-2 py-1 rounded" style="background: #ef4444; color: white;">
+    Error: {str(e)}
+  </span>
+</div>
+
+---
+
+## ⚠️ エラー詳細
+
+スライド生成中にエラーが発生しました。
+
+- 検索結果の取得に失敗した可能性があります
+- もう一度お試しください
+
+"""
+    return {
+      "slide_md": fallback_md,
+      "title": ja_title,
+      "error": f"slides_slidev_error: {e}",
+      "log": _log(state, f"[slides_slidev] EXCEPTION {e} - using fallback")
+    }
+
+# -------------------
 # Node E: 評価（スライド前提）
 # -------------------
 # MAX_ATTEMPTS = 3
@@ -762,30 +1067,117 @@ def save_and_render(state: State) -> Dict:
   }
 
 # -------------------
-# グラフ構築
+# Node F-Slidev: 保存 & Slidevレンダリング (Phase 1 - MVP-2)
+# -------------------
+@traceable(run_name="f_save_and_render_slidev")
+def save_and_render_slidev(state: State) -> Dict:
+  """Slidev形式のスライドを保存してPDF生成"""
+  if state.get("error"):
+    return {}
+
+  slide_md = state.get("slide_md") or ""
+  title = state.get("title") or "AIスライド"
+
+  # スライド内容が空の場合のエラーハンドリング
+  if not slide_md.strip():
+    return {
+      "error": "slide_md is empty",
+      "log": _log(state, "[save_slidev] ERROR: slide_md is empty")
+    }
+
+  # スライドファイル名の英語表記を生成
+  slug_prompt = [
+    ("system", "You create concise English slugs for filenames."),
+    ("user",
+     "Convert the following Japanese title into a short English filename base (<=6 words). "
+     "Only letters and spaces; no punctuation or numbers.\n\n"
+     f"Title: {title}")
+  ]
+
+  try:
+    emsg = llm.invoke(slug_prompt)
+    file_stem = _slugify_en(emsg.content.strip()) or _slugify_en(title)
+  except Exception:
+    file_stem = _slugify_en(title) or "ai-latest-info"
+
+  slide_dir = Path(__file__).parent / "slides"
+  slide_dir.mkdir(parents=True, exist_ok=True)
+  slide_md_path = slide_dir / f"{file_stem}_slidev.md"
+  slide_md_path.write_text(slide_md, encoding="utf-8")
+
+  # Slidev PDF生成
+  slidev = shutil.which("slidev")
+  out_path = str(slide_md_path)
+
+  if slidev and SLIDE_FORMAT == "pdf":
+    pdf_file = slide_dir / f"{file_stem}_slidev.pdf"
+    try:
+      subprocess.run(
+        ["slidev", "export", str(slide_md_path),
+         "--output", str(pdf_file),
+         "--format", "pdf",
+         "--timeout", "60000"],  # 60秒タイムアウト
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=90  # プロセス全体のタイムアウト
+      )
+      out_path = str(pdf_file)
+      log_msg = f"[slidev] generated PDF -> {pdf_file.name}"
+    except subprocess.TimeoutExpired:
+      log_msg = f"[slidev] PDF generation timeout (90s) - MD saved at {slide_md_path.name}"
+    except subprocess.CalledProcessError as e:
+      error_msg = e.stderr.decode() if e.stderr else str(e)
+      log_msg = f"[slidev] export failed: {error_msg[:100]} - MD saved"
+  else:
+    if not slidev:
+      log_msg = "[slidev] slidev-cli not found – skipped rendering (left .md)."
+    else:
+      log_msg = f"[slidev] rendering skipped (SLIDE_FORMAT={SLIDE_FORMAT}, only pdf supported)."
+
+  return {
+    "slide_path": out_path,
+    "log": _log(state, log_msg)
+  }
+
+# -------------------
+# グラフ構築 (Phase 1 - MVP-3)
 # -------------------
 graph_builder = StateGraph(State)
 graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
-graph_builder.add_node("write_slides", write_slides)
-# graph_builder.add_node("evaluate_slides", evaluate_slides)
-graph_builder.add_node("save_and_render", save_and_render)
 
+# Marpノード（参考用に保持、現在は未使用）
+# graph_builder.add_node("write_slides", write_slides)
+# graph_builder.add_node("save_and_render", save_and_render)
+
+# Slidevノード（Phase 1で使用）
+graph_builder.add_node("write_slides_slidev", write_slides_slidev)
+graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
+
+# 評価ノード（現在は無効化）
+# graph_builder.add_node("evaluate_slides", evaluate_slides)
+
+# エッジ定義（Slidevフロー）
 graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
-graph_builder.add_edge("generate_toc", "write_slides")
-# graph_builder.add_edge("write_slides", "evaluate_slides")
-graph_builder.add_edge("write_slides", "save_and_render")
+graph_builder.add_edge("generate_toc", "write_slides_slidev")
+graph_builder.add_edge("write_slides_slidev", "save_and_render_slidev")
+graph_builder.add_edge("save_and_render_slidev", END)
 
+# Marpフロー（参考用にコメントアウト）
+# graph_builder.add_edge("generate_toc", "write_slides")
+# graph_builder.add_edge("write_slides", "save_and_render")
+# graph_builder.add_edge("save_and_render", END)
+
+# 評価ループ（現在は無効化）
 # graph_builder.add_conditional_edges(
 #   "evaluate_slides",
 #   route_after_eval,
 #   {"retry": "generate_key_points", "ok": "save_and_render"}
 # )
-
-graph_builder.add_edge("save_and_render", END)
 
 graph = graph_builder.compile()
 
