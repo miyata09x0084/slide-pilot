@@ -294,14 +294,19 @@ def _create_llm_summarized_bullets(results: List[Dict], vendor_name: str = "Micr
       "- 後でもう一度お試しください"
     ]
 
-  # LLMで箇条書きに要約
+  # LLMで箇条書きに要約（Phase 2 - MVP-1: プロンプト最適化）
   prompt = [
-    ("system", "あなたはAI技術のエキスパートです。検索結果から重要なポイントを抽出します。"),
+    ("system", "あなたはAI技術のエキスパートです。検索結果から重要なポイントを抽出し、Slidevスライド向けに視覚的に魅力的な箇条書きを作成します。"),
     ("user",
-     f"以下の{vendor_name}に関する検索結果から、重要なポイントを{num_bullets}つの箇条書きで簡潔にまとめてください。\n"
-     f"各箇条書きは1-2文で、技術的に正確かつ分かりやすく記述してください。\n\n"
-     f"{results_text}\n\n"
-     f"出力形式:\n" + "\n".join([f"- ポイント{i+1}" for i in range(num_bullets)]))
+     f"以下の{vendor_name}に関する検索結果から、重要なポイントを{num_bullets}つの箇条書きで簡潔にまとめてください。\n\n"
+     f"【フォーマット要件】\n"
+     f"- 各箇条書きは **太字** で技術用語を強調\n"
+     f"- バージョン番号や数値などの具体的情報を含める\n"
+     f"- **必ず日付を含める**（例: 2024年10月、10月1日など）\n"
+     f"- 1行は40-60文字程度に収める\n"
+     f"- 適切な絵文字を先頭に付ける（🚀 💡 ⚡ 🎯 📊 🔧 など）\n\n"
+     f"【検索結果】\n{results_text}\n\n"
+     f"【出力形式】\n" + "\n".join([f"- 絵文字 **キーワード** (日付): 説明文" for i in range(num_bullets)]))
   ]
 
   try:
@@ -344,26 +349,26 @@ def _generate_multi_vendor_slides_integrated(topic: str, sources: Dict[str, List
 
   # 各ベンダーの検索結果から箇条書きを生成
   for vendor in vendors:
-    # sourcesから該当するベンダーの検索結果を抽出
+    # sourcesから該当するベンダーの検索結果を抽出（Phase 2 - Bug Fix: URL-based domain matching）
     vendor_results = []
-    for query, items in sources.items():
-      # クエリに該当するベンダーのドメインが含まれているか確認
-      for domain in vendor["domains"]:
-        if domain in str(items):
-          vendor_results.extend(items)
-          break
-
-    # 重複除去
     seen_urls = set()
-    unique_results = []
-    for item in vendor_results:
-      url = item.get("url", "")
-      if url and url not in seen_urls:
-        seen_urls.add(url)
-        unique_results.append(item)
+
+    for query, items in sources.items():
+      # 各検索結果のURLがベンダーのドメインに含まれているか確認
+      for item in items:
+        url = item.get("url", "")
+        if not url or url in seen_urls:
+          continue
+
+        # URLがベンダーのドメインのいずれかに含まれているか確認
+        for domain in vendor["domains"]:
+          if domain in url:
+            vendor_results.append(item)
+            seen_urls.add(url)
+            break
 
     # LLMで箇条書きに要約
-    bullets = _create_llm_summarized_bullets(unique_results[:5], vendor["name"], num_bullets=3)
+    bullets = _create_llm_summarized_bullets(vendor_results[:5], vendor["name"], num_bullets=3)
 
     vendor_bullets.append({
       "name": vendor["name"],
@@ -436,20 +441,38 @@ class: px-2
 
 """
 
-  # まとめスライド
+  # まとめスライド（Phase 2 - MVP-2: まとめスライド強化）
   slide_content += f"""---
-layout: end
+layout: center
 class: text-center
 ---
 
-# ✨ まとめ
+# ✨ 本日のまとめ
 
 <div class="mt-8">
 
-## 完了 🎉
+<v-clicks>
 
-全6社のAI最新情報を統合しました
+## 🔑 キーポイント
 
+"""
+
+  # 各ベンダーの最重要ポイントを1行ずつ表示
+  for vb in vendor_bullets:
+    first_bullet = vb['bullets'][0] if vb['bullets'] else "- 情報なし"
+    # 日付や絵文字を除去してコンパクトに
+    clean_bullet = first_bullet.lstrip('- ').split(':', 1)[-1].strip() if ':' in first_bullet else first_bullet.lstrip('- ')
+    slide_content += f"- {vb['emoji']} **{vb['name']}**: {clean_bullet[:50]}...\n"
+
+  slide_content += f"""
+</v-clicks>
+
+</div>
+
+<div class="mt-12">
+  <span class="px-4 py-2 rounded" style="background: #6366f1; color: white; font-weight: 600;">
+    📚 詳細は各セクションをご確認ください
+  </span>
 </div>
 
 <div style="position: absolute; bottom: 1.5rem; right: 1.5rem; font-size: 0.875rem; opacity: 0.5;">
