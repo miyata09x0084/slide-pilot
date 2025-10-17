@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SlidePilot is an AI-powered presentation slide generation system that automatically creates Marp slides about AI industry news. It uses:
-- **LangGraph** for orchestrating a multi-step AI agent workflow
+SlidePilot is an AI-powered presentation slide generation system that automatically creates Slidev slides about AI industry news. It uses:
+- **LangGraph** for orchestrating a multi-step AI agent workflow with quality evaluation
 - **OpenAI GPT-4** for content generation
 - **Tavily** for real-time web search (recent AI news from major vendors)
-- **Marp** for slide rendering (Markdown → PDF/HTML/PNG)
+- **Slidev** for slide rendering (Markdown → PDF/HTML with modern design)
 - **React + TypeScript** frontend with Google OAuth authentication
 
 ## Commands
@@ -29,7 +29,7 @@ pip install -r requirements.txt
 langgraph dev
 
 # Direct execution (for testing the agent without the API server)
-python marp_agent.py
+python slide_agent.py
 ```
 
 ### Frontend Development
@@ -55,31 +55,31 @@ npm run preview
 
 ## Architecture
 
-### LangGraph Workflow (backend/marp_agent.py)
+### LangGraph Workflow (backend/slide_agent.py)
 
-The backend is a **stateful LangGraph agent** with 6 sequential nodes:
+The backend is a **stateful LangGraph agent** with quality evaluation (Phase 3):
 
 ```
-START → collect_info → generate_key_points → generate_toc → write_slides → evaluate_slides → save_and_render → END
-                                                                                    ↓
-                                                                              (if score < 8.0)
-                                                                                    ↓
-                                                        retry ← ← ← ← ← ← ← ← ← ← ← ←
+START → collect_info → generate_key_points → generate_toc → write_slides_slidev → evaluate_slides_slidev → save_and_render_slidev → END
+                                                                                              ↓
+                                                                                        (if score < 8.0)
+                                                                                              ↓
+                                                                  retry ← ← ← ← ← ← ← ← ← ← ← ←
 ```
 
 **Node Responsibilities:**
 1. **collect_info**: Searches Tavily for recent AI news (last 2 months) from official domains (Microsoft, OpenAI, Google, AWS, Meta, Anthropic)
 2. **generate_key_points**: Extracts 5 key points from search results using GPT-4
 3. **generate_toc**: Creates 5-8 section outline for the slide deck
-4. **write_slides**: Generates Marp-formatted markdown slides with proper structure (title slide, agenda, content sections)
-5. **evaluate_slides**: Scores slides on 5 criteria (structure, practicality, accuracy, readability, conciseness) - must score ≥8.0 to pass
-6. **save_and_render**: Saves markdown and optionally renders to PDF/PNG/HTML using marp-cli
+4. **write_slides_slidev**: Generates Slidev-formatted markdown slides with modern design (apple-basic theme, v-clicks animation, two-cols layout)
+5. **evaluate_slides_slidev**: Scores slides on 5 criteria (structure, practicality, accuracy, readability, conciseness) - must score ≥8.0 to pass
+6. **save_and_render_slidev**: Saves markdown and renders to PDF using slidev export with Playwright/Chromium
 
 **Key Design Decision**: The evaluation loop (max 3 attempts) ensures quality output. If evaluation fails, the workflow retries from `generate_key_points` with feedback.
 
 ### State Flow
 
-The `State` TypedDict (lines 301-332 in backend/marp_agent.py) flows through all nodes:
+The `State` TypedDict in backend/slide_agent.py flows through all nodes:
 
 ```python
 State = {
@@ -149,22 +149,28 @@ Get OAuth credentials from: https://console.cloud.google.com/apis/credentials
 
 ### LangGraph Configuration (backend/langgraph.json)
 
-- Defines the graph export path: `marp_agent.py:graph`
-- Graph ID: `poc-aiagent`
+- Defines the graph export path: `react_agent.py:graph`
+- Graph ID: `react-agent`
 - LangGraph version: 0.5.2
 
 ## Important Implementation Details
 
-### Marp Slide Generation
+### Slidev Slide Generation (Phase 0-3)
 
-The `write_slides` node generates slides with strict formatting rules:
-- **No code fences**: Output is raw markdown (code fences are stripped via `_strip_whole_code_fence`)
-- **Automatic separators**: `_insert_separators` adds `---` before each `## ` heading (H2)
-- **YAML frontmatter**: `_ensure_marp_header` injects Marp configuration (theme, pagination, title)
-- **Presenter removal**: `_remove_presenter_lines` strips presenter name from title slide
-- **Japanese titles**: Uses JST timezone (`ZoneInfo("Asia/Tokyo")`) to generate month-based titles
+The `write_slides_slidev` node generates slides with modern design:
+- **Theme**: apple-basic (clean, professional design)
+- **Animations**: `<v-clicks>` for progressive disclosure
+- **Layouts**: `two-cols` for vendor comparisons, `center` for summary
+- **Visual enhancements**: Emojis, bold keywords, dates in bullets (Phase 2)
+- **Multi-vendor coverage**: All 6 AI vendors (Microsoft, OpenAI, Google, AWS, Meta, Anthropic)
+- **YAML frontmatter**: Slidev configuration (theme, layout, fonts)
+- **Japanese titles**: Uses JST timezone to generate month-based titles
 
-**Critical**: The LLM is instructed to output markdown WITHOUT `---` separators or code blocks. Separators are injected programmatically to avoid LLM inconsistency.
+**Key features**:
+- LLM generates optimized bullets with emojis, bold formatting, and dates
+- Gradient backgrounds per vendor
+- Summary slide with all vendor key points
+- PDF export via `slidev export` with Playwright/Chromium
 
 ### SSE Streaming Protocol
 
@@ -184,17 +190,18 @@ Frontend parsing (App.tsx:122-151):
 4. Extract node names from JSON keys
 5. Map to human-readable progress messages via `nodeNames` lookup
 
-### Evaluation Criteria
+### Evaluation Criteria (Phase 3)
 
-The `evaluate_slides` node uses weighted scoring:
+The `evaluate_slides_slidev` node uses weighted scoring:
 - **structure** (20%): Logical flow, one-message-per-slide principle
-- **practicality** (25%): Actionable content, code examples, warnings
-- **accuracy** (25%): Factual correctness, API specifications, terminology
+- **practicality** (25%): Actionable content, specific examples, warnings
+- **accuracy** (25%): Factual correctness, terminology
 - **readability** (15%): Clarity, visual hierarchy, bullet point granularity
 - **conciseness** (15%): Minimal redundancy
 
 **Pass threshold**: 8.0/10.0 total score
 **Max retries**: 3 attempts (controlled by `MAX_ATTEMPTS` constant)
+**Retry behavior**: If evaluation fails, workflow retries from `generate_key_points` with feedback
 
 ### Tavily Search Strategy
 
@@ -241,9 +248,14 @@ curl -N -X POST "http://localhost:2024/threads/{thread_id}/runs/stream" \
 
 ## Troubleshooting
 
-### "Marp not found" warning
-Install marp-cli globally: `npm install -g @marp-team/marp-cli`
-Without it, slides are saved as `.md` only (no PDF/PNG/HTML rendering).
+### "Slidev not found" or PDF export fails
+Install Slidev CLI and Playwright globally:
+```bash
+npm install -g @slidev/cli
+npm install -g playwright-chromium
+npx playwright-chromium install chromium
+```
+Without these, PDF export will fail (slides saved as `.md` only).
 
 ### CORS errors in frontend
 The LangGraph dev server should allow CORS by default. If issues persist, add proxy configuration to `frontend/vite.config.ts`:

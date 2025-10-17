@@ -17,8 +17,6 @@ from langsmith import traceable
 # ツールのインポート
 from tools.gmail_tool import send_gmail
 from tools.slide_generator import generate_slides
-from tools.slidev_tool import generate_slidev_test
-from tools.slidev_dynamic_mvp1 import generate_slidev_mvp1
 
 # 環境変数読み込み
 load_dotenv()
@@ -35,7 +33,7 @@ llm = ChatOpenAI(
 )
 
 # ツールリスト
-tools = [send_gmail, generate_slides, generate_slidev_test, generate_slidev_mvp1]
+tools = [send_gmail, generate_slides]
 
 # システムプロンプト
 # LLMにエージェントの役割と振る舞いを指示
@@ -43,19 +41,16 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 
 ユーザーの要望に応じて、以下のツールを使用できます:
 - **send_gmail**: メール送信（添付ファイル対応）
-- **generate_slides**: AI最新情報のスライドを自動生成（Marp形式）
-- **generate_slidev_test**: Slidevテストスライドを生成（ハードコード版・検証用）
-- **generate_slidev_mvp1**: Slidev動的スライド生成（推奨）
-  - デフォルト: 全6社（Microsoft, OpenAI, Google, AWS, Meta, Anthropic）のAI Industry Report
-  - multi_vendor=False: Microsoft AIのみのレポート
+- **generate_slides**: AI最新情報のスライドを自動生成（Slidev形式）
+  - LangGraphワークフローで品質評価（score ≥ 8.0）を実施
+  - 全6社（Microsoft, OpenAI, Google, AWS, Meta, Anthropic）のAI Industry Report
+  - 評価基準: structure, practicality, accuracy, readability, conciseness
 
 ## 重要な指示
 
 1. **ツールの使い分け**
-   - 通常のスライド作成 → generate_slides
-   - Slidevテストスライド作成 → generate_slidev_test
-   - メール送信を求められたら → send_gmail
-   - 両方なら → 順番に実行
+   - **スライド作成** → generate_slides（評価付き、高品質保証）
+   - **メール送信** → send_gmail
 
 2. **エラー処理**
    - ツールがエラーを返した場合、ユーザーに報告
@@ -69,7 +64,7 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 ## 実行例
 
 ユーザー: 「AI最新情報のスライド作って」
-→ generate_slides ツールを使用
+→ generate_slides ツールを使用（評価付き、高品質）
 
 ユーザー: 「それをtanaka@example.comに送って」
 → send_gmail ツールを使用（前回生成したスライドを添付）

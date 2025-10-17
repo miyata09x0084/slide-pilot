@@ -963,75 +963,79 @@ class: text-center
 # -------------------
 # Node E: 評価（スライド前提）
 # -------------------
-# MAX_ATTEMPTS = 3
-# @traceable(run_name="e_evaluate_slides")
-# def evaluate_slides(state: State) -> Dict:
-#   if state.get("error"):
-#     return {}
-#   slide_md = state.get("slide_md") or ""
-#   toc = state.get("toc") or []
-#   topic = state.get("topic") or ""
-#   eval_guide = (
-#         "評価観点と重み:\n"
-#         "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
-#         "- practicality(0.25): 実務に使える具体性（手順、コード例、注意点）\n"
-#         "- accuracy(0.25): 事実・API仕様・用語の正確さ\n"
-#         "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度）\n"
-#         "- conciseness(0.15): 冗長性の少なさ\n"
-#         "合格: score >= 8.0\n"
-#   )
-#   prompt = [
-#         ("system",
-#          "あなたはCloud Solution Architectです。以下のMarpスライドMarkdownを、"
-#          "指定の観点・重みで厳密に採点します。出力はJSONのみ。"),
-#         ("user",
-#          f"Topic: {topic}\nTOC: {json.dumps(toc, ensure_ascii=False)}\n\n"
-#          "Slides (Marp Markdown):\n<<<SLIDES\n" + slide_md + "\nSLIDES\n\n"
-#          "Evaluation Guide:\n<<<EVAL\n" + eval_guide + "\nEVAL\n\n"
-#          "Return strictly this JSON schema:\n"
-#          "{\n"
-#          "  \"score\": number,\n"
-#          "  \"subscores\": {\"structure\": number, \"practicality\": number, \"accuracy\": number, \"readability\": number, \"conciseness\": number},\n"
-#          "  \"reasons\": {\"structure\": string, \"practicality\": string, \"accuracy\": string, \"readability\": string, \"conciseness\": string},\n"
-#          "  \"suggestions\": [string],\n"
-#          "  \"risk_flags\": [string],\n"
-#          "  \"pass\": boolean,\n"
-#          "  \"feedback\": string\n"
-#          "}"
-#         )]
-#   try:
-#     msg = llm.invoke(prompt)
-#     raw = msg.content or ""
-#     js = _find_json(raw) or raw
-#     data = json.loads(js)
-#
-#     score = float(data.get("score", 0.0))
-#     subscores = data.get("subscores") or {}
-#     reasons = data.get("reasons") or {}
-#     suggestions = data.get("suggestions") or []
-#     risk_flags = data.get("risk_flags") or []
-#     passed = bool(data.get("pass", score >= 8.0))
-#     feedback = str(data.get("feedback", "")).strip()
-#     attempts = (state.get("attempts") or 0) + 1
-#
-#     return {
-#       "score": score,
-#       "subscores": subscores,
-#       "reasons": reasons,
-#       "suggestions": suggestions,
-#       "risk_flags": risk_flags,
-#       "passed": passed,
-#       "feedback": feedback,
-#       "attempts": attempts,
-#       "log": _log(state, f"[evaluate] score={score:.2f} pass={passed} attempts={attempts}")
-#     }
-#   except Exception as e:
-#     return {"error": f"eval_error: {e}", "log": _log(state, f"[evaluate] EXCEPTION {e}")}
-#
-# def route_after_eval(state: State) -> str:
-#     if (state.get("attempts") or 0) >= MAX_ATTEMPTS:
-#         return "ok"
-#     return "ok" if state.get("passed") else "retry"
+MAX_ATTEMPTS = 3
+
+# Slidev用評価ノード (Phase 3)
+@traceable(run_name="e_evaluate_slides_slidev")
+def evaluate_slides_slidev(state: State) -> Dict:
+  """Slidevスライドの品質評価"""
+  if state.get("error"):
+    return {}
+  slide_md = state.get("slide_md") or ""
+  toc = state.get("toc") or []
+  topic = state.get("topic") or ""
+  eval_guide = (
+        "評価観点と重み:\n"
+        "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
+        "- practicality(0.25): 実務に使える具体性（手順、具体例、注意点）\n"
+        "- accuracy(0.25): 事実・用語の正確さ\n"
+        "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度）\n"
+        "- conciseness(0.15): 冗長性の少なさ\n"
+        "合格: score >= 8.0\n"
+  )
+  prompt = [
+        ("system",
+         "あなたはCloud Solution Architectです。以下のSlidevスライドMarkdownを、"
+         "指定の観点・重みで厳密に採点します。出力はJSONのみ。"),
+        ("user",
+         f"Topic: {topic}\nTOC: {json.dumps(toc, ensure_ascii=False)}\n\n"
+         "Slides (Slidev Markdown):\n<<<SLIDES\n" + slide_md + "\nSLIDES\n\n"
+         "Evaluation Guide:\n<<<EVAL\n" + eval_guide + "\nEVAL\n\n"
+         "Return strictly this JSON schema:\n"
+         "{\n"
+         "  \"score\": number,\n"
+         "  \"subscores\": {\"structure\": number, \"practicality\": number, \"accuracy\": number, \"readability\": number, \"conciseness\": number},\n"
+         "  \"reasons\": {\"structure\": string, \"practicality\": string, \"accuracy\": string, \"readability\": string, \"conciseness\": string},\n"
+         "  \"suggestions\": [string],\n"
+         "  \"risk_flags\": [string],\n"
+         "  \"pass\": boolean,\n"
+         "  \"feedback\": string\n"
+         "}"
+        )]
+  try:
+    msg = llm.invoke(prompt)
+    raw = msg.content or ""
+    js = _find_json(raw) or raw
+    data = json.loads(js)
+
+    score = float(data.get("score", 0.0))
+    subscores = data.get("subscores") or {}
+    reasons = data.get("reasons") or {}
+    suggestions = data.get("suggestions") or []
+    risk_flags = data.get("risk_flags") or []
+    passed = bool(data.get("pass", score >= 8.0))
+    feedback = str(data.get("feedback", "")).strip()
+    attempts = (state.get("attempts") or 0) + 1
+
+    return {
+      "score": score,
+      "subscores": subscores,
+      "reasons": reasons,
+      "suggestions": suggestions,
+      "risk_flags": risk_flags,
+      "passed": passed,
+      "feedback": feedback,
+      "attempts": attempts,
+      "log": _log(state, f"[evaluate_slidev] score={score:.2f} pass={passed} attempts={attempts}")
+    }
+  except Exception as e:
+    return {"error": f"eval_error: {e}", "log": _log(state, f"[evaluate_slidev] EXCEPTION {e}")}
+
+def route_after_eval_slidev(state: State) -> str:
+    """評価結果に基づいてリトライまたは完了を判定"""
+    if (state.get("attempts") or 0) >= MAX_ATTEMPTS:
+        return "ok"
+    return "ok" if state.get("passed") else "retry"
 
 # -------------------
 # Node F: 保存 & Marpレンダリング
@@ -1179,28 +1183,29 @@ graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 
-# 評価ノード（現在は無効化）
-# graph_builder.add_node("evaluate_slides", evaluate_slides)
+# 評価ノード（Phase 3で有効化）
+graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 
-# エッジ定義（Slidevフロー）
+# エッジ定義（Slidevフロー with 評価ループ）
 graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides_slidev")
-graph_builder.add_edge("write_slides_slidev", "save_and_render_slidev")
+graph_builder.add_edge("write_slides_slidev", "evaluate_slides_slidev")
+
+# 評価ループ（Phase 3）
+graph_builder.add_conditional_edges(
+  "evaluate_slides_slidev",
+  route_after_eval_slidev,
+  {"retry": "generate_key_points", "ok": "save_and_render_slidev"}
+)
+
 graph_builder.add_edge("save_and_render_slidev", END)
 
 # Marpフロー（参考用にコメントアウト）
 # graph_builder.add_edge("generate_toc", "write_slides")
 # graph_builder.add_edge("write_slides", "save_and_render")
 # graph_builder.add_edge("save_and_render", END)
-
-# 評価ループ（現在は無効化）
-# graph_builder.add_conditional_edges(
-#   "evaluate_slides",
-#   route_after_eval,
-#   {"retry": "generate_key_points", "ok": "save_and_render"}
-# )
 
 graph = graph_builder.compile()
 

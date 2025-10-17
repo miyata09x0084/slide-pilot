@@ -1,6 +1,6 @@
 """スライド生成ツール（LangChain Tool）
 
-既存のmarp_agentグラフをLangChain Toolとしてラップ。
+既存のslide_agentグラフをLangChain Toolとしてラップ。
 ReActエージェントから呼び出してAI最新情報スライドを生成する。
 """
 
@@ -9,18 +9,18 @@ from typing import Optional
 import json
 from pathlib import Path
 
-# 既存のmarp_agentをインポート
+# 既存のslide_agentをインポート
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from marp_agent import graph, State
+from slide_agent import graph, State
 
 
 @tool
 def generate_slides(topic: str = "AI最新情報") -> str:
     """AI最新情報のスライドを生成
 
-    Tavily検索で最新AIニュースを収集し、Marpスライドを自動生成する。
+    Tavily検索で最新AIニュースを収集し、Slidevスライドを自動生成する。
     評価スコア8.0以上になるまで最大3回リトライ。
 
     処理フロー:

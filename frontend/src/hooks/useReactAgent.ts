@@ -20,6 +20,7 @@ export function useReactAgent() {
   const [threadId, setThreadId] = useState<string | null>(null);  // スレッドID
   const [error, setError] = useState<string | null>(null);        // エラー状態
   const [slideData, setSlideData] = useState<SlideData>({});      // スライドデータ
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);  // スライド生成中フラグ
 
   // スレッド作成
   const createThread = useCallback(async () => {
@@ -55,6 +56,7 @@ export function useReactAgent() {
     setIsThinking(true);
     setThinkingSteps([]);
     setError(null);
+    setIsGeneratingSlides(false); // スライド生成フラグをリセット
 
     try {
       // assistant_id取得
@@ -123,21 +125,36 @@ export function useReactAgent() {
                     // ツール呼び出しがあれば思考ステップに追加
                     if (msg.tool_calls && msg.tool_calls.length > 0) {
                       msg.tool_calls.forEach((call: any) => {
-                        setThinkingSteps(prev => [...prev, {
-                          type: 'action',
-                          content: `${call.name}を実行中...`
-                        }]);
+                        // generate_slidesツールの場合は1回だけ表示
+                        if (call.name === 'generate_slides') {
+                          setIsGeneratingSlides(true);
+                          setThinkingSteps(prev => {
+                            // 既に表示済みなら追加しない
+                            const alreadyExists = prev.some(step =>
+                              step.content.includes('スライド生成中')
+                            );
+                            if (alreadyExists) return prev;
+
+                            return [...prev, {
+                              type: 'action',
+                              content: 'スライド生成中（AI情報の収集・分析・評価）...'
+                            }];
+                          });
+                        } else {
+                          setThinkingSteps(prev => [...prev, {
+                            type: 'action',
+                            content: `${call.name}を実行中...`
+                          }]);
+                        }
                       });
                     }
                   } else if (msg.type === 'tool') {
-                    // ツール実行結果を思考ステップに追加
-                    setThinkingSteps(prev => [...prev, {
-                      type: 'observation',
-                      content: msg.content || '実行完了'
-                    }]);
+                    // ツール実行結果の処理
 
                     // スライド生成ツールの結果からファイルパスを抽出
                     if ((msg.name === 'generate_slides' || msg.name === 'generate_slidev_test' || msg.name === 'generate_slidev_mvp1') && msg.content) {
+                      setIsGeneratingSlides(false); // スライド生成完了
+
                       try {
                         // ツール結果をパース（JSON文字列の場合）
                         const result = typeof msg.content === 'string'
@@ -149,6 +166,12 @@ export function useReactAgent() {
                             path: result.slide_path || result.path,
                             title: result.title || 'スライド'
                           });
+
+                          // 完了メッセージを追加
+                          setThinkingSteps(prev => [...prev, {
+                            type: 'observation',
+                            content: 'スライド生成完了'
+                          }]);
                         }
                       } catch (e) {
                         console.warn('Failed to parse slide data:', e);
