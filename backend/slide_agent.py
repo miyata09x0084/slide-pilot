@@ -730,51 +730,119 @@ class State(TypedDict):
   log: List[str]                                # 実行ログ
 
 # =======================
-# Node A: Tavily 情報収集 (直近2ヶ月 & 公式ドメイン)
+# 入力タイプ自動判別 (Issue #17)
 # =======================
-@traceable(run_name="a_tavily_collect")
+def detect_input_type(topic: str) -> str:
+    """
+    入力タイプを自動判別
+    Returns: "pdf" | "youtube" | "text"
+    """
+    topic_lower = topic.lower()
+
+    # YouTube URLパターン
+    youtube_patterns = [
+        r'youtube\.com/watch\?v=',
+        r'youtu\.be/',
+        r'youtube\.com/embed/',
+    ]
+    for pattern in youtube_patterns:
+        if re.search(pattern, topic_lower):
+            return "youtube"
+
+    # PDFファイルパターン
+    if topic_lower.endswith('.pdf') or '/uploads/' in topic_lower:
+        return "pdf"
+
+    # それ以外はテキスト（Tavily検索）
+    return "text"
+
+# =======================
+# Node A: 情報収集（PDF/YouTube/Tavily対応）
+# =======================
+@traceable(run_name="a_collect_info")
 def collect_info(state: State) -> State:
   topic = state.get("topic") or "AI最新情報"
 
-  # JSTの現在日時 と　月英語表記を取得
-  def month_en_for(dt: datetime) -> str:
-    months = ["January","February","March","April","May","June",
-              "July","August","September","October","November","December"]
-    return f"{months[dt.month-1]} {dt.year}"
+  # 入力タイプを自動判別
+  input_type = detect_input_type(topic)
 
-  now = now_jst()
-  # 先月は、月末日の1日になる
-  prev_month_dt = now.replace(day=1) - timedelta(days=1)
-  # 直近2ヶ月
-  month_labels = [month_en_for(now), month_en_for(prev_month_dt)]
-
-  # ベンダー毎の公式ドメイン
-  vendors_domains = [
-        (["azure.microsoft.com","news.microsoft.com","learn.microsoft.com"],
-         ["Microsoft AI updates", "Azure OpenAI updates"]),
-        (["openai.com"], ["OpenAI announcements","OpenAI updates"]),
-        (["blog.google","ai.googleblog.com","research.google"], ["Google AI updates", "Gemini updates"]),
-        (["aws.amazon.com"], ["AWS Bedrock updates","Amazon AI updates"]),
-        (["ai.meta.com"], ["Meta AI updates", "Llama updates"]),
-        (["anthropic.com"], ["Anthropic Claude updates","Claude announcements"]),
-    ]
-
-  # ★ 直近2ヶ月 × 各社のパターンで検索クエリを構成
-  queries: List[Dict[str, Any]] = []
-  for m in month_labels:
-    for domains, patterns in vendors_domains:
-      for p in patterns:
-        queries.append({"q": f"{p} {m}", "include_domains": domains, "time_range": "month"})
   try:
-    sources = tavily_collect_context(queries, max_per_query=6, default_time_range="month")
-    context_md = context_to_bullets(sources)
-    return {
-      "sources": sources,
-      "context_md": context_md,
-      "log": _log(state, f"[tavily] months={month_labels} queries={len(queries)}")
-    }
+    # PDF処理パイプライン
+    if input_type == "pdf":
+      from tools.pdf_processor import process_pdf
+      result = process_pdf(topic)
+      data = json.loads(result)
+
+      if data["status"] == "success":
+        # PDFコンテンツを整形
+        pdf_filename = Path(topic).stem
+        context_md = f"# PDF: {pdf_filename}\n\n{data['content'][:10000]}"  # 最初の10000文字
+
+        # sourcesに保存（後で参照可能に）
+        sources = {
+          "pdf_content": [{
+            "title": pdf_filename,
+            "url": topic,
+            "content": data['content'][:500],  # プレビュー用
+            "num_pages": data.get('num_pages', 0),
+            "total_chars": data.get('total_chars', 0)
+          }]
+        }
+
+        return {
+          "sources": sources,
+          "context_md": context_md,
+          "log": _log(state, f"[pdf] pages={data.get('num_pages')}, chars={data.get('total_chars')}")
+        }
+      else:
+        return {"error": f"PDF処理エラー: {data['message']}", "log": _log(state, f"[pdf] ERROR {data['message']}")}
+
+    # YouTube処理パイプライン（将来実装）
+    elif input_type == "youtube":
+      return {"error": "YouTube処理は準備中です（Issue #18で実装予定）", "log": _log(state, "[youtube] NOT_IMPLEMENTED")}
+
+    # テキスト処理（既存のTavily検索）
+    else:
+      # JSTの現在日時 と　月英語表記を取得
+      def month_en_for(dt: datetime) -> str:
+        months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"]
+        return f"{months[dt.month-1]} {dt.year}"
+
+      now = now_jst()
+      # 先月は、月末日の1日になる
+      prev_month_dt = now.replace(day=1) - timedelta(days=1)
+      # 直近2ヶ月
+      month_labels = [month_en_for(now), month_en_for(prev_month_dt)]
+
+      # ベンダー毎の公式ドメイン
+      vendors_domains = [
+            (["azure.microsoft.com","news.microsoft.com","learn.microsoft.com"],
+             ["Microsoft AI updates", "Azure OpenAI updates"]),
+            (["openai.com"], ["OpenAI announcements","OpenAI updates"]),
+            (["blog.google","ai.googleblog.com","research.google"], ["Google AI updates", "Gemini updates"]),
+            (["aws.amazon.com"], ["AWS Bedrock updates","Amazon AI updates"]),
+            (["ai.meta.com"], ["Meta AI updates", "Llama updates"]),
+            (["anthropic.com"], ["Anthropic Claude updates","Claude announcements"]),
+        ]
+
+      # ★ 直近2ヶ月 × 各社のパターンで検索クエリを構成
+      queries: List[Dict[str, Any]] = []
+      for m in month_labels:
+        for domains, patterns in vendors_domains:
+          for p in patterns:
+            queries.append({"q": f"{p} {m}", "include_domains": domains, "time_range": "month"})
+
+      sources = tavily_collect_context(queries, max_per_query=6, default_time_range="month")
+      context_md = context_to_bullets(sources)
+      return {
+        "sources": sources,
+        "context_md": context_md,
+        "log": _log(state, f"[tavily] months={month_labels} queries={len(queries)}")
+      }
+
   except Exception as e:
-    return {"error": f"tavily_error: {e}", "log": _log(state, f"[tavily] EXCEPTION {e}")}
+    return {"error": f"collect_info_error: {e}", "log": _log(state, f"[collect_info] EXCEPTION {e}")}
 
 # -------------------
 # Node B: 重要ポイント生成
@@ -783,16 +851,33 @@ def collect_info(state: State) -> State:
 def generate_key_points(state: State) -> Dict:
   topic = state.get("topic") or "AI最新情報"
   ctx = state.get("context_md") or ""
-  prompt = [
-    ("system", "あなたはSolution Engineerです。これからMarpスライドでAI最新情報を発表します。"),
+
+  # 入力タイプを判別
+  input_type = detect_input_type(topic)
+
+  # PDF処理の場合は汎用的なポイント抽出
+  if input_type == "pdf":
+    prompt = [
+      ("system", "あなたは教育のプロフェッショナルです。PDFの内容から重要なポイントを抽出します。"),
       ("user",
-        "以下の“最新情報サマリ（出典付き）”を参考に、発表の重要ポイントを各社5個、"
+        f"以下のPDF内容から、中学生にもわかるように重要なポイントを5個、"
+        f"短い箇条書きで抽出してください。\n\n"
+        f"[PDF内容]\n{ctx[:4000]}\n\n"  # 最大4000文字
+        f"箇条書き形式で出力してください:")
+    ]
+  else:
+    # AI最新情報の場合は既存のプロンプト
+    prompt = [
+      ("system", "あなたはSolution Engineerです。これからMarpスライドでAI最新情報を発表します。"),
+      ("user",
+        "以下の「最新情報サマリ（出典付き）」を参考に、発表の重要ポイントを各社5個、"
         "短い箇条書きで。URLも含めてください。\n\n"
         f"[最新情報サマリ]\n{ctx}\n\n[トピック]\n{topic}")
-  ]
+    ]
+
   try:
     msg = llm.invoke(prompt)
-    bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()] # 箇条書きが取れなかったら、せめて元の文章をそのまま使う。
+    bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()]
     return {"key_points": bullets, "log": _log(state, f"[key_points] {bullets}")}
   except Exception as e:
     return {"error": f"key_points_error: {e}", "log": _log(state, f"[key_points] EXCEPTION {e}")}
@@ -802,13 +887,30 @@ def generate_key_points(state: State) -> Dict:
 # -------------------
 @traceable(run_name="c_generate_toc")
 def generate_toc(state: State) -> Dict:
+  topic = state.get("topic") or ""
   key_points = state.get("key_points") or []
-  prompt = [
-        ("system", "あなたはSolution Engineerです。Marpスライドの構成（目次）を作ります。"),
-        ("user",
-         "以下の重要ポイントから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
-         "重要ポイント:\n- " + "\n- ".join(key_points))
-  ]
+
+  # 入力タイプを判別
+  input_type = detect_input_type(topic)
+
+  # PDF処理の場合は中学生向けの章立て
+  if input_type == "pdf":
+    prompt = [
+      ("system", "あなたは教育のプロフェッショナルです。中学生向けスライドの構成（目次）を作ります。"),
+      ("user",
+       "以下の重要ポイントから、中学生にもわかりやすい5〜8個の章立てを JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
+       "重要ポイント:\n- " + "\n- ".join(key_points) + "\n\n"
+       "章立てはシンプルで親しみやすい言葉を使ってください。")
+    ]
+  else:
+    # AI最新情報の場合は既存のプロンプト
+    prompt = [
+      ("system", "あなたはSolution Engineerです。Marpスライドの構成（目次）を作ります。"),
+      ("user",
+       "以下の重要ポイントから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
+       "重要ポイント:\n- " + "\n- ".join(key_points))
+    ]
+
   try:
     msg = llm.invoke(prompt)
     try:
@@ -904,27 +1006,73 @@ def write_slides(state: State) -> Dict:
 # -------------------
 @traceable(run_name="d_generate_slide_slidev")
 def write_slides_slidev(state: State) -> Dict:
-  """Slidev形式のスライドを生成（全6社対応）"""
+  """Slidev形式のスライドを生成（全6社対応 / PDF対応）"""
   sources = state.get("sources") or {}
   topic = state.get("topic") or "AI最新情報"
+  context_md = state.get("context_md") or ""
+  key_points = state.get("key_points") or []
+  toc = state.get("toc") or []
 
-  # タイトルは当月で固定
-  ja_title = f"{month_ja()} AI最新情報まとめ"
+  # 入力タイプを判別
+  input_type = detect_input_type(topic)
 
   try:
-    # Slidevマークダウン生成
-    slide_md = _generate_multi_vendor_slides_integrated(
-      topic=ja_title,
-      sources=sources,
-      mvp_version="AI Industry Report 2025"
-    )
+    # PDF処理の場合は汎用的なスライドを生成
+    if input_type == "pdf":
+      # PDFファイル名からタイトル生成
+      pdf_filename = Path(topic).stem if topic.endswith('.pdf') else "PDF資料"
+      ja_title = f"{pdf_filename} - 中学生向け解説"
 
-    return {
-      "slide_md": slide_md,
-      "title": ja_title,
-      "error": "",
-      "log": _log(state, f"[slides_slidev] generated ({len(slide_md)} chars, 6 vendors)")
-    }
+      # LLMでSlidevマークダウンを生成
+      prompt = [
+        ("system",
+         "あなたは教育のプロフェッショナルです。PDFの内容を中学生にもわかりやすく説明するSlidevスライドを作成します。"),
+        ("user",
+         f"以下のPDF内容から、中学生向けのわかりやすいスライドを作成してください。\n\n"
+         f"【PDF内容】\n{context_md[:8000]}\n\n"  # 最大8000文字
+         f"【重要ポイント】\n" + "\n".join([f"- {kp}" for kp in key_points[:5]]) + "\n\n"
+         f"【目次】\n" + "\n".join([f"- {t}" for t in toc[:8]]) + "\n\n"
+         f"【要件】\n"
+         f"- Slidev形式（YAMLフロントマター + Markdown）\n"
+         f"- theme: apple-basic を使用\n"
+         f"- タイトルスライド: # {ja_title}\n"
+         f"- Agendaスライド: 目次を<v-clicks>で表示\n"
+         f"- 各セクション: 目次に基づいて5-8スライド作成\n"
+         f"- 各スライドは簡潔に（1スライド1メッセージ）\n"
+         f"- 中学生でもわかる言葉で説明\n"
+         f"- 絵文字を活用して視覚的に\n"
+         f"- まとめスライド: 重要ポイントを3-5個に凝縮\n\n"
+         f"出力はSlidevマークダウンのみ（コードブロック不要）:")
+      ]
+
+      msg = llm.invoke(prompt)
+      slide_md = msg.content.strip()
+
+      # コードブロックがあれば除去
+      slide_md = _strip_whole_code_fence(slide_md)
+
+      return {
+        "slide_md": slide_md,
+        "title": ja_title,
+        "error": "",
+        "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from PDF")
+      }
+
+    # AI最新情報（Tavily）の場合は既存のマルチベンダー生成
+    else:
+      ja_title = f"{month_ja()} AI最新情報まとめ"
+      slide_md = _generate_multi_vendor_slides_integrated(
+        topic=ja_title,
+        sources=sources,
+        mvp_version="AI Industry Report 2025"
+      )
+
+      return {
+        "slide_md": slide_md,
+        "title": ja_title,
+        "error": "",
+        "log": _log(state, f"[slides_slidev] generated ({len(slide_md)} chars, 6 vendors)")
+      }
 
   except Exception as e:
     # エラー時はフォールバックスライドを生成

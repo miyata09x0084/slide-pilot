@@ -18,24 +18,30 @@ from slide_agent import graph, State
 
 @tool
 def generate_slides(topic: str = "AI最新情報") -> str:
-    """AI最新情報のスライドを生成
+    """スライドを生成（PDF/YouTube/テキスト対応）
 
-    Tavily検索で最新AIニュースを収集し、Slidevスライドを自動生成する。
-    評価スコア8.0以上になるまで最大3回リトライ。
+    入力に応じて自動的に処理方法を切り替えます:
+    - PDF: PDFファイルからテキスト抽出してスライド生成
+    - YouTube URL: 字幕取得してスライド生成（準備中）
+    - テキスト: Tavily検索でAI最新情報を収集してスライド生成
 
     処理フロー:
-    1. Tavily検索（直近2ヶ月のAIニュース）
-    2. キーポイント抽出
-    3. 目次生成
-    4. スライド生成
-    5. 評価（8.0以上で合格）
-    6. PDF/PNG/HTML保存
+    1. 入力タイプ自動判別（PDF/YouTube/テキスト）
+    2. コンテンツ収集（PDF抽出/YouTube字幕/Tavily検索）
+    3. キーポイント抽出
+    4. 目次生成
+    5. スライド生成
+    6. 評価（8.0以上で合格、最大3回リトライ）
+    7. Slidev形式でPDF保存
 
     Args:
-        topic: スライドのトピック（デフォルト: "AI最新情報"）
+        topic: スライドのトピック
+               - PDFファイルパス（例: "/path/to/file.pdf"）
+               - YouTube URL（例: "https://youtube.com/watch?v=..."）
+               - テキスト（例: "AI最新情報"）
 
     Returns:
-        str: 生成されたスライドのパスと結果情報
+        str: 生成されたスライドのパスと結果情報（JSON形式）
     """
 
     # 初期State設定

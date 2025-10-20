@@ -1,10 +1,11 @@
-// メインアプリケーション
-// チャット形式のUIでReActエージェントと対話
+// メインアプリケーション（2モード対応: input/chat）
+// PDFアップロード→自動スライド生成→チャット画面
 
 import { useState, useEffect, useRef } from 'react';
 import type { CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import Login from './components/Login';
+import InitialInputForm from './components/InitialInputForm';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ThinkingIndicator from './components/ThinkingIndicator';
@@ -16,8 +17,11 @@ interface UserInfo {
   picture: string;
 }
 
+type Mode = 'input' | 'chat';
+
 function App() {
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [mode, setMode] = useState<Mode>('input');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ReActエージェントのカスタムフック
@@ -52,6 +56,7 @@ function App() {
     setUser(null);
     localStorage.removeItem('user');
     resetChat();
+    setMode('input');
   };
 
   // ページロード時にlocalStorageから復元
@@ -72,10 +77,46 @@ function App() {
     return <Login onSuccess={handleLoginSuccess} />;
   }
 
+  // PDFアップロード処理（初回入力画面から）
+  const handlePdfUpload = async (path: string) => {
+    console.log('📄 Starting slide generation from PDF:', path);
+
+    try {
+      // チャット画面に遷移
+      setMode('chat');
+
+      // スレッド作成
+      const tid = await createThread();
+
+      // PDFからスライド生成を自動実行
+      await sendMessage(
+        `このPDFから中学生向けのわかりやすいスライドを作成してください: ${path}`,
+        tid
+      );
+    } catch (err) {
+      console.error('❌ PDF処理エラー:', err);
+    }
+  };
+
+  // YouTube URL送信処理（将来実装）
+  const handleYoutubeSubmit = async (url: string) => {
+    console.log('🎥 YouTube URL:', url);
+
+    try {
+      setMode('chat');
+      const tid = await createThread();
+      await sendMessage(
+        `このYouTube動画から中学生向けのスライドを作成してください: ${url}`,
+        tid
+      );
+    } catch (err) {
+      console.error('❌ YouTube処理エラー:', err);
+    }
+  };
+
   // メッセージ送信処理
   const handleSendMessage = async (content: string) => {
     try {
-      // threadIdがnullの場合のみcreateThread()を呼び出し、結果は必ずstring型
       const currentThreadId = threadId || await createThread();
       await sendMessage(content, currentThreadId);
     } catch (err) {
@@ -83,16 +124,70 @@ function App() {
     }
   };
 
-  // 新しいチャットを開始
-  const handleNewChat = async () => {
+  // 新しいスライドを作成（初回画面に戻る）
+  const handleNewSlide = () => {
     resetChat();
-    try {
-      await createThread();
-    } catch (err) {
-      console.error('Failed to create thread:', err);
-    }
+    setMode('input');
   };
 
+  // 初回入力画面
+  if (mode === 'input') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f5f5f5',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        {/* ヘッダー */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '16px 24px',
+          background: 'white',
+          borderBottom: '1px solid #dee2e6',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
+            SlidePilot
+          </h1>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img
+              src={user.picture}
+              alt={user.name}
+              style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+            />
+            <div style={{ fontSize: '14px' }}>
+              <div style={{ fontWeight: 'bold' }}>{user.name}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '6px 12px',
+                fontSize: '13px',
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              ログアウト
+            </button>
+          </div>
+        </div>
+
+        {/* 初回入力フォーム */}
+        <InitialInputForm
+          onPdfUpload={handlePdfUpload}
+          onYoutubeSubmit={handleYoutubeSubmit}
+        />
+      </div>
+    );
+  }
+
+  // チャット画面
   return (
     <div style={{
       display: 'flex',
@@ -115,22 +210,20 @@ function App() {
           <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
             SlidePilot Chat
           </h1>
-          {threadId && (
-            <button
-              onClick={handleNewChat}
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              新しいチャット
-            </button>
-          )}
+          <button
+            onClick={handleNewSlide}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              background: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            新しいスライドを作成
+          </button>
         </div>
 
         {/* ユーザー情報 */}
@@ -168,44 +261,6 @@ function App() {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {/* スレッド未作成時の案内 */}
-        {!threadId && messages.length === 0 && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '16px',
-            color: '#6c757d'
-          }}>
-            <div style={{ fontSize: '48px' }}>💬</div>
-            <h2 style={{ margin: 0, fontSize: '24px', color: '#333' }}>
-              SlidePilotへようこそ
-            </h2>
-            <p style={{ margin: 0, textAlign: 'center', maxWidth: '400px' }}>
-              AIがスライド生成やメール送信をお手伝いします。<br />
-              下のメッセージ欄から会話を始めてください。
-            </p>
-            <div style={{
-              marginTop: '16px',
-              padding: '16px',
-              background: '#e7f3ff',
-              borderRadius: '8px',
-              maxWidth: '500px'
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#0056b3' }}>
-                使用例:
-              </div>
-              <ul style={{ margin: 0, paddingLeft: '20px', color: '#495057' }}>
-                <li>「AI最新情報のスライドを作って」</li>
-                <li>「スライド作ってdev@example.comに送って」</li>
-                <li>「OpenAIの最新情報を教えて」</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
         {/* メッセージ履歴 */}
         {messages.map((message, index) => (
           <ChatMessage key={index} message={message} />
@@ -286,45 +341,21 @@ function App() {
         onSend={handleSendMessage}
         disabled={isThinking}
         placeholder={
-          !threadId
-            ? 'メッセージを入力してチャットを開始...'
-            : isThinking
+          isThinking
             ? 'AIが考え中...'
-            : 'メッセージを入力...'
+            : 'スライド内容について質問してください...'
         }
       />
 
       {/* レスポンシブ対応のCSS */}
       <style>{`
         @media (max-width: 768px) {
-          /* ヘッダーのレスポンシブ対応 */
           h1 {
             font-size: 18px !important;
           }
-
-          /* ボタンサイズ調整 */
           button {
             font-size: 12px !important;
             padding: 5px 10px !important;
-          }
-
-          /* ユーザー名を非表示（スペース節約） */
-          .user-name {
-            display: none !important;
-          }
-
-          /* チャットエリアのパディング調整 */
-          .chat-area {
-            padding: 16px !important;
-          }
-
-          /* ウェルカム画面のテキストサイズ調整 */
-          .welcome-title {
-            font-size: 20px !important;
-          }
-
-          .welcome-text {
-            font-size: 14px !important;
           }
         }
       `}</style>
