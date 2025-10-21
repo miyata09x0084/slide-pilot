@@ -119,25 +119,29 @@ def collect_info(state: State) -> State:
       data = json.loads(result)
 
       if data["status"] == "success":
-        # PDFコンテンツを整形
+        # PDFコンテンツを整形（★全文保持に変更）
         pdf_filename = Path(topic).stem
-        context_md = f"# PDF: {pdf_filename}\n\n{data['content'][:10000]}"  # 最初の10000文字
+        full_content = data['content']  # チャンク区切り "---" で結合済み
+        context_md = f"# PDF: {pdf_filename}\n\n{full_content}"
 
-        # sourcesに保存（後で参照可能に）
+        # sourcesに保存（チャンク情報も含める）
+        chunks = full_content.split("\n\n---\n\n")
         sources = {
           "pdf_content": [{
             "title": pdf_filename,
             "url": topic,
             "content": data['content'][:500],  # プレビュー用
             "num_pages": data.get('num_pages', 0),
-            "total_chars": data.get('total_chars', 0)
+            "total_chars": data.get('total_chars', 0),
+            "num_chunks": len(chunks),
+            "chunks": chunks  # ★全チャンクを保持
           }]
         }
 
         return {
           "sources": sources,
           "context_md": context_md,
-          "log": _log(state, f"[pdf] pages={data.get('num_pages')}, chars={data.get('total_chars')}")
+          "log": _log(state, f"[pdf] pages={data.get('num_pages')}, chars={data.get('total_chars')}, chunks={len(chunks)}")
         }
       else:
         return {"error": f"PDF処理エラー: {data['message']}", "log": _log(state, f"[pdf] ERROR {data['message']}")}
@@ -196,20 +200,87 @@ def collect_info(state: State) -> State:
 def generate_key_points(state: State) -> Dict:
   topic = state.get("topic") or "AI最新情報"
   ctx = state.get("context_md") or ""
+  sources = state.get("sources") or {}
 
   # 入力タイプを判別
   input_type = detect_input_type(topic)
 
-  # PDF処理の場合は汎用的なポイント抽出
+  # PDF処理の場合はMap-Reduce方式で全チャンクを処理
   if input_type == "pdf":
-    prompt = [
-      ("system", "あなたは教育のプロフェッショナルです。PDFの内容から重要なポイントを抽出します。"),
-      ("user",
-        f"以下のPDF内容から、中学生にもわかるように重要なポイントを5個、"
-        f"短い箇条書きで抽出してください。\n\n"
-        f"[PDF内容]\n{ctx[:4000]}\n\n"  # 最大4000文字
-        f"箇条書き形式で出力してください:")
-    ]
+    try:
+      # チャンクを取得
+      pdf_data = sources.get("pdf_content", [{}])[0]
+      chunks = pdf_data.get("chunks", [])
+
+      if not chunks:
+        # フォールバック: context_mdから分割
+        full_content = ctx.replace("# PDF: ", "").split("\n\n", 1)[-1]
+        chunks = full_content.split("\n\n---\n\n")
+
+      # Map: 各チャンクから重要ポイントを抽出（最大3個）
+      chunk_points = []
+      for i, chunk in enumerate(chunks[:20]):  # 最大20チャンク（LLMコスト削減）
+        if not chunk.strip():
+          continue
+
+        map_prompt = [
+          ("system", "あなたは教育のプロフェッショナルです。中学生にも分かりやすく内容を説明する専門家です。"),
+          ("user",
+            f"以下のテキストから、中学生にもわかるように重要なポイントを最大3個、"
+            f"短い箇条書きで抽出してください。\n\n"
+            f"[テキスト部分 {i+1}]\n{chunk[:3000]}\n\n"  # チャンクごとに3000文字まで
+            f"箇条書き形式で出力してください（最大3個）:")
+        ]
+
+        msg = llm.invoke(map_prompt)
+        points = _strip_bullets(msg.content.splitlines())[:3]
+        chunk_points.extend(points)
+
+      # Reduce: 全ポイントを統合して5つに凝縮
+      if chunk_points:
+        reduce_prompt = [
+          ("system", "あなたは教育のプロフェッショナルです。情報を整理統合するのが得意です。"),
+          ("user",
+            f"以下の重要ポイントリストから、重複を削除し、最も重要な5個に絞り込んでください。\n\n"
+            f"[抽出されたポイント]\n" + "\n".join([f"- {p}" for p in chunk_points]) + "\n\n"
+            f"【出力形式】\n"
+            f"- 必ず箇条書き形式で出力（「-」または「1.」で始める）\n"
+            f"- 必ず5個の箇条書き（4個や6個ではなく正確に5個）\n"
+            f"- 「以下の5つのポイントは...」などの前置き文は不要\n"
+            f"- 各ポイントは1行で簡潔に\n\n"
+            f"中学生にもわかりやすい表現で、最重要な5個を選んでください:")
+        ]
+
+        msg = llm.invoke(reduce_prompt)
+        lines = msg.content.splitlines()
+
+        # 前置き行を除外（箇条書き記号または番号で始まる行のみ抽出）
+        filtered_lines = [
+          line for line in lines
+          if line.strip() and (
+            line.strip().startswith(('-', '•', '*', '・')) or
+            re.match(r'^\d+\.', line.strip())
+          )
+        ]
+
+        final_bullets = _strip_bullets(filtered_lines)[:5] if filtered_lines else chunk_points[:5]
+
+        # 5個未満の場合はchunk_pointsから補充
+        while len(final_bullets) < 5 and chunk_points:
+          candidate = chunk_points.pop(0)
+          if candidate not in final_bullets:  # 重複回避
+            final_bullets.append(candidate)
+      else:
+        final_bullets = ["内容の抽出に失敗しました"]
+
+      return {
+        "key_points": final_bullets,
+        "log": _log(state, f"[key_points_map_reduce] chunks={len(chunks)}, extracted={len(chunk_points)}, final={len(final_bullets)}")
+      }
+
+    except Exception as e:
+      return {"error": f"key_points_pdf_error: {e}", "log": _log(state, f"[key_points_pdf] EXCEPTION {e}")}
+
   else:
     # AI最新情報の場合は既存のプロンプト
     prompt = [
@@ -220,12 +291,12 @@ def generate_key_points(state: State) -> Dict:
         f"[最新情報サマリ]\n{ctx}\n\n[トピック]\n{topic}")
     ]
 
-  try:
-    msg = llm.invoke(prompt)
-    bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()]
-    return {"key_points": bullets, "log": _log(state, f"[key_points] {bullets}")}
-  except Exception as e:
-    return {"error": f"key_points_error: {e}", "log": _log(state, f"[key_points] EXCEPTION {e}")}
+    try:
+      msg = llm.invoke(prompt)
+      bullets = _strip_bullets(msg.content.splitlines())[:5] or [msg.content.strip()]
+      return {"key_points": bullets, "log": _log(state, f"[key_points] {bullets}")}
+    except Exception as e:
+      return {"error": f"key_points_error: {e}", "log": _log(state, f"[key_points] EXCEPTION {e}")}
 
 # -------------------
 # Node C: 目次生成
@@ -241,9 +312,10 @@ def generate_toc(state: State) -> Dict:
   # PDF処理の場合は中学生向けの章立て
   if input_type == "pdf":
     prompt = [
-      ("system", "あなたは教育のプロフェッショナルです。中学生向けスライドの構成（目次）を作ります。"),
+      ("system", "あなたは教育のプロフェッショナルです。中学生にも理解できるスライドの構成を考えるのが得意です。"),
       ("user",
        "以下の重要ポイントから、中学生にもわかりやすい5〜8個の章立てを JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
+       "各章タイトルはやさしい日本語で。構成に流れがあるようにしてください。\n\n"
        "重要ポイント:\n- " + "\n- ".join(key_points) + "\n\n"
        "章立てはシンプルで親しみやすい言葉を使ってください。")
     ]
@@ -286,17 +358,70 @@ def write_slides_slidev(state: State) -> Dict:
   try:
     # PDF処理の場合は汎用的なスライドを生成
     if input_type == "pdf":
-      # PDFファイル名からタイトル生成
-      pdf_filename = Path(topic).stem if topic.endswith('.pdf') else "PDF資料"
-      ja_title = f"{pdf_filename} - 中学生向け解説"
+      # ★全チャンクから要約を作成してからスライド生成
+      pdf_data = sources.get("pdf_content", [{}])[0]
+      chunks = pdf_data.get("chunks", [])
 
-      # LLMでSlidevマークダウンを生成
+      if not chunks:
+        # フォールバック: context_mdから分割
+        full_content = context_md.replace("# PDF: ", "").split("\n\n", 1)[-1]
+        chunks = full_content.split("\n\n---\n\n")
+
+      # PDFの内容からLLMでタイトルを生成
+      title_prompt = [
+        ("system", "あなたは教育のプロフェッショナルです。PDFの内容から魅力的なタイトルを作成します。"),
+        ("user",
+         f"以下のPDF内容から、中学生向けスライドにふさわしい魅力的なタイトルを1行で生成してください。\n\n"
+         f"【PDF冒頭】\n{chunks[0][:2000] if chunks else '内容なし'}\n\n"
+         f"【重要ポイント】\n" + "\n".join([f"- {kp}" for kp in key_points[:3]]) + "\n\n"
+         f"【要件】\n"
+         f"- 中学生が興味を持つタイトル\n"
+         f"- 簡潔でわかりやすい（15文字以内推奨）\n"
+         f"- 絵文字は不要\n"
+         f"- 例: 「AIの仕組みと未来」「地球温暖化を学ぼう」\n\n"
+         f"タイトルのみを出力してください:")
+      ]
+
+      try:
+        title_msg = llm.invoke(title_prompt)
+        ja_title = title_msg.content.strip().replace('"', '').replace("'", '')
+        # タイトルが長すぎる場合は切り詰め
+        if len(ja_title) > 30:
+          ja_title = ja_title[:30] + "..."
+      except Exception as e:
+        # フォールバック: ファイル名から生成
+        pdf_filename = Path(topic).stem if topic.endswith('.pdf') else "PDF資料"
+        # UUIDを除去
+        if '_' in pdf_filename:
+          pdf_filename = pdf_filename.split('_', 1)[1] if len(pdf_filename.split('_', 1)) > 1 else pdf_filename
+        ja_title = f"{pdf_filename}"
+
+      # チャンクを直接使用（要約なし・コスト削減版）
+      chunk_texts = []
+      total_chars = 0
+      for i, chunk in enumerate(chunks[:20]):
+        if not chunk.strip():
+          continue
+
+        # 各チャンクの先頭1500文字を使用
+        chunk_preview = chunk[:1500]
+        chunk_texts.append(f"## セクション{i+1}\n{chunk_preview}")
+        total_chars += len(chunk_preview)
+
+        # 合計15,000文字まで使用（スライド生成の上限）
+        if total_chars > 15000:
+          break
+
+      # 全チャンクテキストを結合
+      full_summary = "\n\n".join(chunk_texts)
+
+      # LLMでSlidevマークダウンを生成（チャンク抜粋版を使用）
       prompt = [
         ("system",
-         "あなたは教育のプロフェッショナルです。PDFの内容を中学生にもわかりやすく説明するSlidevスライドを作成します。"),
+         "あなたは教育のプロフェッショナルです。PDFの内容を中学生にもわかりやすく説明するSlidevスライドを作成します。各セクションでは、目次に基づいて短い物語や会話形式で説明してください。1枚のスライドには伝えたいポイントをひとつだけ載せ、絵文字も活用して子どもの興味を引いてください。専門用語は可能な限り避け、優しい口調で話しかけるように説明しましょう。"),
         ("user",
-         f"以下のPDF内容から、中学生向けのわかりやすいスライドを作成してください。\n\n"
-         f"【PDF内容】\n{context_md[:8000]}\n\n"  # 最大8000文字
+         f"以下のPDF内容（抜粋）から、中学生向けのわかりやすいスライドを作成してください。\n\n"
+         f"【PDF内容（セクション別抜粋）】\n{full_summary}\n\n"
          f"【重要ポイント】\n" + "\n".join([f"- {kp}" for kp in key_points[:5]]) + "\n\n"
          f"【目次】\n" + "\n".join([f"- {t}" for t in toc[:8]]) + "\n\n"
          f"【要件】\n"
@@ -308,7 +433,9 @@ def write_slides_slidev(state: State) -> Dict:
          f"- 各スライドは簡潔に（1スライド1メッセージ）\n"
          f"- 中学生でもわかる言葉で説明\n"
          f"- 絵文字を活用して視覚的に\n"
-         f"- まとめスライド: 重要ポイントを3-5個に凝縮\n\n"
+         f"- できれば短いストーリーや、先生と生徒の会話形式も使ってください\n"
+         f"- まとめスライド: 【重要ポイント】で示した5個すべてを箇条書きで表示してください\n"
+         f"- PDF全体の流れを反映した論理的な構成にしてください\n\n"
          f"出力はSlidevマークダウンのみ（コードブロック不要）:")
       ]
 
@@ -322,7 +449,7 @@ def write_slides_slidev(state: State) -> Dict:
         "slide_md": slide_md,
         "title": ja_title,
         "error": "",
-        "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from PDF")
+        "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from {len(chunk_texts)} chunks (cost-optimized, no LLM summary)")
       }
 
     # AI最新情報（Tavily）の場合は既存のマルチベンダー生成
@@ -383,13 +510,35 @@ MAX_ATTEMPTS = 3
 # Slidev用評価ノード
 @traceable(run_name="e_evaluate_slides_slidev")
 def evaluate_slides_slidev(state: State) -> Dict:
-  """Slidevスライドの品質評価"""
+  """Slidevスライドの品質評価（PDF/AI情報対応）"""
   if state.get("error"):
     return {}
   slide_md = state.get("slide_md") or ""
   toc = state.get("toc") or []
   topic = state.get("topic") or ""
-  eval_guide = (
+
+  # 入力タイプを判別してPDF特有の評価基準を追加
+  input_type = detect_input_type(topic)
+
+  if input_type == "pdf":
+    # PDF向け評価基準（中学生向け解説）
+    eval_guide = (
+        "評価観点と重み:\n"
+        "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
+        "- comprehensiveness(0.25): PDF全体の重要トピックをカバーしているか（網羅性）\n"
+        "- clarity(0.25): 中学生にもわかる説明、難しい用語の言い換え\n"
+        "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度、絵文字活用）\n"
+        "- engagement(0.15): 興味を引く工夫（ストーリー、会話形式、視覚要素）\n"
+        "合格: score >= 8.0\n"
+        "\n"
+        "【重要】\n"
+        "- PDFの最初のページだけでなく、全体の流れを反映していること\n"
+        "- 専門用語は中学生にもわかる言葉で説明されていること\n"
+        "- 絵文字や視覚要素で視覚的に理解しやすいこと\n"
+    )
+  else:
+    # AI情報向け評価基準（既存）
+    eval_guide = (
         "評価観点と重み:\n"
         "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
         "- practicality(0.25): 実務に使える具体性（手順、具体例、注意点）\n"
@@ -397,7 +546,7 @@ def evaluate_slides_slidev(state: State) -> Dict:
         "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度）\n"
         "- conciseness(0.15): 冗長性の少なさ\n"
         "合格: score >= 8.0\n"
-  )
+    )
   prompt = [
         ("system",
          "あなたはCloud Solution Architectです。以下のSlidevスライドMarkdownを、"
