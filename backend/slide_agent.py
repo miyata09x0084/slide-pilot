@@ -29,6 +29,7 @@ from typing import Optional, Dict, Any, Union, List
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
+from tools.pdf_processor import process_pdf
 import os
 import re
 import json
@@ -75,7 +76,7 @@ class State(TypedDict):
   log: List[str]                                # 実行ログ
 
 # =======================
-# 入力タイプ自動判別 (Issue #17)
+# 入力タイプ自動判別
 # =======================
 def detect_input_type(topic: str) -> str:
     """
@@ -114,11 +115,6 @@ def collect_info(state: State) -> State:
   try:
     # PDF処理パイプライン
     if input_type == "pdf":
-      # 条件付きインポート（パッケージ構造対応）
-      try:
-        from .tools.pdf_processor import process_pdf
-      except ImportError:
-        from tools.pdf_processor import process_pdf
       result = process_pdf(topic)
       data = json.loads(result)
 
@@ -273,7 +269,7 @@ def generate_toc(state: State) -> Dict:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
 # -------------------
-# Node D: スライド本文（Slidev）生成 (Phase 1 - MVP-1)
+# Node D: スライド本文（Slidev）生成
 # -------------------
 @traceable(run_name="d_generate_slide_slidev")
 def write_slides_slidev(state: State) -> Dict:
@@ -380,11 +376,11 @@ class: text-center
     }
 
 # -------------------
-# Node E: 評価（スライド前提）
+# Node E: 評価
 # -------------------
 MAX_ATTEMPTS = 3
 
-# Slidev用評価ノード (Phase 3)
+# Slidev用評価ノード
 @traceable(run_name="e_evaluate_slides_slidev")
 def evaluate_slides_slidev(state: State) -> Dict:
   """Slidevスライドの品質評価"""
@@ -457,7 +453,7 @@ def route_after_eval_slidev(state: State) -> str:
     return "ok" if state.get("passed") else "retry"
 
 # -------------------
-# Node F: 保存 & Slidevレンダリング (Phase 1 - MVP-2)
+# Node F: 保存 & Slidevレンダリング
 # -------------------
 @traceable(run_name="f_save_and_render_slidev")
 def save_and_render_slidev(state: State) -> Dict:
