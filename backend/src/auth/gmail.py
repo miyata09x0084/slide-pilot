@@ -30,8 +30,8 @@ def get_gmail_service():
         FileNotFoundError: credentials.jsonが見つからない場合
     """
     creds = None
-    token_path = Path(__file__).parent / 'token.json'
-    creds_path = Path(__file__).parent / 'credentials.json'
+    token_path = Path(__file__).parent.parent.parent / 'data' / 'tokens' / 'token.json'
+    creds_path = Path(__file__).parent.parent.parent / 'data' / 'tokens' / 'credentials.json'
 
     # 既存トークンの読み込み
     if token_path.exists():

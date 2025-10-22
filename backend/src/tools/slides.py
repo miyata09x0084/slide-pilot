@@ -9,17 +9,8 @@ from typing import Optional
 import json
 from pathlib import Path
 
-# 既存のslide_agentをインポート（パッケージ構造対応）
-try:
-    # 相対インポート（推奨: パッケージとして実行される場合）
-    from ..slide_agent import graph, State
-except ImportError:
-    # 絶対インポート（後方互換: 直接実行される場合）
-    import sys
-    _backend_dir = Path(__file__).resolve().parent.parent
-    if str(_backend_dir) not in sys.path:
-        sys.path.insert(0, str(_backend_dir))
-    from slide_agent import graph, State
+# slide_workflowグラフをインポート
+from src.agents.slide_workflow import graph, State
 
 
 @tool

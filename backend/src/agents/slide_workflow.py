@@ -3,11 +3,9 @@
 # フロー: 情報収集 -> キーポイント抽出 -> 目次生成 -> スライド生成 -> 評価 -> 保存
 
 # 共通ロジックのインポート
-from slide_core import (
-    # 環境変数・定数
-    TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE,
-    # LLMクライアント
-    llm,
+from src.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from src.core.llm import llm
+from src.core.utils import (
     # ユーティリティ関数
     _log, _strip_bullets, _slugify_en, _find_json,
     _ensure_marp_header, _insert_separators, _double_separators,
@@ -29,7 +27,7 @@ from typing import Optional, Dict, Any, Union, List
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
-from tools.pdf_processor import process_pdf
+from src.tools.pdf import process_pdf
 import os
 import re
 import json
@@ -635,7 +633,7 @@ def save_and_render_slidev(state: State) -> Dict:
   except Exception:
     file_stem = _slugify_en(title) or "ai-latest-info"
 
-  slide_dir = Path(__file__).parent / "slides"
+  slide_dir = Path(__file__).parent.parent.parent / "data" / "slides"
   slide_dir.mkdir(parents=True, exist_ok=True)
   slide_md_path = slide_dir / f"{file_stem}_slidev.md"
   slide_md_path.write_text(slide_md, encoding="utf-8")

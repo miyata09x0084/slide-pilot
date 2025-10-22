@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 # アップロードディレクトリの設定
-UPLOAD_DIR = Path(__file__).parent / "uploads"
+UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # ファイルサイズ制限（100MB）

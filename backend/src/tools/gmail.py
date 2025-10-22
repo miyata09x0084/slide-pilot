@@ -15,7 +15,7 @@ from email import encoders
 from typing import Optional
 
 from langchain_core.tools import tool
-from gmail_auth import get_gmail_service
+from src.auth.gmail import get_gmail_service
 
 
 def validate_email(email: str) -> bool:
