@@ -426,7 +426,7 @@ def write_slides_slidev(state: State) -> Dict:
          f"- Slidev形式（YAMLフロントマター + Markdown）\n"
          f"- theme: apple-basic を使用\n"
          f"- タイトルスライド: # {ja_title}\n"
-         f"- Agendaスライド: 目次を<v-clicks>で表示\n"
+         f"- Agendaスライド: 目次を箇条書きで表示（<v-clicks>は使わない）\n"
          f"- 各セクション: 目次に基づいて5-8スライド作成\n"
          f"- 各スライドは簡潔に（1スライド1メッセージ）\n"
          f"- 中学生でもわかる言葉で説明\n"

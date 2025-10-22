@@ -80,15 +80,16 @@ def generate_slides(topic: str = "AI最新情報") -> str:
         # score = result.get("score", 0.0)
         # passed = result.get("passed", False)
 
-        # 絶対パスから相対パスに変換（frontend/publicからアクセス可能にする）
-        relative_path = str(Path(slide_path).relative_to(Path(__file__).parent.parent))
+        # 絶対パスからファイル名を抽出してAPIエンドポイント形式に変換
+        filename = Path(slide_path).name
+        api_url = f"http://localhost:8001/api/slides/{filename}"
 
         # JSON形式で返す（フロントエンドがパース可能）
         return json.dumps({
             "status": "success",
             "message": "✅ スライド生成完了",
             "title": title,
-            "slide_path": relative_path
+            "slide_path": api_url
         }, ensure_ascii=False)
 
     except Exception as e:

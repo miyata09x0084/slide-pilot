@@ -297,7 +297,7 @@ function App() {
               </div>
             )}
             <a
-              href={`/${slideData.path}`}
+              href={slideData.path}
               download
               style={{
                 display: 'inline-block',

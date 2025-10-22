@@ -624,14 +624,14 @@ AI技術は急速に進化中
       )
       return json.dumps({
         "status": "success",
-        "slide_path": str(pdf_path.relative_to(slide_dir.parent)),
+        "slide_path": str(pdf_path),
         "title": topic,
         "message": f"Slidevスライドを生成しました: {pdf_path.name}"
       }, ensure_ascii=False)
     except subprocess.TimeoutExpired:
       return json.dumps({
         "status": "error",
-        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "slide_path": str(md_path),
         "title": topic,
         "error": "PDF生成がタイムアウトしました（90秒超過）",
         "message": "Markdownファイルのみ保存しました"
@@ -641,7 +641,7 @@ AI技術は急速に進化中
       error_msg = e.stderr.decode() if e.stderr else str(e)
       return json.dumps({
         "status": "partial",
-        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "slide_path": str(md_path),
         "title": topic,
         "error": f"PDF生成失敗: {error_msg}",
         "message": "Markdownファイルのみ保存しました"
@@ -650,7 +650,7 @@ AI技術は急速に進化中
     # slidev未インストール時
     return json.dumps({
       "status": "md_only",
-      "slide_path": str(md_path.relative_to(slide_dir.parent)),
+      "slide_path": str(md_path),
       "title": topic,
       "message": "slidevが見つかりません。Markdownのみ保存しました"
     }, ensure_ascii=False)

@@ -5,6 +5,7 @@ FastAPIを使用してPDFファイルをアップロードするエンドポイ�
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pathlib import Path
 import uuid
 import shutil
@@ -23,6 +24,10 @@ app.add_middleware(
 # アップロードディレクトリの設定
 UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+# スライドディレクトリの設定
+SLIDES_DIR = Path(__file__).parent.parent.parent / "data" / "slides"
+SLIDES_DIR.mkdir(exist_ok=True)
 
 # ファイルサイズ制限（100MB）
 MAX_FILE_SIZE = 100 * 1024 * 1024
@@ -110,6 +115,24 @@ async def delete_upload(filename: str):
         return {"status": "success", "message": "ファイルを削除しました"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ファイル削除エラー: {str(e)}")
+
+
+@app.get("/api/slides/{filename}")
+async def download_slide(filename: str):
+    """生成されたスライドをダウンロード"""
+    file_path = SLIDES_DIR / filename
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="スライドが見つかりません")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 if __name__ == "__main__":
