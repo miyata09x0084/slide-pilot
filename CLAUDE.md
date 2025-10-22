@@ -55,7 +55,35 @@ npm run preview
 
 ## Architecture
 
-### LangGraph Workflow (backend/slide_agent.py)
+### Backend Directory Structure (Issue #23 Refactoring)
+
+```
+backend/
+├── src/
+│   ├── agents/          # LangGraph workflow definitions
+│   │   ├── react_agent.py       # ReAct agent (Gmail + Slides)
+│   │   └── slide_workflow.py    # Slide generation workflow
+│   ├── tools/           # Tool implementations
+│   │   ├── gmail.py     # Gmail sending
+│   │   ├── pdf.py       # PDF text extraction
+│   │   └── slides.py    # Slide generation tool wrapper
+│   ├── core/            # Core utilities
+│   │   ├── config.py    # Environment variables
+│   │   ├── llm.py       # LLM client (OpenAI GPT-4)
+│   │   └── utils.py     # Shared utility functions
+│   ├── prompts/         # Prompt definitions (Issue #23 Phase 3)
+│   │   ├── slide_prompts.py       # Slide generation prompts
+│   │   └── evaluation_prompts.py  # Evaluation prompts
+│   ├── auth/            # Authentication
+│   │   └── gmail.py     # Gmail OAuth flow
+│   └── api/             # API endpoints
+│       └── upload.py    # File upload handler
+├── data/slides/         # Generated slides storage
+├── tests/               # Test files
+└── langgraph.json       # LangGraph configuration
+```
+
+### LangGraph Workflow (backend/src/agents/slide_workflow.py)
 
 The backend is a **stateful LangGraph agent** with quality evaluation (Phase 3):
 
@@ -190,9 +218,53 @@ Frontend parsing (App.tsx:122-151):
 4. Extract node names from JSON keys
 5. Map to human-readable progress messages via `nodeNames` lookup
 
+### Prompt Management (Issue #23 Phase 3)
+
+All prompts are externalized in `backend/src/prompts/`:
+
+**`slide_prompts.py`** - Slide generation prompts:
+- `get_key_points_map_prompt()` - PDF chunk → key points (Map phase)
+- `get_key_points_reduce_prompt()` - Consolidate key points to 5 (Reduce phase)
+- `get_key_points_ai_prompt()` - AI news → key points
+- `get_toc_pdf_prompt()` - PDF key points → table of contents
+- `get_toc_ai_prompt()` - AI key points → table of contents
+- `get_slide_title_prompt()` - Generate slide title from PDF
+- `get_slide_pdf_prompt()` - Generate Slidev markdown from PDF
+- `get_slug_prompt()` - Japanese title → English filename
+
+**`evaluation_prompts.py`** - Evaluation prompts:
+- `get_evaluation_prompt()` - Slide quality evaluation (switches criteria based on input type)
+
+**Design pattern**: Constants + Methods (Hybrid)
+- Prompt text defined as constants (easy to version control, readable diffs)
+- Methods provide type-safe interface with argument validation
+- Example:
+  ```python
+  # Constant
+  KEY_POINTS_MAP_USER = "以下のテキストから...{chunk}...{chunk_index}"
+
+  # Method
+  def get_key_points_map_prompt(chunk: str, chunk_index: int):
+      return [("system", SYSTEM), ("user", USER.format(chunk=chunk[:3000], chunk_index=chunk_index))]
+  ```
+
+**How to customize prompts**:
+1. Edit constants in `backend/src/prompts/*.py`
+2. No code changes needed in `slide_workflow.py`
+3. Restart `langgraph dev` to apply changes
+
 ### Evaluation Criteria (Phase 3)
 
-The `evaluate_slides_slidev` node uses weighted scoring:
+The `evaluate_slides_slidev` node uses weighted scoring with **different criteria based on input type**:
+
+**PDF input** (for educational slides):
+- **structure** (20%): Logical flow, one-message-per-slide principle
+- **comprehensiveness** (25%): Covers all important topics from PDF
+- **clarity** (25%): Middle-school friendly language, term explanations
+- **readability** (15%): Clarity, visual hierarchy, emoji usage
+- **engagement** (15%): Storytelling, conversation format, visual elements
+
+**AI news input** (for technical reports):
 - **structure** (20%): Logical flow, one-message-per-slide principle
 - **practicality** (25%): Actionable content, specific examples, warnings
 - **accuracy** (25%): Factual correctness, terminology
