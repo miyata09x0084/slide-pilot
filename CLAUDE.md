@@ -15,21 +15,52 @@ SlidePilot is an AI-powered presentation slide generation system that automatica
 
 ### Backend Development
 
+**Important**: You need to run **two servers** for full functionality:
+
+#### 1. FastAPI Server (Port 8001) - Main API Gateway
+
 ```bash
-# Navigate to backend directory
+cd backend/src
+python3 main.py
+# Alternative: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+This server handles:
+- PDF upload and download
+- Slide download
+- **LangGraph API proxy** (routes `/api/agent/*` to LangGraph server)
+- Health checks
+
+#### 2. LangGraph Server (Port 2024) - AI Agent Engine
+
+```bash
 cd backend
+python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
 
-# Activate virtual environment
-source venv/bin/activate
+# または、Python 3.11がデフォルトの場合:
+# langgraph dev
+```
 
-# Install dependencies
-pip install -r requirements.txt
+**Note**:
+- Requires Python 3.11+ for LangGraph dev server
+- `langgraph dev` コマンドはPython 3.10では動作しません（`langgraph-api`が必要）
+- 確実に動作させるには `python3.11 -m langgraph_cli dev` を使用してください
 
-# Start LangGraph development server (port 2024)
-langgraph dev
+This server handles:
+- AI agent workflow execution
+- ReAct agent (Gmail + Slides)
+- SSE streaming for real-time progress
 
-# Direct execution (for testing the agent without the API server)
-python slide_agent.py
+**Architecture**:
+```
+Frontend (localhost:5173)
+    ↓ All requests to localhost:8001
+FastAPI (port 8001)
+    ├── /api/upload-pdf → Direct handling
+    ├── /api/slides/{fn} → Direct handling
+    └── /api/agent/* → Proxy to LangGraph (port 2024)
+            ↓
+    LangGraph (port 2024) - Internal service
 ```
 
 ### Frontend Development
@@ -55,33 +86,59 @@ npm run preview
 
 ## Architecture
 
-### Backend Directory Structure (Issue #23 Refactoring)
+### Backend Directory Structure (FastAPI + LangGraph)
 
 ```
 backend/
 ├── src/
+│   ├── main.py          # FastAPI application entry point
+│   ├── config.py        # Unified settings (FastAPI + environment)
+│   ├── dependencies.py  # FastAPI dependency injection
+│   │
+│   ├── routers/         # FastAPI routers (follows official pattern)
+│   │   ├── health.py    # Health check endpoint
+│   │   ├── uploads.py   # PDF upload endpoint
+│   │   ├── slides.py    # Slide download endpoint
+│   │   └── agent.py     # LangGraph API proxy (NEW)
+│   │
 │   ├── agents/          # LangGraph workflow definitions
 │   │   ├── react_agent.py       # ReAct agent (Gmail + Slides)
 │   │   └── slide_workflow.py    # Slide generation workflow
+│   │
 │   ├── tools/           # Tool implementations
 │   │   ├── gmail.py     # Gmail sending
 │   │   ├── pdf.py       # PDF text extraction
 │   │   └── slides.py    # Slide generation tool wrapper
-│   ├── core/            # Core utilities
-│   │   ├── config.py    # Environment variables
+│   │
+│   ├── core/            # Core utilities (LangGraph)
+│   │   ├── config.py    # Environment variables (legacy, for agents)
 │   │   ├── llm.py       # LLM client (OpenAI GPT-4)
 │   │   └── utils.py     # Shared utility functions
-│   ├── prompts/         # Prompt definitions (Issue #23 Phase 3)
+│   │
+│   ├── prompts/         # Prompt definitions
 │   │   ├── slide_prompts.py       # Slide generation prompts
 │   │   └── evaluation_prompts.py  # Evaluation prompts
-│   ├── auth/            # Authentication
-│   │   └── gmail.py     # Gmail OAuth flow
-│   └── api/             # API endpoints
-│       └── upload.py    # File upload handler
-├── data/slides/         # Generated slides storage
+│   │
+│   └── auth/            # Authentication
+│       └── gmail.py     # Gmail OAuth flow
+│
+├── data/
+│   ├── uploads/         # Uploaded PDF files
+│   └── slides/          # Generated slides
+│
 ├── tests/               # Test files
 └── langgraph.json       # LangGraph configuration
 ```
+
+**Key architectural decisions**:
+- **`routers/`** instead of `api/`: Follows FastAPI official documentation pattern
+- **Dependency injection**: Path configuration via `dependencies.py` (DRY principle)
+- **Unified settings**: `config.py` manages both FastAPI and environment variables
+- **Proxy pattern**: FastAPI proxies LangGraph API (`/api/agent/*` → `localhost:2024`)
+  - Frontend only connects to single endpoint (`localhost:8001`)
+  - CORS managed in one place (FastAPI)
+  - LangGraph runs as internal service
+  - Performance overhead: +1-2ms (negligible)
 
 ### LangGraph Workflow (backend/src/agents/slide_workflow.py)
 
@@ -294,7 +351,24 @@ Each query is scoped to `include_domains` and `time_range: "month"` to ensure fr
 
 ## Testing the System
 
-### Backend Health Check
+### FastAPI Server Health Check
+
+```bash
+# Check root endpoint
+curl http://localhost:8001/
+
+# Check health endpoint
+curl http://localhost:8001/api/health
+
+# Upload PDF test
+curl -X POST http://localhost:8001/api/upload-pdf \
+  -F "file=@/path/to/test.pdf"
+
+# Access API documentation
+open http://localhost:8001/docs
+```
+
+### LangGraph Server Health Check
 
 ```bash
 # Check server is running
@@ -312,11 +386,18 @@ curl -N -X POST "http://localhost:2024/threads/{thread_id}/runs/stream" \
   -d '{"assistant_id": "{assistant_id}", "input": {"topic": "AI最新情報"}, "stream_mode": ["updates"]}'
 ```
 
-### Frontend Development URLs
+### Development URLs
 
 - **Frontend dev server**: http://localhost:5173
-- **LangGraph API**: http://localhost:2024
-- **LangGraph Studio**: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+- **FastAPI server** (main gateway): http://localhost:8001
+  - Swagger UI: http://localhost:8001/docs
+  - Health check: http://localhost:8001/api/health
+  - LangGraph proxy: http://localhost:8001/api/agent/*
+- **LangGraph API** (internal): http://localhost:2024
+  - Direct access: http://localhost:2024/ok
+  - LangGraph Studio: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+
+**Note**: Frontend should only connect to `http://localhost:8001` (FastAPI), which proxies LangGraph requests internally.
 
 ## Troubleshooting
 

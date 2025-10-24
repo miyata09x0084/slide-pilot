@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react';
 import type { Message } from '../components/ChatMessage';
 import type { ThinkingStep } from '../components/ThinkingIndicator';
 
-const API_BASE_URL = 'http://localhost:2024';
+const API_BASE_URL = 'http://localhost:8001/api/agent';
 
 // スライドデータの型定義
 export interface SlideData {
