@@ -22,6 +22,7 @@ import subprocess
 
 from src.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
 from src.core.llm import llm
+from src.config import settings
 
 # -------------------
 # ユーティリティ
@@ -596,9 +597,8 @@ AI技術は急速に進化中
 
 """
 
-  # ファイル保存
-  slide_dir = Path(__file__).parent.parent.parent / "data" / "slides"
-  slide_dir.mkdir(parents=True, exist_ok=True)
+  # 統一設定からスライドディレクトリを取得
+  slide_dir = settings.SLIDES_DIR
 
   # ファイル名生成
   slug = _slugify_en(topic) or "test"

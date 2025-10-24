@@ -10,6 +10,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from src.config import settings
+
 # Gmail送信権限のみ（最小権限の原則）
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
@@ -30,8 +32,8 @@ def get_gmail_service():
         FileNotFoundError: credentials.jsonが見つからない場合
     """
     creds = None
-    token_path = Path(__file__).parent.parent.parent / 'data' / 'tokens' / 'token.json'
-    creds_path = Path(__file__).parent.parent.parent / 'data' / 'tokens' / 'credentials.json'
+    token_path = settings.TOKENS_DIR / 'token.json'
+    creds_path = settings.TOKENS_DIR / 'credentials.json'
 
     # 既存トークンの読み込み
     if token_path.exists():

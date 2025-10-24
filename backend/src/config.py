@@ -11,7 +11,7 @@ from typing import Optional
 # 環境変数読み込み
 load_dotenv()
 
-# ベースディレクトリ
+# ベースディレクトリ（デフォルト）
 BASE_DIR = Path(__file__).parent.parent
 
 
@@ -33,9 +33,13 @@ class Settings:
         "http://localhost:3000",  # Alternative frontend port
     ]
 
-    # ファイルパス設定
-    UPLOAD_DIR: Path = BASE_DIR / "data" / "uploads"
-    SLIDES_DIR: Path = BASE_DIR / "data" / "slides"
+    # データディレクトリ（環境変数で制御可能）
+    DATA_DIR: Path = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
+
+    # ファイルパス設定（DATA_DIRベース）
+    UPLOAD_DIR: Path = DATA_DIR / "uploads"
+    SLIDES_DIR: Path = DATA_DIR / "slides"
+    TOKENS_DIR: Path = DATA_DIR / "tokens"
 
     # ファイルサイズ制限（100MB）
     MAX_FILE_SIZE: int = 100 * 1024 * 1024
@@ -56,8 +60,10 @@ class Settings:
 
     def __init__(self):
         """ディレクトリを自動作成"""
+        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         self.SLIDES_DIR.mkdir(parents=True, exist_ok=True)
+        self.TOKENS_DIR.mkdir(parents=True, exist_ok=True)
 
         # LangSmith環境変数設定
         os.environ.setdefault("LANGCHAIN_TRACING_V2", self.LANGCHAIN_TRACING_V2)

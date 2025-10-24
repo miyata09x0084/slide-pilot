@@ -49,6 +49,8 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from src.config import settings
+
 
 # -------------------
 # State
@@ -537,8 +539,8 @@ def save_and_render_slidev(state: State) -> Dict:
   except Exception:
     file_stem = _slugify_en(title) or "ai-latest-info"
 
-  slide_dir = Path(__file__).parent.parent.parent / "data" / "slides"
-  slide_dir.mkdir(parents=True, exist_ok=True)
+  # 統一設定からスライドディレクトリを取得
+  slide_dir = settings.SLIDES_DIR
   slide_md_path = slide_dir / f"{file_stem}_slidev.md"
   slide_md_path.write_text(slide_md, encoding="utf-8")
 
