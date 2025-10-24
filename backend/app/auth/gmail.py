@@ -10,7 +10,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from src.config import settings
+from app.config import settings
 
 # Gmail送信権限のみ（最小権限の原則）
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']

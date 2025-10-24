@@ -20,7 +20,7 @@ SlidePilot is an AI-powered presentation slide generation system that automatica
 #### 1. FastAPI Server (Port 8001) - Main API Gateway
 
 ```bash
-cd backend/src
+cd backend/app
 python3 main.py
 # Alternative: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
@@ -90,7 +90,7 @@ npm run preview
 
 ```
 backend/
-├── src/
+├── app/
 │   ├── main.py          # FastAPI application entry point
 │   ├── config.py        # Unified settings (FastAPI + environment)
 │   ├── dependencies.py  # FastAPI dependency injection
@@ -140,7 +140,7 @@ backend/
   - LangGraph runs as internal service
   - Performance overhead: +1-2ms (negligible)
 
-### LangGraph Workflow (backend/src/agents/slide_workflow.py)
+### LangGraph Workflow (backend/app/agents/slide_workflow.py)
 
 The backend is a **stateful LangGraph agent** with quality evaluation (Phase 3):
 
@@ -277,7 +277,7 @@ Frontend parsing (App.tsx:122-151):
 
 ### Prompt Management (Issue #23 Phase 3)
 
-All prompts are externalized in `backend/src/prompts/`:
+All prompts are externalized in `backend/app/prompts/`:
 
 **`slide_prompts.py`** - Slide generation prompts:
 - `get_key_points_map_prompt()` - PDF chunk → key points (Map phase)
@@ -306,7 +306,7 @@ All prompts are externalized in `backend/src/prompts/`:
   ```
 
 **How to customize prompts**:
-1. Edit constants in `backend/src/prompts/*.py`
+1. Edit constants in `backend/app/prompts/*.py`
 2. No code changes needed in `slide_workflow.py`
 3. Restart `langgraph dev` to apply changes
 

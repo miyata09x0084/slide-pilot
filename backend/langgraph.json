@@ -2,7 +2,7 @@
   "dependencies": ["langgraph==0.5.2"],
   "graphs": {
     "react-agent": {
-      "path": "./src/agents/react_agent.py:graph",
+      "path": "./app/agents/react_agent.py:graph",
       "description": "ReAct agent for Gmail sending and slide generation"
     }
   },

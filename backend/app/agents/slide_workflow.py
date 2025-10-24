@@ -3,9 +3,9 @@
 # フロー: 情報収集 -> キーポイント抽出 -> 目次生成 -> スライド生成 -> 評価 -> 保存
 
 # 共通ロジックのインポート
-from src.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
-from src.core.llm import llm
-from src.core.utils import (
+from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from app.core.llm import llm
+from app.core.utils import (
     # ユーティリティ関数
     _log, _strip_bullets, _slugify_en, _find_json,
     _ensure_marp_header, _insert_separators, _double_separators,
@@ -22,7 +22,7 @@ from src.core.utils import (
 )
 
 # プロンプト定義のインポート
-from src.prompts.slide_prompts import (
+from app.prompts.slide_prompts import (
     get_key_points_map_prompt,
     get_key_points_reduce_prompt,
     get_key_points_ai_prompt,
@@ -32,7 +32,7 @@ from src.prompts.slide_prompts import (
     get_slide_pdf_prompt,
     get_slug_prompt,
 )
-from src.prompts.evaluation_prompts import get_evaluation_prompt
+from app.prompts.evaluation_prompts import get_evaluation_prompt
 
 # ワークフロー固有のインポート
 from typing_extensions import TypedDict
@@ -40,7 +40,7 @@ from typing import Optional, Dict, Any, Union, List
 from langsmith import traceable
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableConfig
-from src.tools.pdf import process_pdf
+from app.tools.pdf import process_pdf
 import os
 import re
 import json
@@ -49,7 +49,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.config import settings
+from app.config import settings
 
 
 # -------------------

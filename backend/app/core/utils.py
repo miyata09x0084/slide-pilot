@@ -20,9 +20,9 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from src.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
-from src.core.llm import llm
-from src.config import settings
+from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from app.core.llm import llm
+from app.config import settings
 
 # -------------------
 # ユーティリティ

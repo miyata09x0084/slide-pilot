@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 # slide_workflowグラフをインポート
-from src.agents.slide_workflow import graph, State
+from app.agents.slide_workflow import graph, State
 
 
 @tool
