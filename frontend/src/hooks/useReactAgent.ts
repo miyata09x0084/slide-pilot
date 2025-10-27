@@ -9,8 +9,10 @@ const API_BASE_URL = 'http://localhost:8001/api/agent';
 
 // スライドデータの型定義
 export interface SlideData {
-  path?: string;    // スライドファイルパス
-  title?: string;   // スライドタイトル
+  path?: string;      // スライドファイルパス（ローカル）
+  title?: string;     // スライドタイトル
+  slide_id?: string;  // Supabase slide ID（Issue #24）
+  pdf_url?: string;   // Supabase公開URL（Issue #24）
 }
 
 export function useReactAgent() {
@@ -76,10 +78,19 @@ export function useReactAgent() {
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
 
+      // ──────────────────────────────────────────────────────────────
+      // ユーザー情報取得（Issue #24: Supabase統合）
+      // ──────────────────────────────────────────────────────────────
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = user.email || 'anonymous@example.com';
+
       // SSEストリーミング開始
       const response = await fetch(`${API_BASE_URL}/threads/${activeThreadId}/runs/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Email': userEmail  // ユーザー識別ヘッダー
+        },
         body: JSON.stringify({
           assistant_id: assistantId,
           input: {
@@ -164,7 +175,9 @@ export function useReactAgent() {
                         if (result.slide_path || result.path) {
                           setSlideData({
                             path: result.slide_path || result.path,
-                            title: result.title || 'スライド'
+                            title: result.title || 'スライド',
+                            slide_id: result.slide_id,     // Supabase ID（Issue #24）
+                            pdf_url: result.pdf_url        // Supabase公開URL（Issue #24）
                           });
 
                           // 完了メッセージを追加

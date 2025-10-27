@@ -9,6 +9,7 @@ import InitialInputForm from './components/InitialInputForm';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ThinkingIndicator from './components/ThinkingIndicator';
+import { SlideViewer } from './components/SlideViewer';
 import { useReactAgent } from './hooks/useReactAgent';
 
 interface UserInfo {
@@ -22,6 +23,7 @@ type Mode = 'input' | 'chat';
 function App() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [mode, setMode] = useState<Mode>('input');
+  const [showSlideViewer, setShowSlideViewer] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ReActエージェントのカスタムフック
@@ -269,7 +271,7 @@ function App() {
         {/* 思考過程インジケーター */}
         <ThinkingIndicator steps={thinkingSteps} isActive={isThinking} />
 
-        {/* スライドダウンロード */}
+        {/* スライドダウンロード（Issue #24: Supabase統合対応） */}
         {slideData.path && (
           <div style={{
             margin: '16px 0',
@@ -296,25 +298,72 @@ function App() {
                 タイトル: {slideData.title}
               </div>
             )}
-            <a
-              href={slideData.path}
-              download
-              style={{
-                display: 'inline-block',
-                padding: '10px 24px',
-                background: '#28a745',
-                color: 'white',
-                textDecoration: 'none',
-                borderRadius: '6px',
-                fontSize: '15px',
-                fontWeight: 'bold',
-                transition: 'background 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#218838'}
-              onMouseOut={(e) => e.currentTarget.style.background = '#28a745'}
-            >
-              📥 スライドをダウンロード
-            </a>
+
+            {/* Supabase統合時: プレビュー + PDFダウンロード */}
+            {slideData.slide_id ? (
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setShowSlideViewer(true)}
+                  style={{
+                    padding: '10px 24px',
+                    background: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#0056b3'}
+                  onMouseOut={(e) => e.currentTarget.style.background = '#007bff'}
+                >
+                  📄 スライドを見る
+                </button>
+                {slideData.pdf_url && (
+                  <a
+                    href={slideData.pdf_url}
+                    download
+                    style={{
+                      display: 'inline-block',
+                      padding: '10px 24px',
+                      background: '#28a745',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '6px',
+                      fontSize: '15px',
+                      fontWeight: 'bold',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#218838'}
+                    onMouseOut={(e) => e.currentTarget.style.background = '#28a745'}
+                  >
+                    📥 PDFダウンロード
+                  </a>
+                )}
+              </div>
+            ) : (
+              // ローカルのみ（Supabase未設定時）
+              <a
+                href={slideData.path}
+                download
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 24px',
+                  background: '#28a745',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '6px',
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#218838'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#28a745'}
+              >
+                📥 スライドをダウンロード
+              </a>
+            )}
           </div>
         )}
 
@@ -346,6 +395,14 @@ function App() {
             : 'スライド内容について質問してください...'
         }
       />
+
+      {/* SlideViewerモーダル（Issue #24） */}
+      {showSlideViewer && slideData.slide_id && (
+        <SlideViewer
+          slideId={slideData.slide_id}
+          onClose={() => setShowSlideViewer(false)}
+        />
+      )}
 
       {/* レスポンシブ対応のCSS */}
       <style>{`

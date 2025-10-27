@@ -5,7 +5,7 @@ LangGraphサーバー (localhost:2024) へのリクエストをプロキシし�
 フロントエンドが単一エンドポイント (localhost:8001) で全機能にアクセスできるようにする。
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 import httpx
 from typing import Any, Dict
@@ -72,7 +72,11 @@ async def search_assistants(request: Request):
 
 
 @router.post("/threads/{thread_id}/runs/stream")
-async def stream_run(thread_id: str, request: Request):
+async def stream_run(
+    thread_id: str,
+    request: Request,
+    x_user_email: str = Header(None, alias="X-User-Email")
+):
     """
     LangGraphエージェントをストリーミング実行
 
@@ -82,12 +86,21 @@ async def stream_run(thread_id: str, request: Request):
     Args:
         thread_id: LangGraphスレッドID
         request: リクエストボディ（assistant_id, input, stream_mode含む）
+        x_user_email: ユーザー識別子（Emailヘッダー、オプショナル）
 
     Returns:
         StreamingResponse: SSEストリーム
     """
     try:
         body = await request.json()
+
+        # ──────────────────────────────────────────────────────────────
+        # user_id を input に注入（Issue #24: Supabase統合）
+        # ──────────────────────────────────────────────────────────────
+        if x_user_email:
+            if "input" not in body:
+                body["input"] = {}
+            body["input"]["user_id"] = x_user_email
 
         async def stream_generator():
             """LangGraphからのSSEレスポンスをリアルタイムで転送"""

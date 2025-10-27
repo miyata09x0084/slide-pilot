@@ -8,8 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 設定とルーターのインポート
-from config import settings
-from routers import health, uploads, slides, agent
+from app.config import settings
+from app.routers import health, uploads, slides, agent
 
 # FastAPIアプリケーション作成
 app = FastAPI(

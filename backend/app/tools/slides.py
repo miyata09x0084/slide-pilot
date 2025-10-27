@@ -77,6 +77,8 @@ def generate_slides(topic: str = "AI最新情報") -> str:
         # 成功時の情報を返す
         title = result.get("title", "AI最新情報スライド")
         slide_path = result.get("slide_path", "")
+        slide_id = result.get("slide_id")  # Supabase slide ID (Issue #24)
+        pdf_url = result.get("pdf_url")    # Supabase公開URL (Issue #24)
         # score = result.get("score", 0.0)
         # passed = result.get("passed", False)
 
@@ -85,11 +87,14 @@ def generate_slides(topic: str = "AI最新情報") -> str:
         api_url = f"http://localhost:8001/api/slides/{filename}"
 
         # JSON形式で返す（フロントエンドがパース可能）
+        # Issue #24: slide_idとpdf_urlを追加してブラウザプレビューを有効化
         return json.dumps({
             "status": "success",
             "message": "✅ スライド生成完了",
             "title": title,
-            "slide_path": api_url
+            "slide_path": api_url,
+            "slide_id": slide_id,
+            "pdf_url": pdf_url
         }, ensure_ascii=False)
 
     except Exception as e:
