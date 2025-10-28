@@ -562,6 +562,45 @@ class: text-center
     }
 
 # -------------------
+# Node D.5: Mermaid図解生成（Issue #25）
+# -------------------
+@traceable(run_name="d5_generate_diagrams")
+def generate_diagrams(state: State) -> Dict:
+    """Mermaid図解を生成してスライドに挿入"""
+    slide_md = state.get("slide_md") or ""
+    topic = state.get("topic") or ""
+    key_points = state.get("key_points") or []
+
+    # PDF以外はスキップ
+    input_type = detect_input_type(topic)
+    if input_type != "pdf":
+        return {"diagrams": {}, "log": _log(state, "[diagrams] skipped (not PDF)")}
+
+    diagrams_meta = {}
+
+    try:
+        # 1. アーキテクチャ図生成
+        arch_diagram = _generate_architecture_flowchart(key_points)
+        slide_md = _insert_after_section(slide_md, "Agenda", arch_diagram)
+        diagrams_meta["architecture"] = {"type": "flowchart", "inserted": True}
+
+        # 2. ユースケース図生成
+        use_case_diagram = _generate_use_case_mindmap(key_points)
+        slide_md = _insert_before_section(slide_md, "まとめ", use_case_diagram)
+        diagrams_meta["use_cases"] = {"type": "mindmap", "inserted": True}
+
+        return {
+            "slide_md": slide_md,
+            "diagrams": diagrams_meta,
+            "log": _log(state, f"[diagrams] generated {len(diagrams_meta)} diagrams")
+        }
+    except Exception as e:
+        return {
+            "error": f"diagram_generation_error: {e}",
+            "log": _log(state, f"[diagrams] EXCEPTION {e}")
+        }
+
+# -------------------
 # Node E: 評価
 # -------------------
 MAX_ATTEMPTS = 3
