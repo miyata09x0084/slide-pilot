@@ -398,28 +398,28 @@ mindmap
 
 
 def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
-    """指定セクション直後にコンテンツを挿入"""
+    """指定セクション直後にコンテンツを挿入（h1/h2/h3対応）"""
     import re
 
-    # "## section_title" の後の "---" を見つけて、その直後に挿入
-    pattern = rf'(##\s+{re.escape(section_title)}.*?\n---\s*\n)'
+    # "# section_title" または "## section_title" の後の "---" を見つけて挿入
+    pattern = rf'(#+\s+{re.escape(section_title)}.*?\n---\s*\n)'
 
     if re.search(pattern, slide_md, re.DOTALL):
         return re.sub(pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
     else:
-        # セクションが見つからない場合はAgenda直後に挿入（フォールバック）
-        agenda_pattern = r'(##\s+(?:目次|Agenda).*?\n---\s*\n)'
+        # フォールバック: 目次/Agendaの後に挿入
+        agenda_pattern = r'(#+\s+(?:目次|Agenda).*?\n---\s*\n)'
         if re.search(agenda_pattern, slide_md, re.DOTALL):
             return re.sub(agenda_pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
         return slide_md
 
 
 def _insert_before_section(slide_md: str, section_title: str, content: str) -> str:
-    """指定セクション直前にコンテンツを挿入"""
+    """指定セクション直前にコンテンツを挿入（h1/h2/h3対応）"""
     import re
 
-    # "---\n\n## section_title" の直前に挿入
-    pattern = rf'(---\s*\n\n##\s+{re.escape(section_title)})'
+    # "---\n\n# section_title" または "---\n\n## section_title" の直前に挿入
+    pattern = rf'(---\s*\n\n#+\s+{re.escape(section_title)})'
 
     if re.search(pattern, slide_md):
         return re.sub(pattern, rf'{content}\n\1', slide_md, count=1)
