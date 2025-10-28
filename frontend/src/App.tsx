@@ -10,6 +10,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ThinkingIndicator from './components/ThinkingIndicator';
 import { SlideViewer } from './components/SlideViewer';
+import { SlideHistory } from './components/SlideHistory';
 import { useReactAgent } from './hooks/useReactAgent';
 
 interface UserInfo {
@@ -24,6 +25,7 @@ function App() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [mode, setMode] = useState<Mode>('input');
   const [showSlideViewer, setShowSlideViewer] = useState(false);
+  const [previewSlideId, setPreviewSlideId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ReActエージェントのカスタムフック
@@ -185,6 +187,38 @@ function App() {
           onPdfUpload={handlePdfUpload}
           onYoutubeSubmit={handleYoutubeSubmit}
         />
+
+        {/* スライド履歴セクション */}
+        <div style={{
+          maxWidth: '1200px',
+          margin: '40px auto',
+          padding: '0 24px'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: 600,
+            marginBottom: '20px',
+            color: '#333',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>📚</span>
+            <span>過去のスライド</span>
+          </h2>
+          <SlideHistory
+            userEmail={user.email}
+            onPreview={(slideId) => setPreviewSlideId(slideId)}
+          />
+        </div>
+
+        {/* プレビューモーダル（履歴から開く） */}
+        {previewSlideId && (
+          <SlideViewer
+            slideId={previewSlideId}
+            onClose={() => setPreviewSlideId(null)}
+          />
+        )}
       </div>
     );
   }
