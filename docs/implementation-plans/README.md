@@ -22,3 +22,4 @@
 ## 既存の実装計画
 
 - [Issue #25: Mermaid図解統合](./IMPLEMENTATION_PLAN_ISSUE25.md)
+- [スライド履歴プレビュー機能 + user_id問題修正](./IMPLEMENTATION_PLAN_HISTORY_PREVIEW.md)

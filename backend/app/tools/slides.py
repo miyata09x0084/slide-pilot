@@ -5,16 +5,20 @@ ReActエージェントから呼び出してAI最新情報スライドを生成�
 """
 
 from langchain_core.tools import tool
-from typing import Optional
 import json
 from pathlib import Path
+from typing_extensions import Annotated
+from langgraph.prebuilt import InjectedState
 
 # slide_workflowグラフをインポート
 from app.agents.slide_workflow import graph, State
 
 
 @tool
-def generate_slides(topic: str = "AI最新情報") -> str:
+def generate_slides(
+    topic: str = "AI最新情報",
+    state: Annotated[dict, InjectedState] = None
+) -> str:
     """スライドを生成（PDF/YouTube/テキスト対応）
 
     入力に応じて自動的に処理方法を切り替えます:
@@ -36,14 +40,21 @@ def generate_slides(topic: str = "AI最新情報") -> str:
                - PDFファイルパス（例: "/path/to/file.pdf"）
                - YouTube URL（例: "https://youtube.com/watch?v=..."）
                - テキスト（例: "AI最新情報"）
+        state: LangGraphから自動注入されるState（user_id含む）
+               このパラメータはLLMのツールスキーマから除外される
 
     Returns:
         str: 生成されたスライドのパスと結果情報（JSON形式）
     """
 
+    # user_idを取得（InjectedStateから）
+    user_id = state.get("user_id", "anonymous") if state else "anonymous"
+    print(f"[generate_slides] topic={topic[:50]}, user_id={user_id}")
+
     # 初期State設定
     init_state: State = {
         "topic": topic,
+        "user_id": user_id,  # ← 追加
         "key_points": [],
         "toc": [],
         "slide_md": "",
