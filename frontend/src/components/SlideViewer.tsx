@@ -144,8 +144,17 @@ export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
                     h3: ({ children }) => <h3 style={styles.h3}>{children}</h3>,
                     // コードブロック
                     code: (props) => {
-                      const { children, ...rest } = props;
+                      const { children, className, ...rest } = props;
+                      const match = /language-(\w+)/.exec(className || '');
+                      const language = match ? match[1] : '';
                       const inline = !String(children).includes('\n');
+
+                      // Mermaid図解の場合
+                      if (language === 'mermaid' && !inline) {
+                        return <MermaidDiagram chart={String(children).replace(/\n$/, '')} index={index} />;
+                      }
+
+                      // 通常のコードブロック
                       return inline ? (
                         <code style={styles.inlineCode} {...rest}>{children}</code>
                       ) : (
