@@ -772,15 +772,17 @@ graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
+graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 
-# エッジ定義（Slidevフロー with 評価ループ）
+# エッジ定義（Slidevフロー with 評価ループ + Mermaid図解）
 graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides_slidev")
-graph_builder.add_edge("write_slides_slidev", "evaluate_slides_slidev")
+graph_builder.add_edge("write_slides_slidev", "generate_diagrams")
+graph_builder.add_edge("generate_diagrams", "evaluate_slides_slidev")
 
 # 評価ループ（最大3回リトライ）
 graph_builder.add_conditional_edges(
