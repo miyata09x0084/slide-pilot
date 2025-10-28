@@ -354,8 +354,7 @@ def generate_toc(state: State) -> Dict:
 # -------------------
 def _generate_architecture_flowchart(key_points: List[str]) -> str:
     """重要ポイントからアーキテクチャ図を生成"""
-    return '''---
-
+    return '''
 ## 📊 技術の仕組み
 
 ```mermaid
@@ -368,14 +367,12 @@ flowchart LR
 ```
 
 **この図は、技術の全体フローを示しています**
-
----'''
+'''
 
 
 def _generate_use_case_mindmap(key_points: List[str]) -> str:
     """重要ポイントからユースケース図を生成"""
-    return '''---
-
+    return '''
 ## 🎯 活用例
 
 ```mermaid
@@ -393,8 +390,7 @@ mindmap
 ```
 
 **3つの領域で実用可能です**
-
----'''
+'''
 
 
 def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
@@ -402,15 +398,17 @@ def _insert_after_section(slide_md: str, section_title: str, content: str) -> st
     import re
 
     # "# section_title" または "## section_title" の後の "---" を見つけて挿入
+    # contentの先頭と末尾の改行を削除してから、区切りを追加して挿入
+    clean_content = content.strip('\n')
     pattern = rf'(#+\s+{re.escape(section_title)}.*?\n---\s*\n)'
 
     if re.search(pattern, slide_md, re.DOTALL):
-        return re.sub(pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
+        return re.sub(pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
     else:
         # フォールバック: 目次/Agendaの後に挿入
         agenda_pattern = r'(#+\s+(?:目次|Agenda).*?\n---\s*\n)'
         if re.search(agenda_pattern, slide_md, re.DOTALL):
-            return re.sub(agenda_pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
+            return re.sub(agenda_pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
         return slide_md
 
 
@@ -418,14 +416,19 @@ def _insert_before_section(slide_md: str, section_title: str, content: str) -> s
     """指定セクション直前にコンテンツを挿入（h1/h2/h3対応）"""
     import re
 
-    # "---\n\n# section_title" または "---\n\n## section_title" の直前に挿入
-    pattern = rf'(---\s*\n\n#+\s+{re.escape(section_title)})'
+    # contentの先頭と末尾の改行を削除
+    clean_content = content.strip('\n')
+
+    # パターン: --- の後に section_title がある箇所
+    # マッチグループ1: --- + 改行、グループ2: section_title
+    pattern = rf'(---\s*\n\n)(#+\s+{re.escape(section_title)})'
 
     if re.search(pattern, slide_md):
-        return re.sub(pattern, rf'{content}\n\1', slide_md, count=1)
+        # --- と section_title の間に図解を挿入
+        return re.sub(pattern, rf'\1{clean_content}\n\n---\n\n\2', slide_md, count=1)
     else:
         # セクションが見つからない場合は末尾に追加
-        return slide_md + f'\n{content}'
+        return slide_md.rstrip('\n') + f'\n\n{clean_content}\n\n---\n\n'
 
 # -------------------
 # Node D: スライド本文（Slidev）生成
