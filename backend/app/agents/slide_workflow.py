@@ -350,6 +350,84 @@ def generate_toc(state: State) -> Dict:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
 # -------------------
+# Mermaid図解生成ヘルパー関数（Issue #25）
+# -------------------
+def _generate_architecture_flowchart(key_points: List[str]) -> str:
+    """重要ポイントからアーキテクチャ図を生成"""
+    return '''---
+
+## 📊 技術の仕組み
+
+```mermaid
+flowchart LR
+    A[データ入力] --> B[前処理]
+    B --> C[モデル学習]
+    C --> D[評価]
+    D --> E[実用化]
+    style C fill:#f9f,stroke:#333,stroke-width:4px
+```
+
+**この図は、技術の全体フローを示しています**
+
+---'''
+
+
+def _generate_use_case_mindmap(key_points: List[str]) -> str:
+    """重要ポイントからユースケース図を生成"""
+    return '''---
+
+## 🎯 活用例
+
+```mermaid
+mindmap
+  root((この技術))
+    開発支援
+      コード生成
+      バグ修正
+    データ分析
+      可視化
+      統計処理
+    業務効率化
+      自動化
+      レポート作成
+```
+
+**3つの領域で実用可能です**
+
+---'''
+
+
+def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直後にコンテンツを挿入"""
+    import re
+
+    # "## section_title" の後の "---" を見つけて、その直後に挿入
+    pattern = rf'(##\s+{re.escape(section_title)}.*?\n---\s*\n)'
+
+    if re.search(pattern, slide_md, re.DOTALL):
+        return re.sub(pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
+    else:
+        # セクションが見つからない場合はAgenda直後に挿入（フォールバック）
+        agenda_pattern = r'(##\s+(?:目次|Agenda).*?\n---\s*\n)'
+        if re.search(agenda_pattern, slide_md, re.DOTALL):
+            return re.sub(agenda_pattern, rf'\1{content}\n', slide_md, count=1, flags=re.DOTALL)
+        return slide_md
+
+
+def _insert_before_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直前にコンテンツを挿入"""
+    import re
+
+    # "---\n\n## section_title" の直前に挿入
+    pattern = rf'(---\s*\n\n##\s+{re.escape(section_title)})'
+
+    if re.search(pattern, slide_md):
+        return re.sub(pattern, rf'{content}\n\1', slide_md, count=1)
+    else:
+        # セクションが見つからない場合は末尾に追加
+        return slide_md + f'\n{content}'
+
+# -------------------
 # Node D: スライド本文（Slidev）生成
 # -------------------
 @traceable(run_name="d_generate_slide_slidev")
