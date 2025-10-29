@@ -1,11 +1,12 @@
 /**
- * SlideDetailPage
- * スライド詳細ページ（Phase 1: 基本構造のみ）
- * Phase 3でRAGチャット機能を追加予定
+ * SlideDetailPage (Phase 3: 2ペインレイアウト + チャットUI)
+ * スライド詳細ページ
  */
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import SlideDetailLayout from '../components/slide/SlideDetailLayout';
+import ChatPanel from '../components/slide/ChatPanel';
 import { SlideViewer } from '../components/SlideViewer';
 
 interface Slide {
@@ -15,6 +16,113 @@ interface Slide {
   created_at: string;
   pdf_url?: string;
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    minHeight: '100vh',
+    background: '#f5f5f5',
+    fontFamily: 'Arial, sans-serif',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 24px',
+    background: 'white',
+    borderBottom: '1px solid #dee2e6',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  backButton: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    background: '#6c757d',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'background 0.2s',
+  },
+  title: {
+    margin: 0,
+    fontSize: '20px',
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  actions: {
+    display: 'flex',
+    gap: '8px',
+  },
+  actionButton: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    background: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    textDecoration: 'none',
+    transition: 'background 0.2s',
+  },
+  loadingContainer: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f5f5f5',
+  },
+  spinner: {
+    display: 'inline-block',
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #007bff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  errorContainer: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f5f5f5',
+  },
+  errorCard: {
+    textAlign: 'center',
+    padding: '40px',
+    background: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+  },
+  errorIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+  },
+  errorTitle: {
+    color: '#dc3545',
+    marginBottom: '8px',
+  },
+  errorText: {
+    color: '#666',
+    marginBottom: '24px',
+  },
+  slideViewerWrapper: {
+    height: '100%',
+  },
+};
+
+const spinnerKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
 
 export default function SlideDetailPage() {
   const { slideId } = useParams<{ slideId: string }>();
@@ -51,69 +159,34 @@ export default function SlideDetailPage() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f5f5f5'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            display: 'inline-block',
-            width: '40px',
-            height: '40px',
-            border: '4px solid #f3f3f3',
-            borderTop: '4px solid #007bff',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <p style={{ marginTop: '12px', color: '#666' }}>読み込み中...</p>
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
+      <>
+        <div style={styles.loadingContainer}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={styles.spinner} />
+            <p style={{ marginTop: '12px', color: '#666' }}>読み込み中...</p>
+          </div>
         </div>
-      </div>
+        <style>{spinnerKeyframes}</style>
+      </>
     );
   }
 
   if (error || !slide) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f5f5f5'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          padding: '40px',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-          <h2 style={{ color: '#dc3545', marginBottom: '8px' }}>
-            スライドが見つかりません
-          </h2>
-          <p style={{ color: '#666', marginBottom: '24px' }}>
+      <div style={styles.errorContainer}>
+        <div style={styles.errorCard}>
+          <div style={styles.errorIcon}>⚠️</div>
+          <h2 style={styles.errorTitle}>スライドが見つかりません</h2>
+          <p style={styles.errorText}>
             {error || 'スライドが存在しないか、削除された可能性があります。'}
           </p>
           <button
             onClick={() => navigate('/')}
+            onMouseOver={(e) => e.currentTarget.style.background = '#0056b3'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#007bff'}
             style={{
-              padding: '10px 24px',
+              ...styles.actionButton,
               background: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '15px',
-              fontWeight: 'bold',
-              cursor: 'pointer'
             }}
           >
             ダッシュボードに戻る
@@ -124,99 +197,51 @@ export default function SlideDetailPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f5f5f5',
-      fontFamily: 'Arial, sans-serif'
-    }}>
-      {/* ヘッダー */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '16px 24px',
-        background: 'white',
-        borderBottom: '1px solid #dee2e6',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            onClick={() => navigate('/')}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              background: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            ← Dashboard
-          </button>
-          <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
-            {slide.title}
-          </h1>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {slide.pdf_url && (
-            <a
-              href={slide.pdf_url}
-              download
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                textDecoration: 'none',
-                cursor: 'pointer'
-              }}
+    <>
+      <div style={styles.container}>
+        {/* ヘッダー */}
+        <div style={styles.header}>
+          <div style={styles.headerLeft}>
+            <button
+              onClick={() => navigate('/')}
+              onMouseOver={(e) => e.currentTarget.style.background = '#5a6268'}
+              onMouseOut={(e) => e.currentTarget.style.background = '#6c757d'}
+              style={styles.backButton}
             >
-              📥 PDF
-            </a>
-          )}
-        </div>
-      </div>
+              ← Dashboard
+            </button>
+            <h1 style={styles.title}>{slide.title}</h1>
+          </div>
 
-      {/* スライドビューア（Phase 1: フルスクリーン表示） */}
-      <div style={{
-        padding: '24px',
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <SlideViewer
-            slideId={slideId!}
-            onClose={() => navigate('/')}
-          />
+          <div style={styles.actions}>
+            {slide.pdf_url && (
+              <a
+                href={slide.pdf_url}
+                download
+                onMouseOver={(e) => e.currentTarget.style.background = '#218838'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#28a745'}
+                style={styles.actionButton}
+              >
+                📥 PDF
+              </a>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Phase 3: ここにRAGチャットパネルを追加予定 */}
-      <div style={{
-        padding: '24px',
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
-        <div style={{
-          background: '#fff3cd',
-          border: '1px solid #ffeaa7',
-          borderRadius: '8px',
-          padding: '16px',
-          textAlign: 'center',
-          color: '#856404'
-        }}>
-          💬 RAGチャット機能は Phase 3 で実装予定です
-        </div>
+        {/* 2ペインレイアウト */}
+        <SlideDetailLayout
+          slidePane={
+            <div style={styles.slideViewerWrapper}>
+              <SlideViewer
+                slideId={slideId!}
+                onClose={() => navigate('/')}
+              />
+            </div>
+          }
+          chatPane={<ChatPanel slideId={slideId!} />}
+        />
       </div>
-    </div>
+      <style>{spinnerKeyframes}</style>
+    </>
   );
 }
