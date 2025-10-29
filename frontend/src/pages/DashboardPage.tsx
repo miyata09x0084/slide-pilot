@@ -1,5 +1,5 @@
 /**
- * DashboardPage
+ * DashboardPage (Phase 2: 3カラムレイアウト)
  * トップページ: PDFアップロード + スライド履歴表示
  */
 
@@ -7,9 +7,59 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useReactAgent } from '../hooks/useReactAgent';
-import InitialInputForm from '../components/InitialInputForm';
-import { SlideHistory } from '../components/SlideHistory';
+import DashboardLayout from '../components/dashboard/DashboardLayout';
+import AssistantPanel from '../components/dashboard/AssistantPanel';
+import SlideHistoryGrid from '../components/dashboard/SlideHistoryGrid';
+import QuickActionPanel from '../components/dashboard/QuickActionPanel';
 import { SlideViewer } from '../components/SlideViewer';
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    minHeight: '100vh',
+    background: '#f5f5f5',
+    fontFamily: 'Arial, sans-serif',
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 24px',
+    background: 'white',
+    borderBottom: '1px solid #dee2e6',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+  logo: {
+    margin: 0,
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  userSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  avatar: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+  },
+  userName: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+  },
+  logoutButton: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    background: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'background 0.2s',
+  },
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -28,15 +78,8 @@ export default function DashboardPage() {
     console.log('📄 Starting slide generation from PDF:', path);
 
     try {
-      // スレッド作成
       const tid = await createThread();
-
-      // 生成進行状況ページへ遷移
-      navigate(`/generate/${tid}`, {
-        state: { pdfPath: path }
-      });
-
-      // PDFからスライド生成を自動実行
+      navigate(`/generate/${tid}`, { state: { pdfPath: path } });
       await sendMessage(
         `このPDFから中学生向けのわかりやすいスライドを作成してください: ${path}`,
         tid
@@ -52,10 +95,7 @@ export default function DashboardPage() {
 
     try {
       const tid = await createThread();
-      navigate(`/generate/${tid}`, {
-        state: { youtubeUrl: url }
-      });
-
+      navigate(`/generate/${tid}`, { state: { youtubeUrl: url } });
       await sendMessage(
         `このYouTube動画から中学生向けのスライドを作成してください: ${url}`,
         tid
@@ -65,96 +105,80 @@ export default function DashboardPage() {
     }
   };
 
-  // スライド履歴カードクリック
-  const handleSlidePreview = (slideId: string) => {
-    // Phase 1: モーダルプレビュー（既存機能）
-    setPreviewSlideId(slideId);
+  // クイックテンプレートクリック
+  const handleTemplateClick = async (templateId: string) => {
+    const templates: Record<string, string> = {
+      'ai-news': 'AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください',
+      'ml-basics': '機械学習の基礎について、初心者向けのスライドを作成してください',
+      'textbook': '教科書の章立てから復習用スライドを作成してください',
+    };
 
-    // Phase 3: スライド詳細ページへ遷移（将来実装）
-    // navigate(`/slides/${slideId}`);
+    const prompt = templates[templateId];
+    if (!prompt) return;
+
+    try {
+      const tid = await createThread();
+      navigate(`/generate/${tid}`, { state: { template: templateId } });
+      await sendMessage(prompt, tid);
+    } catch (err) {
+      console.error('❌ テンプレート処理エラー:', err);
+    }
+  };
+
+  // スライド履歴カードクリック
+  const handleSlideClick = (slideId: string) => {
+    setPreviewSlideId(slideId);
+    // Phase 3: navigate(`/slides/${slideId}`);
   };
 
   if (!user) {
-    return null; // ProtectedRouteでリダイレクトされるので表示されない
+    return null;
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#f5f5f5',
-      fontFamily: 'Arial, sans-serif'
-    }}>
+    <div style={styles.container}>
       {/* ヘッダー */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '16px 24px',
-        background: 'white',
-        borderBottom: '1px solid #dee2e6',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
-          SlidePilot
-        </h1>
+      <div style={styles.header}>
+        <h1 style={styles.logo}>SlidePilot</h1>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={styles.userSection}>
           <img
             src={user.picture}
             alt={user.name}
-            style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+            style={styles.avatar}
           />
-          <div style={{ fontSize: '14px' }}>
-            <div style={{ fontWeight: 'bold' }}>{user.name}</div>
-          </div>
+          <div style={styles.userName}>{user.name}</div>
           <button
             onClick={handleLogout}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              background: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#c82333'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#dc3545'}
+            style={styles.logoutButton}
           >
             ログアウト
           </button>
         </div>
       </div>
 
-      {/* 初回入力フォーム */}
-      <InitialInputForm
-        onPdfUpload={handlePdfUpload}
-        onYoutubeSubmit={handleYoutubeSubmit}
+      {/* 3カラムレイアウト */}
+      <DashboardLayout
+        leftSidebar={
+          <SlideHistoryGrid
+            userEmail={user.email}
+            onSlideClick={handleSlideClick}
+          />
+        }
+        centerPanel={
+          <AssistantPanel
+            onPdfUpload={handlePdfUpload}
+            onYoutubeSubmit={handleYoutubeSubmit}
+          />
+        }
+        rightSidebar={
+          <QuickActionPanel onTemplateClick={handleTemplateClick} />
+        }
       />
 
-      {/* スライド履歴セクション */}
-      <div style={{
-        maxWidth: '1200px',
-        margin: '40px auto',
-        padding: '0 24px'
-      }}>
-        <h2 style={{
-          fontSize: '20px',
-          fontWeight: 600,
-          marginBottom: '20px',
-          color: '#333',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span>📚</span>
-          <span>過去のスライド</span>
-        </h2>
-        <SlideHistory
-          userEmail={user.email}
-          onPreview={handleSlidePreview}
-        />
-      </div>
-
-      {/* プレビューモーダル（履歴から開く） */}
+      {/* プレビューモーダル */}
       {previewSlideId && (
         <SlideViewer
           slideId={previewSlideId}
