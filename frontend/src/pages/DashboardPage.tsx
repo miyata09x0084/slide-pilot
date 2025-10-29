@@ -1,9 +1,8 @@
 /**
- * DashboardPage (Phase 2: 3カラムレイアウト)
+ * DashboardPage (Phase 3: ページ遷移対応)
  * トップページ: PDFアップロード + スライド履歴表示
  */
 
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useReactAgent } from '../hooks/useReactAgent';
@@ -11,7 +10,6 @@ import DashboardLayout from '../components/dashboard/DashboardLayout';
 import AssistantPanel from '../components/dashboard/AssistantPanel';
 import SlideHistoryGrid from '../components/dashboard/SlideHistoryGrid';
 import QuickActionPanel from '../components/dashboard/QuickActionPanel';
-import { SlideViewer } from '../components/SlideViewer';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -65,7 +63,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
-  const [previewSlideId, setPreviewSlideId] = useState<string | null>(null);
 
   // ログアウト処理
   const handleLogout = () => {
@@ -125,10 +122,9 @@ export default function DashboardPage() {
     }
   };
 
-  // スライド履歴カードクリック
+  // スライド履歴カードクリック（Phase 3: 専用ページに遷移）
   const handleSlideClick = (slideId: string) => {
-    setPreviewSlideId(slideId);
-    // Phase 3: navigate(`/slides/${slideId}`);
+    navigate(`/slides/${slideId}`);
   };
 
   if (!user) {
@@ -177,14 +173,6 @@ export default function DashboardPage() {
           <QuickActionPanel onTemplateClick={handleTemplateClick} />
         }
       />
-
-      {/* プレビューモーダル */}
-      {previewSlideId && (
-        <SlideViewer
-          slideId={previewSlideId}
-          onClose={() => setPreviewSlideId(null)}
-        />
-      )}
     </div>
   );
 }

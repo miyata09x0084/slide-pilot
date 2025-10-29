@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import SlideDetailLayout from '../components/slide/SlideDetailLayout';
 import ChatPanel from '../components/slide/ChatPanel';
-import { SlideViewer } from '../components/SlideViewer';
+import { SlideContentViewer } from '../components/slide/SlideContentViewer';
 
 interface Slide {
   id: string;
@@ -135,7 +135,7 @@ export default function SlideDetailPage() {
     const fetchSlide = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8001/api/slides/${slideId}`
+          `http://localhost:8001/api/slides/${slideId}/markdown`
         );
 
         if (!response.ok) {
@@ -143,7 +143,15 @@ export default function SlideDetailPage() {
         }
 
         const data = await response.json();
-        setSlide(data);
+
+        // APIレスポンス形式をSlide型に変換
+        setSlide({
+          id: data.slide_id,
+          title: data.title,
+          topic: data.title, // topicフィールドはtitleで代用
+          created_at: data.created_at,
+          pdf_url: data.pdf_url,
+        });
       } catch (err: any) {
         console.error('Failed to fetch slide:', err);
         setError(err.message);
@@ -232,10 +240,7 @@ export default function SlideDetailPage() {
         <SlideDetailLayout
           slidePane={
             <div style={styles.slideViewerWrapper}>
-              <SlideViewer
-                slideId={slideId!}
-                onClose={() => navigate('/')}
-              />
+              <SlideContentViewer slideId={slideId!} />
             </div>
           }
           chatPane={<ChatPanel slideId={slideId!} />}

@@ -19,9 +19,9 @@ export default function GenerationProgressPage() {
       hasRedirected.current = true;
       console.log('✅ Slide generation completed, redirecting to slide detail...');
 
-      // Phase 1: Dashboardに戻る（Phase 3でSlideDetailPageへ遷移予定）
+      // Phase 3: SlideDetailPageへ遷移
       setTimeout(() => {
-        navigate('/', { replace: true });
+        navigate(`/slides/${slideData.slide_id}`, { replace: true });
       }, 2000);
     }
   }, [slideData, isThinking, navigate]);
@@ -138,7 +138,7 @@ export default function GenerationProgressPage() {
                 color: '#155724',
                 marginTop: '8px'
               }}>
-                まもなくダッシュボードに戻ります...
+                まもなくスライド詳細ページに移動します...
               </div>
             </div>
           )}

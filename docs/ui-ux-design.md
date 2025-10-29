@@ -991,9 +991,9 @@ xl: 1280px  /* ワイドスクリーン */
 | TypeScript       | 5.x        | 型安全性          |
 | Vite             | 6.x        | ビルドツール      |
 | React Router     | 6.x        | ルーティング      |
+| Recoil           | 0.7.x      | **状態管理**      |
 | Framer Motion    | 11.x       | アニメーション    |
 | Tailwind CSS     | 3.x        | スタイリング      |
-| Zustand or Jotai | 4.x        | 軽量状態管理      |
 | react-hot-toast  | 2.x        | 通知 UI           |
 
 ### バックエンド
@@ -1018,52 +1018,203 @@ xl: 1280px  /* ワイドスクリーン */
 | Vercel         | フロントエンドホスティング  |
 | Railway/Render | バックエンドホスティング    |
 
+### 状態管理（Recoil）
+
+#### Recoil採用理由
+- **React Hooksライクな直感的API**: `useRecoilState()`, `useRecoilValue()`で学習コストが低い
+- **細かい粒度の状態管理**: Atom単位で状態を分割、不要な再レンダリングを防止
+- **非同期処理のサポート**: Selector で非同期データフェッチを簡潔に記述可能
+- **軽量・高パフォーマンス**: Context APIより効率的、Reduxよりボイラープレート少ない
+- **ページ間の状態共有**: DashboardPage → GenerationProgressPage の状態引き継ぎに最適
+
+#### Atoms定義
+
+```typescript
+// frontend/src/store/reactAgentAtoms.ts
+import { atom } from 'recoil';
+
+export const messagesAtom = atom<Message[]>({
+  key: 'reactAgent/messages',
+  default: [],
+});
+
+export const thinkingStepsAtom = atom<ThinkingStep[]>({
+  key: 'reactAgent/thinkingSteps',
+  default: [],
+});
+
+export const isThinkingAtom = atom<boolean>({
+  key: 'reactAgent/isThinking',
+  default: false,
+});
+
+export const slideDataAtom = atom<SlideData>({
+  key: 'reactAgent/slideData',
+  default: {
+    slide_id: '',
+    slide_path: '',
+    title: '',
+    pdf_url: '',
+  },
+});
+
+export const errorAtom = atom<string | null>({
+  key: 'reactAgent/error',
+  default: null,
+});
+```
+
+#### useReactAgent のRecoil移行
+
+```typescript
+// frontend/src/hooks/useReactAgent.ts
+import { useRecoilState } from 'recoil';
+import {
+  messagesAtom,
+  thinkingStepsAtom,
+  isThinkingAtom,
+  slideDataAtom,
+  errorAtom,
+} from '../store/reactAgentAtoms';
+
+export function useReactAgent() {
+  const [messages, setMessages] = useRecoilState(messagesAtom);
+  const [thinkingSteps, setThinkingSteps] = useRecoilState(thinkingStepsAtom);
+  const [isThinking, setIsThinking] = useRecoilState(isThinkingAtom);
+  const [slideData, setSlideData] = useRecoilState(slideDataAtom);
+  const [error, setError] = useRecoilState(errorAtom);
+
+  // sendMessage, resetState などのロジックは従来通り
+  // ...
+}
+```
+
+#### App.tsx のRecoilRoot設定
+
+```typescript
+// frontend/src/App.tsx
+import { RecoilRoot } from 'recoil';
+
+function App() {
+  return (
+    <RecoilRoot>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <BrowserRouter>
+          <Routes>
+            {/* ... */}
+          </Routes>
+        </BrowserRouter>
+      </GoogleOAuthProvider>
+    </RecoilRoot>
+  );
+}
+```
+
+#### 状態共有フロー
+
+```
+DashboardPage
+  ↓ sendMessage() 実行
+  ↓ useRecoilState(isThinkingAtom) → true に更新
+  ↓ useRecoilState(slideDataAtom) → SSE更新を反映
+  ↓ navigate('/generate/:threadId')
+  ↓
+GenerationProgressPage
+  ↓ useRecoilValue(isThinkingAtom) → true を購読
+  ↓ useRecoilValue(slideDataAtom) → slide_id をリアルタイム監視
+  ↓ slideData.slide_id が設定されたら自動リダイレクト
+  ↓ navigate('/')
+```
+
+**メリット**:
+- DashboardPageとGenerationProgressPageで同じ状態を共有
+- ページ遷移しても状態が保持される
+- 生成完了時の自動リダイレクトが正常に動作
+
 ---
 
 ## 実装フェーズ
 
-### Phase 1: ルーティング基盤 (Week 1)
+### Phase 1: ルーティング基盤 ✅ **完了**
 
 **目標**: React Router でページ分離
 
-- [ ] React Router v6 導入
-- [ ] ProtectedRoute 実装（認証ガード）
-- [ ] Dashboard, GenerationProgress, SlideDetail の基本ページ作成
-- [ ] ページ遷移の動作確認
+- [x] React Router v6 導入
+- [x] ProtectedRoute 実装（認証ガード）
+- [x] Dashboard, GenerationProgress, SlideDetail の基本ページ作成
+- [x] ページ遷移の動作確認
 
 **成果物**:
 
 - `/`, `/generate/:id`, `/slides/:id` のルーティング
 - 認証チェック機能
+- useAuth フック（Google OAuth + localStorage）
 
-### Phase 2: トップページ改修 (Week 2)
+**実装済みファイル**:
+- `frontend/src/App.tsx` - ルーティング設定
+- `frontend/src/components/ProtectedRoute.tsx` - 認証ガード
+- `frontend/src/hooks/useAuth.ts` - 認証状態管理
+- `frontend/src/pages/LoginPage.tsx`
+- `frontend/src/pages/DashboardPage.tsx`
+- `frontend/src/pages/GenerationProgressPage.tsx`
+- `frontend/src/pages/SlideDetailPage.tsx`
+
+### Phase 2: トップページ改修 ✅ **完了**
 
 **目標**: リサーチアシスタント型 UI の実装
 
-- [ ] DashboardLayout 作成（3 カラム）
-- [ ] AssistantPanel 実装（キャラクター + 吹き出し）
-- [ ] SlideHistoryGrid 実装（カードクリック → `/slides/:id`）
-- [ ] QuickActionPanel 実装（ワンクリック生成）
-- [ ] Tailwind CSS 導入 + レスポンシブ対応
+- [x] DashboardLayout 作成（3 カラム）
+- [x] AssistantPanel 実装（PDF ドロップゾーン）
+- [x] SlideHistoryGrid 実装（カードクリック → `/slides/:id`）
+- [x] QuickActionPanel 実装（ワンクリック生成）
+- [x] CSS-in-JS によるレスポンシブ対応（Tailwind は延期）
 
 **成果物**:
 
 - 能動的な提案を行うトップページ
 - 履歴カードからスライド詳細への遷移
+- モーダルプレビュー廃止、専用ページ遷移に変更
 
-### Phase 3: スライド詳細ページ (Week 3)
+**実装済みファイル**:
+- `frontend/src/components/dashboard/DashboardLayout.tsx`
+- `frontend/src/components/dashboard/AssistantPanel.tsx`
+- `frontend/src/components/dashboard/SlideHistoryGrid.tsx`
+- `frontend/src/components/dashboard/QuickActionPanel.tsx`
+
+**設計変更**:
+- Tailwind CSS → CSS-in-JS（`const styles: Record<string, React.CSSProperties>`）
+- モーダルプレビュー → 専用ページ遷移（`navigate(/slides/:id)`）
+
+### Phase 3: スライド詳細ページ ✅ **完了**
 
 **目標**: 2 ペインレイアウト + チャット UI（RAG 機能なし）
 
-- [ ] SlideDetailLayout 作成（2 ペイン）
-- [ ] ChatPanel 実装（UI のみ）
-- [ ] RAGChatInput + SuggestedQuestions
-- [ ] チャットメッセージ表示（ダミーデータ）
-- [ ] レスポンシブ対応（タブ切り替え）
+- [x] SlideDetailLayout 作成（2 ペイン: 60% + 40%）
+- [x] ChatPanel 実装（UI のみ）
+- [x] SuggestedQuestions コンポーネント
+- [x] SlideContentViewer 作成（モーダルなし版）
+- [x] レスポンシブ対応（モバイルで縦並び）
+- [x] Recoil 導入による状態管理（React 18 ダウングレード対応）
 
 **成果物**:
 
 - スライド閲覧 + チャット UI の統合画面
+- モーダルなしのスライド表示
+- `/api/slides/:slideId/markdown` エンドポイント対応
+
+**実装済みファイル**:
+- `frontend/src/components/slide/SlideDetailLayout.tsx`
+- `frontend/src/components/slide/ChatPanel.tsx`
+- `frontend/src/components/slide/SuggestedQuestions.tsx`
+- `frontend/src/components/slide/SlideContentViewer.tsx` ← **新規作成**
+- `frontend/src/store/reactAgentAtoms.ts` - Recoil atoms
+- `frontend/src/hooks/useReactAgent.ts` - Recoil 対応
+
+**重要な技術的決定**:
+- **Recoil 導入**: DashboardPage と GenerationProgressPage で状態共有
+- **React 18 ダウングレード**: Recoil 互換性のため（19 → 18.3.1）
+- **SlideContentViewer**: モーダル形式の SlideViewer とは別に、埋め込み可能なコンポーネントを新規作成
+- **状態共有**: `slideData.slide_id` がページ遷移後も保持され、生成完了時の自動リダイレクトが正常動作
 
 ### Phase 4: RAG バックエンド (Week 4-5)
 
@@ -1130,5 +1281,6 @@ xl: 1280px  /* ワイドスクリーン */
 ---
 
 **最終更新**: 2025-10-29
+**実装状況**: Phase 1-3 完了、Phase 4 以降未実装
 **レビュー者**: -
 **承認者**: -
