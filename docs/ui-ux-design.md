@@ -1,15 +1,16 @@
-# UI/UX設計方針書
+# UI/UX 設計方針書
 
 **作成日**: 2025-10-29
-**対象バージョン**: SlidePilot v2.0 (UI/UX改修)
+**対象バージョン**: SlidePilot v2.0 (UI/UX 改修)
 
 ## 目次
+
 1. [設計コンセプト](#設計コンセプト)
 2. [アーキテクチャ概要](#アーキテクチャ概要)
 3. [ページ構成](#ページ構成)
 4. [ルーティング設計](#ルーティング設計)
 5. [コンポーネント設計](#コンポーネント設計)
-6. [RAG統合設計](#rag統合設計)
+6. [RAG 統合設計](#rag統合設計)
 7. [レスポンシブデザイン](#レスポンシブデザイン)
 8. [技術スタック](#技術スタック)
 9. [実装フェーズ](#実装フェーズ)
@@ -19,19 +20,22 @@
 ## 設計コンセプト
 
 ### ビジョン
+
 **「常に隣にいてサポートしてくれる研究アシスタント」**
 
-従来の「PDFアップロード→スライド生成」だけでなく、**各スライドごとに対話的な学習体験**を提供するプラットフォームへ進化。
+従来の「PDF アップロード → スライド生成」だけでなく、**各スライドごとに対話的な学習体験**を提供するプラットフォームへ進化。
 
 ### 主要な設計方針
 
 #### 1. スライドごとの独立したチャット機能
-- トップページは**ファイル/URLアップロード専用**（テキスト入力・チャット機能なし）
-- 入力形式: PDFドロップ、URL入力（将来）、クイックテンプレートのみ
+
+- トップページは**ファイル/URL アップロード専用**（テキスト入力・チャット機能なし）
+- 入力形式: PDF ドロップ、URL 入力（将来）、クイックテンプレートのみ
 - 各スライド詳細ページに**専用チャットパネル**を配置
-- RAGでPDF内容を参照した対話型学習を実現
+- RAG で PDF 内容を参照した対話型学習を実現
 
 #### 2. 明確なページ分離
+
 ```
 トップページ (/)
   ↓ スライド生成
@@ -41,10 +45,11 @@
   └─ RAG対応チャット
 ```
 
-#### 3. URLベースのナビゲーション
+#### 3. URL ベースのナビゲーション
+
 - ブラウザの戻る/進むボタンで直感的に操作
-- スライド共有が容易（`/slides/abc123` をURLコピー）
-- SEO対応（将来的な公開スライド機能への布石）
+- スライド共有が容易（`/slides/abc123` を URL コピー）
+- SEO 対応（将来的な公開スライド機能への布石）
 
 ---
 
@@ -101,12 +106,14 @@
 ### 1. トップページ (`/`)
 
 #### 役割
-- **スライド生成の入り口**（PDFアップロード専用）
+
+- **スライド生成の入り口**（PDF アップロード専用）
 - 過去のスライド履歴管理
 - クイックアクション提供
-- **チャット機能なし**（入力はファイル/URLのみ）
+- **チャット機能なし**（入力はファイル/URL のみ）
 
 #### レイアウト（デスクトップ）
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  [SlidePilot Logo]               [User Avatar] [Logout] │
@@ -129,59 +136,68 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-#### 3カラム構成
+#### 3 カラム構成
+
 - **左サイドバー (300px)**
+
   - スライド履歴カードグリッド
   - カードクリック → `/slides/:id` へ遷移
-  - 最新20件を表示、「もっと見る」ボタン
+  - 最新 20 件を表示、「もっと見る」ボタン
 
 - **中央パネル (可変幅)**
+
   - アシスタントキャラクター表示（静的）
-  - **PDFドロップゾーン**（メイン機能）
+  - **PDF ドロップゾーン**（メイン機能）
     - ドラッグ&ドロップ対応
     - クリックでファイル選択
-    - 対応形式: PDF（最大100MB）
-  - **URL入力フィールド**（将来実装）
+    - 対応形式: PDF（最大 100MB）
+  - **URL 入力フィールド**（将来実装）
     - YouTube、論文サイトなど
     - 現在は「準備中」表示
   - **テキスト入力なし**（チャット機能なし）
 
 - **右サイドバー (300px)**
   - クイックテンプレートボタン
-  - 「AI最新ニュース」ワンクリック生成
+  - 「AI 最新ニュース」ワンクリック生成
   - 「機械学習入門」テンプレート
   - 「教科書章立て」テンプレート
-  - ※ クリックで自動的にLangGraph起動 → `/generate/:threadId`
+  - ※ クリックで自動的に LangGraph 起動 → `/generate/:threadId`
 
 #### 主要機能
-1. **PDFアップロード**（メイン機能）
+
+1. **PDF アップロード**（メイン機能）
+
    - ドラッグ&ドロップ対応
    - ファイル選択ダイアログ
    - アップロード後 → 即座に `/generate/:threadId` へ遷移
-   - バリデーション: PDF形式、100MB以下
+   - バリデーション: PDF 形式、100MB 以下
 
-2. **URL入力**（将来実装）
+2. **URL 入力**（将来実装）
+
    - 入力フィールド表示
    - 現在は「準備中」表示
    - 実装後: YouTube, arXiv, 企業ブログなど
 
 3. **スライド履歴表示**
+
    - カード形式（タイトル、作成日時、サムネイル）
    - ホバー時にプレビュー拡大
    - クリックで `/slides/:id` へ遷移
 
 4. **クイックテンプレート**
    - 事前定義トピックからワンクリック生成
-   - クリック → LangGraphに自動送信 → `/generate/:threadId`
-   - 例: 「2025年のAI業界トレンド」「機械学習の基礎」
+   - クリック → LangGraph に自動送信 → `/generate/:threadId`
+   - 例: 「2025 年の AI 業界トレンド」「機械学習の基礎」
 
 ### 2. 生成進行状況ページ (`/generate/:threadId`)
 
 #### 役割
+
 - スライド生成の進行状況をリアルタイム表示
-- LangGraphのSSEストリームを視覚化
+- LangGraph の SSE ストリームを視覚化
 
 #### レイアウト
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  [← Dashboard] スライド生成中...                         │
@@ -208,11 +224,14 @@
 ```
 
 #### 主要機能
+
 1. **リアルタイム進行状況**
-   - LangGraphのノード実行状態を表示
+
+   - LangGraph のノード実行状態を表示
    - アニメーション付きステップ表示
 
 2. **ストーリーテリング**
+
    - 技術的な処理名ではなく親しみやすいメッセージ
    - 例: `collect_info` → 「資料を読んでいます...」
 
@@ -223,10 +242,12 @@
 ### 3. スライド詳細ページ (`/slides/:slideId`)
 
 #### 役割
+
 - スライド閲覧
-- **RAG対応チャットで対話型学習**
+- **RAG 対応チャットで対話型学習**
 
 #### レイアウト（デスクトップ）
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ [← Dashboard] "機械学習の基礎"                 [共有] [削除] │
@@ -259,28 +280,33 @@
 └─────────────────────┴───────────────────────────────────┘
 ```
 
-#### 2ペイン構成
+#### 2 ペイン構成
+
 - **左ペイン (60%): スライドビューア**
+
   - PDF/画像ベースのスライド表示
   - ページナビゲーション
   - ダウンロードボタン
-  - メール送信ボタン（ReActエージェント連携）
+  - メール送信ボタン（ReAct エージェント連携）
 
-- **右ペイン (40%): RAGチャットパネル**
+- **右ペイン (40%): RAG チャットパネル**
   - チャット履歴表示
   - 質問候補提示（Suggested Questions）
   - 入力欄
-  - RAG検索結果の出典表示
+  - RAG 検索結果の出典表示
 
 #### 主要機能
 
 ##### 1. スライド閲覧
+
 - ページ送り/戻し
 - サムネイル一覧（オプション）
 - フルスクリーンモード
 
-##### 2. RAGチャット
+##### 2. RAG チャット
+
 **基本フロー**:
+
 ```
 1. ユーザー質問入力
    ↓
@@ -295,14 +321,17 @@
 ```
 
 **機能詳細**:
+
 - スライド内容に基づいた回答生成
-- 出典ページ番号の表示（「スライド3ページ目を参照」）
+- 出典ページ番号の表示（「スライド 3 ページ目を参照」）
 - 専門用語の自動検出と説明
-- 質問履歴の保存（スライドごとにSupabaseに保存）
+- 質問履歴の保存（スライドごとに Supabase に保存）
 
 ##### 3. Suggested Questions（質問候補）
-AIが自動生成する質問例:
-- 「このページの要点を3つにまとめて」
+
+AI が自動生成する質問例:
+
+- 「このページの要点を 3 つにまとめて」
 - 「〇〇という用語を中学生向けに説明して」
 - 「具体例を教えて」
 - 「次のページとの関連性は？」
@@ -315,7 +344,7 @@ AIが自動生成する質問例:
 
 ```tsx
 // frontend/src/App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 <BrowserRouter>
   <Routes>
@@ -337,17 +366,17 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>
-</BrowserRouter>
+</BrowserRouter>;
 ```
 
-### URL設計
+### URL 設計
 
-| パス | 説明 | 主要機能 |
-|------|------|----------|
-| `/` | トップページ | スライド生成、履歴表示 |
-| `/login` | ログイン画面 | Google OAuth |
-| `/generate/:threadId` | 生成進行状況 | SSEストリーミング |
-| `/slides/:slideId` | スライド詳細 | 閲覧 + RAGチャット |
+| パス                  | 説明         | 主要機能               |
+| --------------------- | ------------ | ---------------------- |
+| `/`                   | トップページ | スライド生成、履歴表示 |
+| `/login`              | ログイン画面 | Google OAuth           |
+| `/generate/:threadId` | 生成進行状況 | SSE ストリーミング     |
+| `/slides/:slideId`    | スライド詳細 | 閲覧 + RAG チャット    |
 
 ### ナビゲーションフロー
 
@@ -431,10 +460,10 @@ frontend/src/
 
 ```tsx
 // frontend/src/pages/Dashboard.tsx
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { AssistantPanel } from '@/components/dashboard/AssistantPanel';
-import { SlideHistoryGrid } from '@/components/dashboard/SlideHistoryGrid';
-import { QuickActionPanel } from '@/components/dashboard/QuickActionPanel';
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AssistantPanel } from "@/components/dashboard/AssistantPanel";
+import { SlideHistoryGrid } from "@/components/dashboard/SlideHistoryGrid";
+import { QuickActionPanel } from "@/components/dashboard/QuickActionPanel";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -449,7 +478,7 @@ export default function Dashboard() {
 
     // 3. 生成進行状況ページへ遷移
     navigate(`/generate/${thread.id}`, {
-      state: { pdfPath: path }
+      state: { pdfPath: path },
     });
   };
 
@@ -478,10 +507,10 @@ export default function Dashboard() {
 
 ```tsx
 // frontend/src/pages/SlideDetail.tsx
-import { useParams } from 'react-router-dom';
-import { SlideDetailLayout } from '@/components/layout/SlideDetailLayout';
-import { SlideViewer } from '@/components/slide/SlideViewer';
-import { ChatPanel } from '@/components/slide/ChatPanel';
+import { useParams } from "react-router-dom";
+import { SlideDetailLayout } from "@/components/layout/SlideDetailLayout";
+import { SlideViewer } from "@/components/slide/SlideViewer";
+import { ChatPanel } from "@/components/slide/ChatPanel";
 
 export default function SlideDetail() {
   const { slideId } = useParams<{ slideId: string }>();
@@ -512,14 +541,14 @@ export default function SlideDetail() {
 }
 ```
 
-#### 3. ChatPanel.tsx（RAGチャット）
+#### 3. ChatPanel.tsx（RAG チャット）
 
 ```tsx
 // frontend/src/components/slide/ChatPanel.tsx
-import { useRAGChat } from '@/hooks/useRAGChat';
-import { ChatMessage } from '@/components/ChatMessage';
-import { SuggestedQuestions } from '@/components/slide/SuggestedQuestions';
-import { RAGChatInput } from '@/components/slide/RAGChatInput';
+import { useRAGChat } from "@/hooks/useRAGChat";
+import { ChatMessage } from "@/components/ChatMessage";
+import { SuggestedQuestions } from "@/components/slide/SuggestedQuestions";
+import { RAGChatInput } from "@/components/slide/RAGChatInput";
 
 interface ChatPanelProps {
   slideId: string;
@@ -543,27 +572,24 @@ export function ChatPanel({ slideId }: ChatPanelProps) {
       </ChatMessages>
 
       <SuggestedQuestions
-        suggestions={['このページを要約', '専門用語を説明']}
+        suggestions={["このページを要約", "専門用語を説明"]}
         onSelect={sendMessage}
       />
 
-      <RAGChatInput
-        onSend={sendMessage}
-        disabled={isLoading}
-      />
+      <RAGChatInput onSend={sendMessage} disabled={isLoading} />
     </div>
   );
 }
 ```
 
-#### 4. useRAGChat.ts（RAGチャットフック）
+#### 4. useRAGChat.ts（RAG チャットフック）
 
 ```tsx
 // frontend/src/hooks/useRAGChat.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   sources?: string[]; // 出典ページ
 }
@@ -579,7 +605,7 @@ export function useRAGChat(slideId: string) {
 
   const sendMessage = async (content: string) => {
     // ユーザーメッセージを追加
-    setMessages((prev) => [...prev, { role: 'user', content }]);
+    setMessages((prev) => [...prev, { role: "user", content }]);
     setIsLoading(true);
 
     try {
@@ -587,8 +613,8 @@ export function useRAGChat(slideId: string) {
       const response = await fetch(
         `http://localhost:8001/api/slides/${slideId}/chat`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: content }),
         }
       );
@@ -599,7 +625,7 @@ export function useRAGChat(slideId: string) {
       setMessages((prev) => [
         ...prev,
         {
-          role: 'assistant',
+          role: "assistant",
           content: data.answer,
           sources: data.sources, // 出典ページ番号
         },
@@ -608,7 +634,7 @@ export function useRAGChat(slideId: string) {
       // Supabaseにチャット履歴を保存
       await saveChatMessage(slideId, content, data.answer);
     } catch (err) {
-      console.error('RAG chat error:', err);
+      console.error("RAG chat error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -620,7 +646,7 @@ export function useRAGChat(slideId: string) {
 
 ---
 
-## RAG統合設計
+## RAG 統合設計
 
 ### システム構成
 
@@ -649,7 +675,7 @@ export function useRAGChat(slideId: string) {
 └─────────────────────────────────────────────────────────┘
 ```
 
-### バックエンドAPI実装
+### バックエンド API 実装
 
 #### 1. エンドポイント定義
 
@@ -700,7 +726,7 @@ async def chat_with_slide(
         raise HTTPException(status_code=500, detail=str(e))
 ```
 
-#### 2. RAGエンジン実装
+#### 2. RAG エンジン実装
 
 ```python
 # backend/app/core/rag.py (新規作成)
@@ -877,17 +903,20 @@ xl: 1280px  /* ワイドスクリーン */
 #### 1. Dashboard（トップページ）
 
 **デスクトップ (>1024px)**
+
 ```
 [Left Sidebar 300px] [Center Panel] [Right Sidebar 300px]
 ```
 
 **タブレット (768px - 1024px)**
+
 ```
 [Center Panel (75%)] [Right Sidebar (25%)]
 ※ Left Sidebarは折りたたみメニューに
 ```
 
 **モバイル (<768px)**
+
 ```
 [Center Panel 100%]
 ※ タブ切り替え: [メイン] [履歴] [アクション]
@@ -896,16 +925,19 @@ xl: 1280px  /* ワイドスクリーン */
 #### 2. SlideDetail（スライド詳細）
 
 **デスクトップ (>1024px)**
+
 ```
 [Slide Viewer 60%] | [Chat Panel 40%]
 ```
 
 **タブレット (768px - 1024px)**
+
 ```
 [Slide Viewer 50%] | [Chat Panel 50%]
 ```
 
 **モバイル (<768px)**
+
 ```
 [タブ切り替え]
 - [スライド]タブ: 100% Viewer
@@ -953,116 +985,128 @@ xl: 1280px  /* ワイドスクリーン */
 
 ### フロントエンド
 
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| React | 19.x | UIフレームワーク |
-| TypeScript | 5.x | 型安全性 |
-| Vite | 6.x | ビルドツール |
-| React Router | 6.x | ルーティング |
-| Framer Motion | 11.x | アニメーション |
-| Tailwind CSS | 3.x | スタイリング |
-| Zustand or Jotai | 4.x | 軽量状態管理 |
-| react-hot-toast | 2.x | 通知UI |
+| 技術             | バージョン | 用途              |
+| ---------------- | ---------- | ----------------- |
+| React            | 19.x       | UI フレームワーク |
+| TypeScript       | 5.x        | 型安全性          |
+| Vite             | 6.x        | ビルドツール      |
+| React Router     | 6.x        | ルーティング      |
+| Framer Motion    | 11.x       | アニメーション    |
+| Tailwind CSS     | 3.x        | スタイリング      |
+| Zustand or Jotai | 4.x        | 軽量状態管理      |
+| react-hot-toast  | 2.x        | 通知 UI           |
 
 ### バックエンド
 
-| 技術 | バージョン | 用途 |
-|------|-----------|------|
-| FastAPI | 0.115.x | APIフレームワーク |
-| LangGraph | 0.2.x | エージェント制御 |
-| LangChain | 0.3.x | RAGパイプライン |
-| OpenAI GPT-4 | - | LLM |
-| ChromaDB | 0.5.x | Vector DB (開発) |
-| Pinecone | - | Vector DB (本番) |
-| Supabase | - | データベース + Storage |
+| 技術         | バージョン | 用途                   |
+| ------------ | ---------- | ---------------------- |
+| FastAPI      | 0.115.x    | API フレームワーク     |
+| LangGraph    | 0.2.x      | エージェント制御       |
+| LangChain    | 0.3.x      | RAG パイプライン       |
+| OpenAI GPT-4 | -          | LLM                    |
+| ChromaDB     | 0.5.x      | Vector DB (開発)       |
+| Pinecone     | -          | Vector DB (本番)       |
+| Supabase     | -          | データベース + Storage |
 
 ### インフラ
 
-| 技術 | 用途 |
-|------|------|
-| Supabase | PostgreSQL + Storage + Auth |
-| ChromaDB | Vector DB (ローカル開発) |
-| Pinecone | Vector DB (本番環境) |
-| Vercel | フロントエンドホスティング |
-| Railway/Render | バックエンドホスティング |
+| 技術           | 用途                        |
+| -------------- | --------------------------- |
+| Supabase       | PostgreSQL + Storage + Auth |
+| ChromaDB       | Vector DB (ローカル開発)    |
+| Pinecone       | Vector DB (本番環境)        |
+| Vercel         | フロントエンドホスティング  |
+| Railway/Render | バックエンドホスティング    |
 
 ---
 
 ## 実装フェーズ
 
 ### Phase 1: ルーティング基盤 (Week 1)
-**目標**: React Routerでページ分離
+
+**目標**: React Router でページ分離
 
 - [ ] React Router v6 導入
-- [ ] ProtectedRoute実装（認証ガード）
+- [ ] ProtectedRoute 実装（認証ガード）
 - [ ] Dashboard, GenerationProgress, SlideDetail の基本ページ作成
 - [ ] ページ遷移の動作確認
 
 **成果物**:
+
 - `/`, `/generate/:id`, `/slides/:id` のルーティング
 - 認証チェック機能
 
 ### Phase 2: トップページ改修 (Week 2)
-**目標**: リサーチアシスタント型UIの実装
 
-- [ ] DashboardLayout作成（3カラム）
-- [ ] AssistantPanel実装（キャラクター + 吹き出し）
-- [ ] SlideHistoryGrid実装（カードクリック → `/slides/:id`）
-- [ ] QuickActionPanel実装（ワンクリック生成）
-- [ ] Tailwind CSS導入 + レスポンシブ対応
+**目標**: リサーチアシスタント型 UI の実装
+
+- [ ] DashboardLayout 作成（3 カラム）
+- [ ] AssistantPanel 実装（キャラクター + 吹き出し）
+- [ ] SlideHistoryGrid 実装（カードクリック → `/slides/:id`）
+- [ ] QuickActionPanel 実装（ワンクリック生成）
+- [ ] Tailwind CSS 導入 + レスポンシブ対応
 
 **成果物**:
+
 - 能動的な提案を行うトップページ
 - 履歴カードからスライド詳細への遷移
 
 ### Phase 3: スライド詳細ページ (Week 3)
-**目標**: 2ペインレイアウト + チャットUI（RAG機能なし）
 
-- [ ] SlideDetailLayout作成（2ペイン）
-- [ ] ChatPanel実装（UI のみ）
+**目標**: 2 ペインレイアウト + チャット UI（RAG 機能なし）
+
+- [ ] SlideDetailLayout 作成（2 ペイン）
+- [ ] ChatPanel 実装（UI のみ）
 - [ ] RAGChatInput + SuggestedQuestions
 - [ ] チャットメッセージ表示（ダミーデータ）
 - [ ] レスポンシブ対応（タブ切り替え）
 
 **成果物**:
-- スライド閲覧 + チャットUIの統合画面
 
-### Phase 4: RAGバックエンド (Week 4-5)
-**目標**: Vector DB統合 + RAG機能実装
+- スライド閲覧 + チャット UI の統合画面
 
-- [ ] ChromaDB導入
-- [ ] RAGEngine実装（`backend/app/core/rag.py`）
+### Phase 4: RAG バックエンド (Week 4-5)
+
+**目標**: Vector DB 統合 + RAG 機能実装
+
+- [ ] ChromaDB 導入
+- [ ] RAGEngine 実装（`backend/app/core/rag.py`）
 - [ ] `/api/slides/{id}/chat` エンドポイント作成
 - [ ] スライド生成時の自動インデックス化
 - [ ] Supabase `chat_messages` テーブル作成
 
 **成果物**:
-- 動作するRAGチャット機能
-- PDF内容に基づく回答生成
 
-### Phase 5: UX強化 (Week 6)
+- 動作する RAG チャット機能
+- PDF 内容に基づく回答生成
+
+### Phase 5: UX 強化 (Week 6)
+
 **目標**: アニメーション + 細部の改善
 
-- [ ] Framer Motion導入
+- [ ] Framer Motion 導入
 - [ ] ページ遷移アニメーション
-- [ ] Suggested Questions自動生成（LLM）
+- [ ] Suggested Questions 自動生成（LLM）
 - [ ] 出典ページへのジャンプ機能
-- [ ] react-hot-toast導入（通知UI）
+- [ ] react-hot-toast 導入（通知 UI）
 
 **成果物**:
+
 - スムーズなページ遷移
 - 直感的なユーザー体験
 
 ### Phase 6: 本番環境対応 (Week 7)
+
 **目標**: 本番デプロイ準備
 
-- [ ] Pinecone移行（Vector DB）
+- [ ] Pinecone 移行（Vector DB）
 - [ ] 環境変数管理（`.env.production`）
 - [ ] エラーハンドリング強化
 - [ ] パフォーマンス最適化
-- [ ] E2Eテスト（Playwright）
+- [ ] E2E テスト（Playwright）
 
 **成果物**:
+
 - 本番環境で動作するシステム
 
 ---
@@ -1070,6 +1114,7 @@ xl: 1280px  /* ワイドスクリーン */
 ## 付録
 
 ### 参考リンク
+
 - [React Router v6 公式ドキュメント](https://reactrouter.com/)
 - [Framer Motion](https://www.framer.com/motion/)
 - [LangChain RAG Tutorial](https://python.langchain.com/docs/use_cases/question_answering/)
@@ -1077,8 +1122,9 @@ xl: 1280px  /* ワイドスクリーン */
 - [Tailwind CSS](https://tailwindcss.com/)
 
 ### 関連ドキュメント
+
 - [CLAUDE.md](../CLAUDE.md) - プロジェクト全体の技術仕様
-- [backend/README.md](../backend/README.md) - バックエンドAPI仕様
+- [backend/README.md](../backend/README.md) - バックエンド API 仕様
 - [frontend/README.md](../frontend/README.md) - フロントエンドセットアップ
 
 ---

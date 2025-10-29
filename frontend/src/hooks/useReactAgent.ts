@@ -22,7 +22,7 @@ export function useReactAgent() {
   const [threadId, setThreadId] = useState<string | null>(null);  // スレッドID
   const [error, setError] = useState<string | null>(null);        // エラー状態
   const [slideData, setSlideData] = useState<SlideData>({});      // スライドデータ
-  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);  // スライド生成中フラグ
+  const [, setIsGeneratingSlides] = useState(false);  // スライド生成中フラグ（状態は使わずsetterのみ使用）
 
   // スレッド作成
   const createThread = useCallback(async () => {
