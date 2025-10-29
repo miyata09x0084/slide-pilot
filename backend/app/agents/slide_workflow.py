@@ -352,45 +352,9 @@ def generate_toc(state: State) -> Dict:
 # -------------------
 # Mermaid図解生成ヘルパー関数（Issue #25）
 # -------------------
-def _generate_architecture_flowchart(key_points: List[str]) -> str:
-    """重要ポイントからアーキテクチャ図を生成"""
-    return '''
-## 📊 技術の仕組み
-
-```mermaid
-flowchart LR
-    A[データ入力] --> B[前処理]
-    B --> C[モデル学習]
-    C --> D[評価]
-    D --> E[実用化]
-    style C fill:#f9f,stroke:#333,stroke-width:4px
-```
-
-**この図は、技術の全体フローを示しています**
-'''
-
-
-def _generate_use_case_mindmap(key_points: List[str]) -> str:
-    """重要ポイントからユースケース図を生成"""
-    return '''
-## 🎯 活用例
-
-```mermaid
-mindmap
-  root((この技術))
-    開発支援
-      コード生成
-      バグ修正
-    データ分析
-      可視化
-      統計処理
-    業務効率化
-      自動化
-      レポート作成
-```
-
-**3つの領域で実用可能です**
-'''
+# 以下の関数は廃止（LLMがプロンプトから独自の図を生成するため不要）
+# def _generate_architecture_flowchart(key_points: List[str]) -> str:
+# def _generate_use_case_mindmap(key_points: List[str]) -> str:
 
 
 def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
@@ -568,40 +532,11 @@ class: text-center
 # Node D.5: Mermaid図解生成（Issue #25）
 # -------------------
 @traceable(run_name="d5_generate_diagrams")
+# generate_diagrams ノードは廃止（LLMがプロンプトから独自の図を生成するため不要）
+# Issue #25: テンプレート図の強制挿入を削除し、LLMによる独自図生成に移行
 def generate_diagrams(state: State) -> Dict:
-    """Mermaid図解を生成してスライドに挿入"""
-    slide_md = state.get("slide_md") or ""
-    topic = state.get("topic") or ""
-    key_points = state.get("key_points") or []
-
-    # PDF以外はスキップ
-    input_type = detect_input_type(topic)
-    if input_type != "pdf":
-        return {"diagrams": {}, "log": _log(state, "[diagrams] skipped (not PDF)")}
-
-    diagrams_meta = {}
-
-    try:
-        # 1. アーキテクチャ図生成
-        arch_diagram = _generate_architecture_flowchart(key_points)
-        slide_md = _insert_after_section(slide_md, "Agenda", arch_diagram)
-        diagrams_meta["architecture"] = {"type": "flowchart", "inserted": True}
-
-        # 2. ユースケース図生成
-        use_case_diagram = _generate_use_case_mindmap(key_points)
-        slide_md = _insert_before_section(slide_md, "まとめ", use_case_diagram)
-        diagrams_meta["use_cases"] = {"type": "mindmap", "inserted": True}
-
-        return {
-            "slide_md": slide_md,
-            "diagrams": diagrams_meta,
-            "log": _log(state, f"[diagrams] generated {len(diagrams_meta)} diagrams")
-        }
-    except Exception as e:
-        return {
-            "error": f"diagram_generation_error: {e}",
-            "log": _log(state, f"[diagrams] EXCEPTION {e}")
-        }
+    """[DEPRECATED] このノードは使用されていません"""
+    return {"log": _log(state, "[diagrams] deprecated - skipped")}
 
 # -------------------
 # Node E: 評価
@@ -779,13 +714,12 @@ graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 
-# エッジ定義（Slidevフロー with 評価ループ + Mermaid図解）
+# エッジ定義（Slidevフロー with 評価ループ）
 graph_builder.add_edge(START, "collect_info")
 graph_builder.add_edge("collect_info", "generate_key_points")
 graph_builder.add_edge("generate_key_points", "generate_toc")
 graph_builder.add_edge("generate_toc", "write_slides_slidev")
-graph_builder.add_edge("write_slides_slidev", "generate_diagrams")
-graph_builder.add_edge("generate_diagrams", "evaluate_slides_slidev")
+graph_builder.add_edge("write_slides_slidev", "evaluate_slides_slidev")
 
 # 評価ループ（最大3回リトライ）
 graph_builder.add_conditional_edges(
