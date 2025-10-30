@@ -648,242 +648,37 @@ export function useRAGChat(slideId: string) {
 
 ## RAG 統合設計
 
-### システム構成
+**別ドキュメント参照**: Phase 4のRAGバックエンド設計は以下を参照してください。
+
+📄 **[RAGバックエンド設計書](./rag-backend-design.md)**
+
+### 概要
+
+- **採用技術**: Supabase Vector (pgvector) + LangGraph RAGエージェント
+- **Issue**: 別途作成予定
+- **実装状況**: Phase 4 未実装
+
+### システムフロー概要
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                Frontend (SlideDetail)                    │
-│  質問入力 → POST /api/slides/:id/chat                   │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Backend API (FastAPI)                       │
-│                                                          │
-│  1. Supabaseからスライド情報取得                          │
-│  2. Vector DBで関連チャンク検索                           │
-│  3. LLM + RAGで回答生成                                  │
-│  4. チャット履歴をSupabaseに保存                          │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│            Vector DB (ChromaDB / Pinecone)               │
-│                                                          │
-│  Collection: slide_embeddings                            │
-│  - Namespace: slide_id                                   │
-│  - Documents: PDFチャンク (500トークン/チャンク)          │
-│  - Metadata: {page, slide_id, chunk_index}               │
-└─────────────────────────────────────────────────────────┘
+Frontend → POST /api/slides/:id/chat
+    ↓
+FastAPI (proxy) → LangGraph API (port 2024)
+    ↓
+RAG Agent: search_context → generate_answer
+    ↓
+Supabase Vector (pgvector)
 ```
 
-### バックエンド API 実装
+**詳細**: [RAGバックエンド設計書](./rag-backend-design.md) を参照
 
-#### 1. エンドポイント定義
+**選定理由**:
+- **デプロイが簡単**: SQL実行のみ、永続化ストレージ管理不要
+- **インフラ管理不要**: Supabaseが自動でバックアップ・スケーリング
+- **コスト効率**: ChromaDB専用サーバー不要（Supabase無料枠で開発可能）
+- **拡張性**: LangGraphエージェントで将来の機能追加が容易
 
-```python
-# backend/app/routers/chat.py (新規作成)
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from app.core.rag import RAGEngine
-
-router = APIRouter(prefix="/api/slides", tags=["chat"])
-
-class ChatRequest(BaseModel):
-    message: str
-
-class ChatResponse(BaseModel):
-    answer: str
-    sources: list[str]  # 出典ページ番号
-
-@router.post("/{slide_id}/chat", response_model=ChatResponse)
-async def chat_with_slide(
-    slide_id: str,
-    request: ChatRequest,
-    rag_engine: RAGEngine = Depends(get_rag_engine)
-):
-    """
-    スライドの内容に基づいてRAG検索 + LLM回答を生成
-    """
-    try:
-        # RAG検索
-        relevant_chunks = await rag_engine.search(
-            slide_id=slide_id,
-            query=request.message,
-            top_k=3
-        )
-
-        # LLM回答生成
-        answer = await rag_engine.generate_answer(
-            query=request.message,
-            context=relevant_chunks
-        )
-
-        # 出典ページ抽出
-        sources = [chunk['metadata']['page'] for chunk in relevant_chunks]
-
-        return ChatResponse(answer=answer, sources=sources)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-```
-
-#### 2. RAG エンジン実装
-
-```python
-# backend/app/core/rag.py (新規作成)
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
-
-class RAGEngine:
-    def __init__(self):
-        self.embeddings = OpenAIEmbeddings()
-        self.llm = ChatOpenAI(model="gpt-4", temperature=0)
-        self.vectorstore = Chroma(
-            collection_name="slide_embeddings",
-            embedding_function=self.embeddings,
-            persist_directory="./data/chroma"
-        )
-
-    async def index_slide(self, slide_id: str, markdown_content: str):
-        """
-        スライドのマークダウンをチャンク化してVector DBに格納
-        """
-        # チャンク分割（500トークン/チャンク、100トークンオーバーラップ）
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=100,
-            length_function=len
-        )
-        chunks = splitter.split_text(markdown_content)
-
-        # Embeddingsを生成してVector DBに保存
-        metadatas = [
-            {"slide_id": slide_id, "chunk_index": i, "page": i // 3}
-            for i in range(len(chunks))
-        ]
-
-        self.vectorstore.add_texts(
-            texts=chunks,
-            metadatas=metadatas,
-            ids=[f"{slide_id}_{i}" for i in range(len(chunks))]
-        )
-
-        print(f"✅ Indexed {len(chunks)} chunks for slide {slide_id}")
-
-    async def search(self, slide_id: str, query: str, top_k: int = 3):
-        """
-        Vector DBで関連チャンクを検索
-        """
-        results = self.vectorstore.similarity_search(
-            query=query,
-            k=top_k,
-            filter={"slide_id": slide_id}  # スライドIDでフィルタ
-        )
-
-        return [
-            {
-                "content": doc.page_content,
-                "metadata": doc.metadata
-            }
-            for doc in results
-        ]
-
-    async def generate_answer(self, query: str, context: list[dict]):
-        """
-        RAGで回答を生成
-        """
-        # コンテキストを結合
-        context_text = "\n\n".join([c['content'] for c in context])
-
-        # プロンプト構築
-        prompt = f"""
-以下のスライド内容を参照して、中学生でも理解できるように質問に答えてください。
-
-スライド内容:
-{context_text}
-
-質問: {query}
-
-回答:
-"""
-
-        # LLM実行
-        response = self.llm.predict(prompt)
-        return response
-```
-
-#### 3. スライド生成時の自動インデックス化
-
-```python
-# backend/app/agents/slide_workflow.py (既存ファイルに追加)
-
-async def save_and_render_slidev(state: State):
-    """
-    スライド保存 + PDF出力 + Vector DB インデックス化
-    """
-    # ... 既存のスライド保存処理 ...
-
-    # RAGのためにVector DBにインデックス化
-    rag_engine = RAGEngine()
-    await rag_engine.index_slide(
-        slide_id=slide_id,
-        markdown_content=state["slide_md"]
-    )
-
-    return {
-        **state,
-        "slide_path": slide_path,
-        "slide_id": slide_id
-    }
-```
-
-### データベース設計
-
-#### Supabase テーブル拡張
-
-```sql
--- chat_messages テーブル (新規)
-CREATE TABLE chat_messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slide_id TEXT NOT NULL REFERENCES slides(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-    content TEXT NOT NULL,
-    sources TEXT[], -- 出典ページ番号の配列
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- インデックス
-CREATE INDEX idx_chat_messages_slide_id ON chat_messages(slide_id);
-CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at DESC);
-```
-
-#### Vector DB スキーマ
-
-```python
-# ChromaDB Collection
-{
-    "name": "slide_embeddings",
-    "metadata": {
-        "description": "SlidePilot スライドのEmbeddings"
-    },
-    "documents": [
-        {
-            "id": "slide-123_0",
-            "embedding": [0.123, 0.456, ...],  # 1536次元
-            "metadata": {
-                "slide_id": "slide-123",
-                "chunk_index": 0,
-                "page": 1,
-                "title": "機械学習の基礎"
-            },
-            "document": "機械学習とは、コンピュータが..."
-        }
-    ]
-}
-```
-
+---
 ---
 
 ## レスポンシブデザイン
@@ -998,25 +793,30 @@ xl: 1280px  /* ワイドスクリーン */
 
 ### バックエンド
 
-| 技術         | バージョン | 用途                   |
-| ------------ | ---------- | ---------------------- |
-| FastAPI      | 0.115.x    | API フレームワーク     |
-| LangGraph    | 0.2.x      | エージェント制御       |
-| LangChain    | 0.3.x      | RAG パイプライン       |
-| OpenAI GPT-4 | -          | LLM                    |
-| ChromaDB     | 0.5.x      | Vector DB (開発)       |
-| Pinecone     | -          | Vector DB (本番)       |
-| Supabase     | -          | データベース + Storage |
+| 技術                  | バージョン | 用途                                       |
+| --------------------- | ---------- | ------------------------------------------ |
+| FastAPI               | 0.115.x    | API フレームワーク                         |
+| LangGraph             | 0.4.x      | エージェント制御（スライド生成 + RAG）     |
+| LangChain             | 0.3.x      | RAG パイプライン                           |
+| OpenAI GPT-4          | -          | LLM                                        |
+| Supabase Vector       | -          | **Vector DB（pgvector拡張）**              |
+| pgvector              | 0.3.x      | PostgreSQL Vector検索                      |
+| langchain-text-splitters | 0.3.x   | テキストチャンク分割                       |
+| Supabase              | -          | データベース + Storage + **Vector DB**     |
 
 ### インフラ
 
-| 技術           | 用途                        |
-| -------------- | --------------------------- |
-| Supabase       | PostgreSQL + Storage + Auth |
-| ChromaDB       | Vector DB (ローカル開発)    |
-| Pinecone       | Vector DB (本番環境)        |
-| Vercel         | フロントエンドホスティング  |
-| Railway/Render | バックエンドホスティング    |
+| 技術           | 用途                                              |
+| -------------- | ------------------------------------------------- |
+| Supabase       | PostgreSQL + Storage + Auth + **Vector DB**       |
+| Vercel         | フロントエンドホスティング                        |
+| Railway/Render | バックエンドホスティング                          |
+
+**インフラ設計の変更点:**
+- ❌ **ChromaDB削除**: ローカル開発でもSupabase Vectorを使用
+- ❌ **Pinecone削除**: 本番環境でもSupabase Vectorで運用
+- ✅ **統一されたインフラ**: 開発・本番で同じSupabase Vectorを使用
+- ✅ **デプロイ簡素化**: Vector DB専用サーバー不要
 
 ### 状態管理（Recoil）
 
@@ -1218,18 +1018,46 @@ GenerationProgressPage
 
 ### Phase 4: RAG バックエンド (Week 4-5)
 
-**目標**: Vector DB 統合 + RAG 機能実装
+**目標**: Supabase Vector + LangGraph RAGエージェント実装
 
-- [ ] ChromaDB 導入
+**採用技術:**
+- **Supabase Vector (pgvector)**: ChromaDBの代わりにPostgreSQL拡張機能を使用
+- **LangGraph RAGエージェント**: ステートフルなエージェント実装
+
+**実装タスク:**
+- [ ] Supabase Vector (pgvector) 有効化
+  - [ ] `vector`拡張の有効化
+  - [ ] `slide_embeddings`テーブル作成
+  - [ ] `match_slide_chunks()`関数作成
+  - [ ] ivfflatインデックス作成
 - [ ] RAGEngine 実装（`backend/app/core/rag.py`）
-- [ ] `/api/slides/{id}/chat` エンドポイント作成
+  - [ ] `index_slide()`: チャンク化 + Embeddings生成
+  - [ ] `search()`: Supabase Vector検索
+  - [ ] `generate_answer()`: RAGプロンプト + LLM回答
+- [ ] LangGraph RAGエージェント（`backend/app/agents/rag_agent.py`）
+  - [ ] `RAGState`定義
+  - [ ] `search_context`ノード実装
+  - [ ] `generate_answer`ノード実装
+  - [ ] グラフ構築
+- [ ] FastAPI プロキシルーター（`backend/app/routers/chat.py`）
+  - [ ] `POST /api/slides/{id}/chat`エンドポイント
+  - [ ] LangGraph API (port 2024) へのプロキシ
+  - [ ] SSEストリーム処理
+- [ ] LangGraph設定更新
+  - [ ] `langgraph.json`に`rag_agent`追加
+  - [ ] `main.py`にルーター登録
 - [ ] スライド生成時の自動インデックス化
+  - [ ] `save_and_render_slidev()`にRAG indexing追加
 - [ ] Supabase `chat_messages` テーブル作成
+- [ ] 依存関係追加
+  - [ ] `pgvector>=0.3.0`
+  - [ ] `langchain-text-splitters>=0.3.0`
 
 **成果物**:
-
-- 動作する RAG チャット機能
-- PDF 内容に基づく回答生成
+- ✅ 動作するRAGチャット機能
+- ✅ スライド内容に基づく回答生成
+- ✅ LangGraph Studio でデバッグ可能
+- ✅ デプロイが容易（Supabase Vector使用）
 
 ### Phase 5: UX 強化 (Week 6)
 
@@ -1250,15 +1078,19 @@ GenerationProgressPage
 
 **目標**: 本番デプロイ準備
 
-- [ ] Pinecone 移行（Vector DB）
 - [ ] 環境変数管理（`.env.production`）
 - [ ] エラーハンドリング強化
 - [ ] パフォーマンス最適化
+  - [ ] Supabase Vectorインデックスチューニング
+  - [ ] LangGraphエージェントのキャッシング
 - [ ] E2E テスト（Playwright）
+- [ ] モニタリング設定
+  - [ ] LangSmith トレーシング
+  - [ ] Supabase ログ監視
 
 **成果物**:
-
-- 本番環境で動作するシステム
+- ✅ 本番環境で動作するシステム
+- ✅ Supabase Vectorで本番運用可能（Pinecone移行不要）
 
 ---
 
@@ -1269,7 +1101,8 @@ GenerationProgressPage
 - [React Router v6 公式ドキュメント](https://reactrouter.com/)
 - [Framer Motion](https://www.framer.com/motion/)
 - [LangChain RAG Tutorial](https://python.langchain.com/docs/use_cases/question_answering/)
-- [ChromaDB Documentation](https://docs.trychroma.com/)
+- [Supabase Vector (pgvector) Documentation](https://supabase.com/docs/guides/ai/vector-columns)
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
 - [Tailwind CSS](https://tailwindcss.com/)
 
 ### 関連ドキュメント
@@ -1280,7 +1113,12 @@ GenerationProgressPage
 
 ---
 
-**最終更新**: 2025-10-29
-**実装状況**: Phase 1-3 完了、Phase 4 以降未実装
+**最終更新**: 2025-10-30
+**実装状況**: Phase 1-3 完了、Phase 4 設計変更（ChromaDB → Supabase Vector + LangGraph）
+**主要な設計変更**:
+- Vector DB: ChromaDB/Pinecone → Supabase Vector (pgvector)
+- RAG実装: 単純なエンドポイント → LangGraph RAGエージェント
+- デプロイ: 大幅簡素化（追加インフラ不要）
+
 **レビュー者**: -
 **承認者**: -
