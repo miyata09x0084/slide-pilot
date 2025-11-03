@@ -229,11 +229,44 @@ LangGraph Serverは`POSTGRES_URI`環境変数を自動認識し、永続化ス�
 
 **成功基準**:
 - [ ] `POSTGRES_URI`環境変数設定完了
-- [ ] ローカルでの動作確認（`langgraph dev`は永続化しないが、Cloud Runでは必要）
+- [ ] ローカルでの動作確認（オプション）
 
 **注意事項**:
-- `langgraph dev`コマンドはインメモリモードのため、この設定は**Cloud Run本番環境でのみ有効**
+- `langgraph dev`コマンドはインメモリモードのため、`POSTGRES_URI`は使用されない
 - ローカル開発では引き続き`langgraph dev`を使用（永続化不要）
+- 永続化テストは`langgraph up`コマンドを使用（後述）
+
+---
+
+**ローカルでPostgreSQL永続化をテストする方法（オプション）**:
+
+通常のローカル開発では不要ですが、本番環境と同じ永続化モードをテストしたい場合:
+
+```bash
+# 1. backend/.envにPOSTGRES_URIを追加
+POSTGRES_URI=postgresql://postgres:[YOUR-PASSWORD]@db.xxxxx.supabase.co:5432/postgres
+
+# 2. langgraph upで起動（本番モード、PostgreSQL永続化）
+cd backend
+python3.11 -m langgraph_cli up --postgres-uri "$(grep POSTGRES_URI .env | cut -d= -f2-)" --port 2024 --watch
+
+# 3. スレッド作成テスト（metadata付き）
+curl -X POST http://localhost:2024/threads \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"user_email": "test@example.com"}}'
+
+# 4. Supabase Dashboardで確認
+# → Table Editor → threadsテーブル（自動作成される）にデータが保存されている
+
+# 5. サーバー再起動後も同じthread_idでアクセス可能（永続化確認）
+```
+
+**`langgraph dev` vs `langgraph up`の違い**:
+
+| コマンド | 用途 | 永続化 | ホットリロード |
+|---------|------|-------|---------------|
+| `langgraph dev` | ローカル開発 | ❌ インメモリ | ✅ 自動 |
+| `langgraph up` | 本番モード | ✅ PostgreSQL | ⚠️ `--watch`必要 |
 
 ---
 

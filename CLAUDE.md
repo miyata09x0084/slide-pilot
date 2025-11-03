@@ -33,6 +33,7 @@ This server handles:
 
 #### 2. LangGraph Server (Port 2024) - AI Agent Engine
 
+**開発モード（インメモリ、ホットリロード）**:
 ```bash
 cd backend
 python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
@@ -41,15 +42,31 @@ python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
 # langgraph dev
 ```
 
+**本番モード（PostgreSQL永続化、オプション）**:
+```bash
+# ローカルで本番環境と同じPostgreSQL永続化をテストする場合
+cd backend
+python3.11 -m langgraph_cli up --postgres-uri "$(grep POSTGRES_URI .env | cut -d= -f2-)" --port 2024 --watch
+```
+
 **Note**:
 - Requires Python 3.11+ for LangGraph dev server
 - `langgraph dev` コマンドはPython 3.10では動作しません（`langgraph-api`が必要）
 - 確実に動作させるには `python3.11 -m langgraph_cli dev` を使用してください
+- **開発時は`langgraph dev`を使用**（スレッドは再起動で消える）
+- **本番環境テスト時のみ`langgraph up`を使用**（PostgreSQL永続化）
+
+**`langgraph dev` vs `langgraph up`**:
+| コマンド | 用途 | 永続化 | ホットリロード |
+|---------|------|-------|---------------|
+| `langgraph dev` | ローカル開発 | ❌ インメモリ | ✅ 自動 |
+| `langgraph up` | 本番モード | ✅ PostgreSQL | ⚠️ `--watch`必要 |
 
 This server handles:
 - AI agent workflow execution
 - ReAct agent (Gmail + Slides)
 - SSE streaming for real-time progress
+- Thread persistence (本番モードのみ)
 
 **Architecture**:
 ```
