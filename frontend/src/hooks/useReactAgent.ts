@@ -38,10 +38,20 @@ export function useReactAgent() {
   // スレッド作成
   const createThread = useCallback(async () => {
     try {
+      // ユーザー情報取得（localStorage から）
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = user.email || 'anonymous@example.com';
+
       const res = await fetch(`${API_BASE_URL}/threads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          metadata: {
+            user_email: userEmail,                    // ユーザー識別子
+            created_from: 'web_ui',                   // 作成元
+            created_at: new Date().toISOString()      // 作成日時
+          }
+        })
       });
 
       if (!res.ok) throw new Error(`Thread creation failed: ${res.statusText}`);

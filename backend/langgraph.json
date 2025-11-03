@@ -4,6 +4,10 @@
     "react-agent": {
       "path": "./app/agents/react_agent.py:graph",
       "description": "ReAct agent for Gmail sending and slide generation"
+    },
+    "slide-workflow": {
+      "path": "./app/agents/slide_workflow.py:graph",
+      "description": "AI news slide generation workflow with quality evaluation"
     }
   },
   "env": ".env"
