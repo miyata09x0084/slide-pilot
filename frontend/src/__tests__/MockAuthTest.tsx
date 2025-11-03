@@ -25,14 +25,10 @@ export function loginWithMockUser() {
   }
 
   localStorage.setItem('user', JSON.stringify(mockUser))
-  console.log('✅ Mock user logged in:', mockUser)
-  console.log('💡 Reload the page to see the effect')
 }
 
 export function logout() {
   localStorage.removeItem('user')
-  console.log('✅ Logged out')
-  console.log('💡 Reload the page')
 }
 
 // ブラウザのグローバルスコープに関数を公開

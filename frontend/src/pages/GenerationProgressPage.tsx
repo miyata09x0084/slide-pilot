@@ -17,7 +17,6 @@ export default function GenerationProgressPage() {
   useEffect(() => {
     if (slideData.slide_id && !hasRedirected.current && !isThinking) {
       hasRedirected.current = true;
-      console.log('✅ Slide generation completed, redirecting to slide detail...');
 
       // Phase 3: SlideDetailPageへ遷移
       setTimeout(() => {

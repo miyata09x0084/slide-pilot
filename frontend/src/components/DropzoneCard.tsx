@@ -254,7 +254,6 @@ export default function DropzoneCard({ onUploadSuccess, onUploadStart }: Dropzon
           const data = JSON.parse(xhr.responseText);
           setState('success');
           setProgress(100);
-          console.log('✅ PDF uploaded:', data);
 
           // 1秒後にコールバック実行（成功状態を見せるため）
           setTimeout(() => {

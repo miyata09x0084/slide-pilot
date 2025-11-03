@@ -139,11 +139,6 @@ export function useReactAgent() {
                     // AIメッセージの最終contentを保存
                     assistantResponse = msg.content;
 
-                    // デバッグ: 最終メッセージのみログ出力
-                    if (msg.response_metadata?.finish_reason === 'stop') {
-                      console.log('✅ AI応答完了:', msg.content);
-                    }
-
                     // ツール呼び出しがあれば思考ステップに追加
                     if (msg.tool_calls && msg.tool_calls.length > 0) {
                       msg.tool_calls.forEach((call: any) => {
