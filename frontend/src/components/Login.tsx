@@ -28,10 +28,17 @@ function Login({ onSuccess }: LoginProps) {
         <p style={{ marginBottom: '30px', color: '#666' }}>
           AIスライド生成ツール
         </p>
+        {/* Note: Gmail scope は Google Cloud Console の OAuth consent screen で設定が必要 */}
         <GoogleLogin
           onSuccess={onSuccess}
           onError={() => {
-            console.log('Login Failed');
+            console.error('❌ [Google OAuth] Login Failed');
+            console.error('  Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+            console.error('  Current Origin:', window.location.origin);
+            console.error('  Expected Origin: http://localhost:5173');
+            console.error('  Check Google Cloud Console:');
+            console.error('    - Authorized JavaScript origins should include: http://localhost:5173');
+            console.error('    - Settings may take 5 minutes to several hours to propagate');
           }}
         />
       </div>
