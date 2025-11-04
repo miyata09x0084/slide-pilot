@@ -122,6 +122,7 @@ export default function QuickActionMenu({
   onSelectUpload,
   onSelectTemplate,
 }: QuickActionMenuProps) {
+  // @ts-ignore - Reserved for future use
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOverlayClick = (e: React.MouseEvent) => {

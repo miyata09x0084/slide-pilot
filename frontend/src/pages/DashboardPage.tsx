@@ -151,7 +151,7 @@ export default function DashboardPage() {
 
       try {
         const response = await fetch(
-          `http://localhost:8001/api/slides?user_id=${encodeURIComponent(user.email)}&limit=20`
+          `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides?user_id=${encodeURIComponent(user.email)}&limit=20`
         );
 
         if (!response.ok) {
@@ -207,7 +207,7 @@ export default function DashboardPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:8001/api/upload-pdf', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/upload-pdf`, {
         method: 'POST',
         body: formData,
       });

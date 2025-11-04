@@ -63,7 +63,7 @@ export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
   useEffect(() => {
     const fetchSlide = async () => {
       try {
-        const response = await fetch(`http://localhost:8001/api/slides/${slideId}/markdown`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides/${slideId}/markdown`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch slide: ${response.statusText}`);

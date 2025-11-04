@@ -3,7 +3,7 @@
  * PDF/YouTube入力の初回画面
  */
 
-import FileDropzone from './FileDropzone';
+// import FileDropzone from './FileDropzone'; // TODO: FileDropzone component not found
 
 interface InitialInputFormProps {
   onPdfUpload: (path: string) => void;
@@ -11,7 +11,7 @@ interface InitialInputFormProps {
 }
 
 export default function InitialInputForm({
-  onPdfUpload,
+  onPdfUpload: _onPdfUpload,
   onYoutubeSubmit,
 }: InitialInputFormProps) {
   return (
@@ -49,7 +49,10 @@ export default function InitialInputForm({
         難しいPDFを、わかりやすいスライドに変換します
       </p>
 
-      <FileDropzone onUpload={onPdfUpload} />
+      {/* <FileDropzone onUpload={onPdfUpload} /> */}
+      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+        FileDropzone component not available
+      </div>
 
       {onYoutubeSubmit && (
         <>

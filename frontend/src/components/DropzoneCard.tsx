@@ -275,7 +275,7 @@ export default function DropzoneCard({ onUploadSuccess, onUploadStart }: Dropzon
         throw new Error('アップロードがタイムアウトしました');
       });
 
-      xhr.open('POST', 'http://localhost:8001/api/upload-pdf');
+      xhr.open('POST', `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/upload-pdf`);
       xhr.timeout = 60000; // 60秒
       xhr.send(formData);
     } catch (err: any) {

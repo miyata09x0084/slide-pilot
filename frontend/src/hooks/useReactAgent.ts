@@ -14,7 +14,8 @@ import {
   slideDataAtom,
 } from '../store/reactAgentAtoms';
 
-const API_BASE_URL = 'http://localhost:8001/api/agent';
+// 環境変数からAPIベースURLを取得（本番環境では相対パス /api を使用）
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/agent`;
 
 // スライドデータの型定義
 export interface SlideData {
@@ -33,6 +34,7 @@ export function useReactAgent() {
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
 
   // スライド生成中フラグ（ローカル変数で管理）
+  // @ts-ignore - Used in closure but TypeScript doesn't detect it
   let _isGeneratingSlides = false;
 
   // スレッド作成

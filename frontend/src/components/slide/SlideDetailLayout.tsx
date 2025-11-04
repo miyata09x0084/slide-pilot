@@ -3,7 +3,7 @@
  * スライド詳細ページの2ペインレイアウト
  */
 
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface SlideDetailLayoutProps {
   slidePane: ReactNode;

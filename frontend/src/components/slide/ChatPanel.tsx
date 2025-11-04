@@ -67,7 +67,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function ChatPanel({ slideId }: ChatPanelProps) {
+export default function ChatPanel({ slideId: _slideId }: ChatPanelProps) {
   const [messages] = useState<Message[]>([]);
 
   return (

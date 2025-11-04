@@ -28,7 +28,7 @@ export function SlideHistory({ userEmail, onPreview }: SlideHistoryProps) {
     const fetchSlides = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8001/api/slides?user_id=${encodeURIComponent(userEmail)}&limit=20`
+          `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides?user_id=${encodeURIComponent(userEmail)}&limit=20`
         );
 
         if (!response.ok) {
