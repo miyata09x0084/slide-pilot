@@ -3,10 +3,11 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 
 # LangChain / LangGraph stack ---
-langchain-core>=0.3.10,<0.4.0
+langchain-core>=0.3.64
 langchain-openai>=0.2.0,<0.3.0
-langgraph>=0.2.0,<0.4.0
-langsmith>=0.1.0,<0.2.0
+langgraph>=0.4.0
+langgraph-sdk>=0.2.0
+langsmith>=0.3.45
 
 # ---Compatibility helpers---
 typing-extensions>=4.8.0
@@ -20,3 +21,6 @@ google-api-python-client==2.108.0
 # ---PDF Processing (Issue #17)---
 pypdf>=3.17.0
 langchain-community>=0.3.0
+
+# ---Supabase (Issue #24)---
+supabase>=2.22.0

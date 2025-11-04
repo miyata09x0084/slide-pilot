@@ -1,35 +1,21 @@
 """
-PDFアップロードAPI (Issue #17)
-FastAPIを使用してPDFファイルをアップロードするエンドポイントを提供
+PDFアップロードルーター
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pathlib import Path
 import uuid
-import shutil
+from app.dependencies import get_upload_dir, get_max_file_size
 
-app = FastAPI()
-
-# CORS設定（フロントエンドからのアクセスを許可）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# アップロードディレクトリの設定
-UPLOAD_DIR = Path(__file__).parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-# ファイルサイズ制限（100MB）
-MAX_FILE_SIZE = 100 * 1024 * 1024
+router = APIRouter()
 
 
-@app.post("/api/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    upload_dir: Path = Depends(get_upload_dir),
+    max_file_size: int = Depends(get_max_file_size)
+):
     """
     PDFファイルをアップロードする
 
@@ -55,7 +41,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     contents = await file.read()
     file_size = len(contents)
 
-    if file_size > MAX_FILE_SIZE:
+    if file_size > max_file_size:
         raise HTTPException(
             status_code=400,
             detail=f"ファイルサイズは100MB以下にしてください（現在: {file_size / 1024 / 1024:.2f}MB）"
@@ -66,7 +52,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     # 一意なファイル名を生成
     unique_name = f"{uuid.uuid4()}_{file.filename}"
-    file_path = UPLOAD_DIR / unique_name
+    file_path = upload_dir / unique_name
 
     # ファイルを保存
     try:
@@ -87,20 +73,10 @@ async def upload_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"ファイル保存エラー: {str(e)}")
 
 
-@app.get("/api/health")
-async def health_check():
-    """ヘルスチェックエンドポイント"""
-    return {
-        "status": "ok",
-        "upload_dir": str(UPLOAD_DIR),
-        "upload_dir_exists": UPLOAD_DIR.exists()
-    }
-
-
-@app.delete("/api/uploads/{filename}")
-async def delete_upload(filename: str):
+@router.delete("/uploads/{filename}")
+async def delete_upload(filename: str, upload_dir: Path = Depends(get_upload_dir)):
     """アップロードされたファイルを削除"""
-    file_path = UPLOAD_DIR / filename
+    file_path = upload_dir / filename
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="ファイルが見つかりません")
@@ -110,10 +86,3 @@ async def delete_upload(filename: str):
         return {"status": "success", "message": "ファイルを削除しました"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ファイル削除エラー: {str(e)}")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    print("🚀 Starting PDF Upload API server on http://localhost:8001")
-    print(f"📁 Upload directory: {UPLOAD_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=8001)

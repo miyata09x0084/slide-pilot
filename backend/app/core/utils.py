@@ -1,10 +1,7 @@
-"""スライド生成の共通ロジック
-
-このモジュールはslide_agent.pyから独立した共通ユーティリティを提供します。
+"""共通ユーティリティ関数
 
 含まれる機能:
-- 環境変数設定とLLMクライアント
-- テキスト処理ユーティリティ（slugify, JSON抽出, 箇条書き整形など）
+- テキスト処理（slugify, JSON抽出, 箇条書き整形など）
 - Marp/Slidev用Markdown整形関数
 - 日時処理（JST対応）
 - Slidev生成ロジック（マルチベンダー対応）
@@ -12,57 +9,20 @@
 """
 
 from zoneinfo import ZoneInfo
-from dotenv import load_dotenv
 from typing import Optional, Dict, Any, Union, List
 import os
 import re
 import requests
-from datetime import datetime, timedelta, timezone
-from langchain_openai import ChatOpenAI
+from datetime import datetime
 from langchain_core.tools import tool
 import json
 from pathlib import Path
 import shutil
 import subprocess
 
-# -------------------
-# 環境変数読み込み
-# -------------------
-
-load_dotenv()
-
-def _get_env(key: str, default: Optional[str] = None) -> str:
-  value = os.getenv(key)
-  if value is None:
-    raise ValueError(f"missing environment variable: {key}")
-  return value
-
-# LangSmith
-os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
-os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
-
-# OpenAI API
-# API キーは環境変数 OPENAI_API_KEY から自動読み込み
-# 明示的に読み込む場合のみ以下を使用
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Tavily
-TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
-
-# Marp 出力（PDF/PNG/HTML）。空なら .md に出力
-SLIDE_FORMAT = os.getenv("SLIDE_FORMAT", "").lower().strip()
-MARP_THEME = os.getenv("MARP_THEME", "default") # default/gaia/gaia-dark/gaia-light
-MARP_PAGINATE = os.getenv("MARP_PAGINATE", "true") # true/false
-
-# -------------------
-# LLM クライアント
-# -------------------
-llm = ChatOpenAI(
-  model="gpt-4o",  # 最新のGPT-4 Omniモデル（または "gpt-3.5-turbo" でコスト削減）
-  temperature=0.2,
-  max_retries=2,    # リトライ回数
-  # api_key は環境変数 OPENAI_API_KEY から自動読み込み
-)
+from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from app.core.llm import llm
+from app.config import settings
 
 # -------------------
 # ユーティリティ
@@ -637,9 +597,8 @@ AI技術は急速に進化中
 
 """
 
-  # ファイル保存
-  slide_dir = Path(__file__).parent / "slides"
-  slide_dir.mkdir(parents=True, exist_ok=True)
+  # 統一設定からスライドディレクトリを取得
+  slide_dir = settings.SLIDES_DIR
 
   # ファイル名生成
   slug = _slugify_en(topic) or "test"
@@ -665,14 +624,14 @@ AI技術は急速に進化中
       )
       return json.dumps({
         "status": "success",
-        "slide_path": str(pdf_path.relative_to(slide_dir.parent)),
+        "slide_path": str(pdf_path),
         "title": topic,
         "message": f"Slidevスライドを生成しました: {pdf_path.name}"
       }, ensure_ascii=False)
     except subprocess.TimeoutExpired:
       return json.dumps({
         "status": "error",
-        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "slide_path": str(md_path),
         "title": topic,
         "error": "PDF生成がタイムアウトしました（90秒超過）",
         "message": "Markdownファイルのみ保存しました"
@@ -682,7 +641,7 @@ AI技術は急速に進化中
       error_msg = e.stderr.decode() if e.stderr else str(e)
       return json.dumps({
         "status": "partial",
-        "slide_path": str(md_path.relative_to(slide_dir.parent)),
+        "slide_path": str(md_path),
         "title": topic,
         "error": f"PDF生成失敗: {error_msg}",
         "message": "Markdownファイルのみ保存しました"
@@ -691,7 +650,7 @@ AI技術は急速に進化中
     # slidev未インストール時
     return json.dumps({
       "status": "md_only",
-      "slide_path": str(md_path.relative_to(slide_dir.parent)),
+      "slide_path": str(md_path),
       "title": topic,
       "message": "slidevが見つかりません。Markdownのみ保存しました"
     }, ensure_ascii=False)

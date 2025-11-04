@@ -179,12 +179,18 @@ config.yaml
 # LangGraph runtime files
 .langgraph_api/
 *.pckl
-# Generated slides (Issue #6)
+# Generated slides (Issue #6, Issue #23)
 backend/slides/*.md
 backend/slides/*.pdf
 backend/slides/*.png
 backend/slides/*.html
 !backend/slides/.gitkeep
+
+# Generated slides (new structure after Issue #23 refactoring)
+backend/data/slides/*.md
+backend/data/slides/*.pdf
+backend/data/slides/*.png
+backend/data/slides/*.html
 
 # Gmail API credentials (Issue #6)
 backend/credentials.json

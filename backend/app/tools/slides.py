@@ -5,25 +5,20 @@ ReActエージェントから呼び出してAI最新情報スライドを生成�
 """
 
 from langchain_core.tools import tool
-from typing import Optional
 import json
 from pathlib import Path
+from typing_extensions import Annotated
+from langgraph.prebuilt import InjectedState
 
-# 既存のslide_agentをインポート（パッケージ構造対応）
-try:
-    # 相対インポート（推奨: パッケージとして実行される場合）
-    from ..slide_agent import graph, State
-except ImportError:
-    # 絶対インポート（後方互換: 直接実行される場合）
-    import sys
-    _backend_dir = Path(__file__).resolve().parent.parent
-    if str(_backend_dir) not in sys.path:
-        sys.path.insert(0, str(_backend_dir))
-    from slide_agent import graph, State
+# slide_workflowグラフをインポート
+from app.agents.slide_workflow import graph, State
 
 
 @tool
-def generate_slides(topic: str = "AI最新情報") -> str:
+def generate_slides(
+    topic: str = "AI最新情報",
+    state: Annotated[dict, InjectedState] = None
+) -> str:
     """スライドを生成（PDF/YouTube/テキスト対応）
 
     入力に応じて自動的に処理方法を切り替えます:
@@ -45,14 +40,21 @@ def generate_slides(topic: str = "AI最新情報") -> str:
                - PDFファイルパス（例: "/path/to/file.pdf"）
                - YouTube URL（例: "https://youtube.com/watch?v=..."）
                - テキスト（例: "AI最新情報"）
+        state: LangGraphから自動注入されるState（user_id含む）
+               このパラメータはLLMのツールスキーマから除外される
 
     Returns:
         str: 生成されたスライドのパスと結果情報（JSON形式）
     """
 
+    # user_idを取得（InjectedStateから）
+    user_id = state.get("user_id", "anonymous") if state else "anonymous"
+    print(f"[generate_slides] topic={topic[:50]}, user_id={user_id}")
+
     # 初期State設定
     init_state: State = {
         "topic": topic,
+        "user_id": user_id,  # ← 追加
         "key_points": [],
         "toc": [],
         "slide_md": "",
@@ -86,18 +88,24 @@ def generate_slides(topic: str = "AI最新情報") -> str:
         # 成功時の情報を返す
         title = result.get("title", "AI最新情報スライド")
         slide_path = result.get("slide_path", "")
+        slide_id = result.get("slide_id")  # Supabase slide ID (Issue #24)
+        pdf_url = result.get("pdf_url")    # Supabase公開URL (Issue #24)
         # score = result.get("score", 0.0)
         # passed = result.get("passed", False)
 
-        # 絶対パスから相対パスに変換（frontend/publicからアクセス可能にする）
-        relative_path = str(Path(slide_path).relative_to(Path(__file__).parent.parent))
+        # 絶対パスからファイル名を抽出してAPIエンドポイント形式に変換
+        filename = Path(slide_path).name
+        api_url = f"http://localhost:8001/api/slides/{filename}"
 
         # JSON形式で返す（フロントエンドがパース可能）
+        # Issue #24: slide_idとpdf_urlを追加してブラウザプレビューを有効化
         return json.dumps({
             "status": "success",
             "message": "✅ スライド生成完了",
             "title": title,
-            "slide_path": relative_path
+            "slide_path": api_url,
+            "slide_id": slide_id,
+            "pdf_url": pdf_url
         }, ensure_ascii=False)
 
     except Exception as e:

@@ -2,12 +2,28 @@
 # スライド生成ワークフロー（PDF/YouTube/テキスト対応）
 # フロー: 情報収集 -> キーポイント抽出 -> 目次生成 -> スライド生成 -> 評価 -> 保存
 
-# 共通ロジックのインポート
-from slide_core import (
-    # 環境変数・定数
-    TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE,
-    # LLMクライアント
-    llm,
+# 標準ライブラリ
+import os
+import re
+import json
+import shutil
+import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Optional, Dict, Any, Union, List
+
+# サードパーティライブラリ
+from typing_extensions import TypedDict
+from langsmith import traceable
+from langgraph.graph import StateGraph, START, END
+from langchain_core.runnables import RunnableConfig
+
+# ローカルモジュール
+from app.config import settings
+from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from app.core.llm import llm
+from app.core.supabase import save_slide_to_supabase
+from app.core.utils import (
     # ユーティリティ関数
     _log, _strip_bullets, _slugify_en, _find_json,
     _ensure_marp_header, _insert_separators, _double_separators,
@@ -22,43 +38,61 @@ from slide_core import (
     # テストツール
     generate_slidev_test,
 )
-
-# ワークフロー固有のインポート
-from typing_extensions import TypedDict
-from typing import Optional, Dict, Any, Union, List
-from langsmith import traceable
-from langgraph.graph import StateGraph, START, END
-from langchain_core.runnables import RunnableConfig
-from tools.pdf_processor import process_pdf
-import os
-import re
-import json
-import shutil
-import subprocess
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from app.prompts.evaluation_prompts import get_evaluation_prompt
+from app.prompts.slide_prompts import (
+    get_key_points_map_prompt,
+    get_key_points_reduce_prompt,
+    get_key_points_ai_prompt,
+    get_toc_pdf_prompt,
+    get_toc_ai_prompt,
+    get_slide_title_prompt,
+    get_slide_pdf_prompt,
+    get_slug_prompt,
+)
+from app.tools.pdf import process_pdf
 
 
 # -------------------
 # State
 # -------------------
-class State(TypedDict):
-  """LangGraphワークフローの状態管理"""
+class State(TypedDict, total=False):
+  """LangGraphワークフローの状態管理
 
+  NOTE: user_id は実行コンテキスト情報（Read-Only）であり、
+        ビジネスロジックデータではない。ノード内で変更禁止。
+        将来 LangGraph v0.6+ では context_schema に移行予定。
+
+  total=False を指定することで、全フィールドをオプショナルとし、
+  後方互換性を確保している。
+  """
+
+  # ══════════════════════════════════════════════════════════
+  # 実行コンテキスト（Read-Only、ノードで変更禁止）
+  # ══════════════════════════════════════════════════════════
+  user_id: str                                  # ユーザー識別子（デフォルト: "anonymous"）
+
+  # ══════════════════════════════════════════════════════════
   # 入力
+  # ══════════════════════════════════════════════════════════
   topic: str                                    # スライドの主題
 
+  # ══════════════════════════════════════════════════════════
   # 情報収集 (Node A)
+  # ══════════════════════════════════════════════════════════
   sources: Dict[str, List[Dict[str, str]]]      # Tavily検索結果
   context_md: str                               # 検索結果のMarkdown
 
+  # ══════════════════════════════════════════════════════════
   # コンテンツ生成 (Node B-D)
+  # ══════════════════════════════════════════════════════════
   key_points: List[str]                         # 重要ポイント5個
   toc: List[str]                                # 目次5-8項目
   slide_md: str                                 # Marpスライド本文
   title: str                                    # スライドタイトル
 
+  # ══════════════════════════════════════════════════════════
   # 評価 (Node E)
+  # ══════════════════════════════════════════════════════════
   score: float                                  # 総合スコア (0-10)
   subscores: Dict[str, float]                   # 項目別スコア
   reasons: Dict[str, str]                       # 評価理由
@@ -68,10 +102,21 @@ class State(TypedDict):
   feedback: str                                 # 総合フィードバック
   attempts: int                                 # リトライ回数 (最大3)
 
-  # 出力 (Node F)
-  slide_path: str                               # 保存ファイルパス
+  # ══════════════════════════════════════════════════════════
+  # 図解生成 (Node D.5) - Issue #25
+  # ══════════════════════════════════════════════════════════
+  diagrams: Dict[str, Any]                      # 生成された図解のメタデータ
 
+  # ══════════════════════════════════════════════════════════
+  # 出力 (Node F)
+  # ══════════════════════════════════════════════════════════
+  slide_path: str                               # ローカルファイルパス
+  slide_id: str                                 # Supabase slide ID（オプショナル）
+  pdf_url: str                                  # Supabase公開URL（オプショナル）
+
+  # ══════════════════════════════════════════════════════════
   # システム
+  # ══════════════════════════════════════════════════════════
   error: str                                    # エラーメッセージ
   log: List[str]                                # 実行ログ
 
@@ -223,14 +268,7 @@ def generate_key_points(state: State) -> Dict:
         if not chunk.strip():
           continue
 
-        map_prompt = [
-          ("system", "あなたは教育のプロフェッショナルです。中学生にも分かりやすく内容を説明する専門家です。"),
-          ("user",
-            f"以下のテキストから、中学生にもわかるように重要なポイントを最大3個、"
-            f"短い箇条書きで抽出してください。\n\n"
-            f"[テキスト部分 {i+1}]\n{chunk[:3000]}\n\n"  # チャンクごとに3000文字まで
-            f"箇条書き形式で出力してください（最大3個）:")
-        ]
+        map_prompt = get_key_points_map_prompt(chunk=chunk, chunk_index=i+1)
 
         msg = llm.invoke(map_prompt)
         points = _strip_bullets(msg.content.splitlines())[:3]
@@ -238,18 +276,7 @@ def generate_key_points(state: State) -> Dict:
 
       # Reduce: 全ポイントを統合して5つに凝縮
       if chunk_points:
-        reduce_prompt = [
-          ("system", "あなたは教育のプロフェッショナルです。情報を整理統合するのが得意です。"),
-          ("user",
-            f"以下の重要ポイントリストから、重複を削除し、最も重要な5個に絞り込んでください。\n\n"
-            f"[抽出されたポイント]\n" + "\n".join([f"- {p}" for p in chunk_points]) + "\n\n"
-            f"【出力形式】\n"
-            f"- 必ず箇条書き形式で出力（「-」または「1.」で始める）\n"
-            f"- 必ず5個の箇条書き（4個や6個ではなく正確に5個）\n"
-            f"- 「以下の5つのポイントは...」などの前置き文は不要\n"
-            f"- 各ポイントは1行で簡潔に\n\n"
-            f"中学生にもわかりやすい表現で、最重要な5個を選んでください:")
-        ]
+        reduce_prompt = get_key_points_reduce_prompt(chunk_points=chunk_points)
 
         msg = llm.invoke(reduce_prompt)
         lines = msg.content.splitlines()
@@ -283,13 +310,7 @@ def generate_key_points(state: State) -> Dict:
 
   else:
     # AI最新情報の場合は既存のプロンプト
-    prompt = [
-      ("system", "あなたはSolution Engineerです。これからMarpスライドでAI最新情報を発表します。"),
-      ("user",
-        "以下の「最新情報サマリ（出典付き）」を参考に、発表の重要ポイントを各社5個、"
-        "短い箇条書きで。URLも含めてください。\n\n"
-        f"[最新情報サマリ]\n{ctx}\n\n[トピック]\n{topic}")
-    ]
+    prompt = get_key_points_ai_prompt(context_md=ctx, topic=topic)
 
     try:
       msg = llm.invoke(prompt)
@@ -311,22 +332,10 @@ def generate_toc(state: State) -> Dict:
 
   # PDF処理の場合は中学生向けの章立て
   if input_type == "pdf":
-    prompt = [
-      ("system", "あなたは教育のプロフェッショナルです。中学生にも理解できるスライドの構成を考えるのが得意です。"),
-      ("user",
-       "以下の重要ポイントから、中学生にもわかりやすい5〜8個の章立てを JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
-       "各章タイトルはやさしい日本語で。構成に流れがあるようにしてください。\n\n"
-       "重要ポイント:\n- " + "\n- ".join(key_points) + "\n\n"
-       "章立てはシンプルで親しみやすい言葉を使ってください。")
-    ]
+    prompt = get_toc_pdf_prompt(key_points=key_points)
   else:
     # AI最新情報の場合は既存のプロンプト
-    prompt = [
-      ("system", "あなたはSolution Engineerです。Marpスライドの構成（目次）を作ります。"),
-      ("user",
-       "以下の重要ポイントから、5〜8個の章立て（配列）を JSON の {\"toc\": [ ... ]} 形式で返してください。\n\n"
-       "重要ポイント:\n- " + "\n- ".join(key_points))
-    ]
+    prompt = get_toc_ai_prompt(key_points=key_points)
 
   try:
     msg = llm.invoke(prompt)
@@ -339,6 +348,51 @@ def generate_toc(state: State) -> Dict:
     return {"toc": toc, "error": "", "log": _log(state, f"[toc] {toc}")}
   except Exception as e:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
+
+# -------------------
+# Mermaid図解生成ヘルパー関数（Issue #25）
+# -------------------
+# 以下の関数は廃止（LLMがプロンプトから独自の図を生成するため不要）
+# def _generate_architecture_flowchart(key_points: List[str]) -> str:
+# def _generate_use_case_mindmap(key_points: List[str]) -> str:
+
+
+def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直後にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # "# section_title" または "## section_title" の後の "---" を見つけて挿入
+    # contentの先頭と末尾の改行を削除してから、区切りを追加して挿入
+    clean_content = content.strip('\n')
+    pattern = rf'(#+\s+{re.escape(section_title)}.*?\n---\s*\n)'
+
+    if re.search(pattern, slide_md, re.DOTALL):
+        return re.sub(pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+    else:
+        # フォールバック: 目次/Agendaの後に挿入
+        agenda_pattern = r'(#+\s+(?:目次|Agenda).*?\n---\s*\n)'
+        if re.search(agenda_pattern, slide_md, re.DOTALL):
+            return re.sub(agenda_pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+        return slide_md
+
+
+def _insert_before_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直前にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # contentの先頭と末尾の改行を削除
+    clean_content = content.strip('\n')
+
+    # パターン: --- の後に section_title がある箇所
+    # マッチグループ1: --- + 改行、グループ2: section_title
+    pattern = rf'(---\s*\n\n)(#+\s+{re.escape(section_title)})'
+
+    if re.search(pattern, slide_md):
+        # --- と section_title の間に図解を挿入
+        return re.sub(pattern, rf'\1{clean_content}\n\n---\n\n\2', slide_md, count=1)
+    else:
+        # セクションが見つからない場合は末尾に追加
+        return slide_md.rstrip('\n') + f'\n\n{clean_content}\n\n---\n\n'
 
 # -------------------
 # Node D: スライド本文（Slidev）生成
@@ -368,19 +422,7 @@ def write_slides_slidev(state: State) -> Dict:
         chunks = full_content.split("\n\n---\n\n")
 
       # PDFの内容からLLMでタイトルを生成
-      title_prompt = [
-        ("system", "あなたは教育のプロフェッショナルです。PDFの内容から魅力的なタイトルを作成します。"),
-        ("user",
-         f"以下のPDF内容から、中学生向けスライドにふさわしい魅力的なタイトルを1行で生成してください。\n\n"
-         f"【PDF冒頭】\n{chunks[0][:2000] if chunks else '内容なし'}\n\n"
-         f"【重要ポイント】\n" + "\n".join([f"- {kp}" for kp in key_points[:3]]) + "\n\n"
-         f"【要件】\n"
-         f"- 中学生が興味を持つタイトル\n"
-         f"- 簡潔でわかりやすい（15文字以内推奨）\n"
-         f"- 絵文字は不要\n"
-         f"- 例: 「AIの仕組みと未来」「地球温暖化を学ぼう」\n\n"
-         f"タイトルのみを出力してください:")
-      ]
+      title_prompt = get_slide_title_prompt(chunks=chunks, key_points=key_points)
 
       try:
         title_msg = llm.invoke(title_prompt)
@@ -416,28 +458,12 @@ def write_slides_slidev(state: State) -> Dict:
       full_summary = "\n\n".join(chunk_texts)
 
       # LLMでSlidevマークダウンを生成（チャンク抜粋版を使用）
-      prompt = [
-        ("system",
-         "あなたは教育のプロフェッショナルです。PDFの内容を中学生にもわかりやすく説明するSlidevスライドを作成します。各セクションでは、目次に基づいて短い物語や会話形式で説明してください。1枚のスライドには伝えたいポイントをひとつだけ載せ、絵文字も活用して子どもの興味を引いてください。専門用語は可能な限り避け、優しい口調で話しかけるように説明しましょう。"),
-        ("user",
-         f"以下のPDF内容（抜粋）から、中学生向けのわかりやすいスライドを作成してください。\n\n"
-         f"【PDF内容（セクション別抜粋）】\n{full_summary}\n\n"
-         f"【重要ポイント】\n" + "\n".join([f"- {kp}" for kp in key_points[:5]]) + "\n\n"
-         f"【目次】\n" + "\n".join([f"- {t}" for t in toc[:8]]) + "\n\n"
-         f"【要件】\n"
-         f"- Slidev形式（YAMLフロントマター + Markdown）\n"
-         f"- theme: apple-basic を使用\n"
-         f"- タイトルスライド: # {ja_title}\n"
-         f"- Agendaスライド: 目次を<v-clicks>で表示\n"
-         f"- 各セクション: 目次に基づいて5-8スライド作成\n"
-         f"- 各スライドは簡潔に（1スライド1メッセージ）\n"
-         f"- 中学生でもわかる言葉で説明\n"
-         f"- 絵文字を活用して視覚的に\n"
-         f"- できれば短いストーリーや、先生と生徒の会話形式も使ってください\n"
-         f"- まとめスライド: 【重要ポイント】で示した5個すべてを箇条書きで表示してください\n"
-         f"- PDF全体の流れを反映した論理的な構成にしてください\n\n"
-         f"出力はSlidevマークダウンのみ（コードブロック不要）:")
-      ]
+      prompt = get_slide_pdf_prompt(
+        full_summary=full_summary,
+        key_points=key_points,
+        toc=toc,
+        ja_title=ja_title
+      )
 
       msg = llm.invoke(prompt)
       slide_md = msg.content.strip()
@@ -503,6 +529,16 @@ class: text-center
     }
 
 # -------------------
+# Node D.5: Mermaid図解生成（Issue #25）
+# -------------------
+@traceable(run_name="d5_generate_diagrams")
+# generate_diagrams ノードは廃止（LLMがプロンプトから独自の図を生成するため不要）
+# Issue #25: テンプレート図の強制挿入を削除し、LLMによる独自図生成に移行
+def generate_diagrams(state: State) -> Dict:
+    """[DEPRECATED] このノードは使用されていません"""
+    return {"log": _log(state, "[diagrams] deprecated - skipped")}
+
+# -------------------
 # Node E: 評価
 # -------------------
 MAX_ATTEMPTS = 3
@@ -520,52 +556,13 @@ def evaluate_slides_slidev(state: State) -> Dict:
   # 入力タイプを判別してPDF特有の評価基準を追加
   input_type = detect_input_type(topic)
 
-  if input_type == "pdf":
-    # PDF向け評価基準（中学生向け解説）
-    eval_guide = (
-        "評価観点と重み:\n"
-        "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
-        "- comprehensiveness(0.25): PDF全体の重要トピックをカバーしているか（網羅性）\n"
-        "- clarity(0.25): 中学生にもわかる説明、難しい用語の言い換え\n"
-        "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度、絵文字活用）\n"
-        "- engagement(0.15): 興味を引く工夫（ストーリー、会話形式、視覚要素）\n"
-        "合格: score >= 8.0\n"
-        "\n"
-        "【重要】\n"
-        "- PDFの最初のページだけでなく、全体の流れを反映していること\n"
-        "- 専門用語は中学生にもわかる言葉で説明されていること\n"
-        "- 絵文字や視覚要素で視覚的に理解しやすいこと\n"
-    )
-  else:
-    # AI情報向け評価基準（既存）
-    eval_guide = (
-        "評価観点と重み:\n"
-        "- structure(0.20): スライドの流れ、章立て、1スライド1メッセージ\n"
-        "- practicality(0.25): 実務に使える具体性（手順、具体例、注意点）\n"
-        "- accuracy(0.25): 事実・用語の正確さ\n"
-        "- readability(0.15): 簡潔明瞭、視認性（箇条書きの粒度）\n"
-        "- conciseness(0.15): 冗長性の少なさ\n"
-        "合格: score >= 8.0\n"
-    )
-  prompt = [
-        ("system",
-         "あなたはCloud Solution Architectです。以下のSlidevスライドMarkdownを、"
-         "指定の観点・重みで厳密に採点します。出力はJSONのみ。"),
-        ("user",
-         f"Topic: {topic}\nTOC: {json.dumps(toc, ensure_ascii=False)}\n\n"
-         "Slides (Slidev Markdown):\n<<<SLIDES\n" + slide_md + "\nSLIDES\n\n"
-         "Evaluation Guide:\n<<<EVAL\n" + eval_guide + "\nEVAL\n\n"
-         "Return strictly this JSON schema:\n"
-         "{\n"
-         "  \"score\": number,\n"
-         "  \"subscores\": {\"structure\": number, \"practicality\": number, \"accuracy\": number, \"readability\": number, \"conciseness\": number},\n"
-         "  \"reasons\": {\"structure\": string, \"practicality\": string, \"accuracy\": string, \"readability\": string, \"conciseness\": string},\n"
-         "  \"suggestions\": [string],\n"
-         "  \"risk_flags\": [string],\n"
-         "  \"pass\": boolean,\n"
-         "  \"feedback\": string\n"
-         "}"
-        )]
+  # プロンプトを取得（入力タイプで評価基準を切り替え）
+  prompt = get_evaluation_prompt(
+    slide_md=slide_md,
+    toc=toc,
+    topic=topic,
+    input_type=input_type
+  )
   try:
     msg = llm.invoke(prompt)
     raw = msg.content or ""
@@ -621,13 +618,7 @@ def save_and_render_slidev(state: State) -> Dict:
     }
 
   # スライドファイル名の英語表記を生成
-  slug_prompt = [
-    ("system", "You create concise English slugs for filenames."),
-    ("user",
-     "Convert the following Japanese title into a short English filename base (<=6 words). "
-     "Only letters and spaces; no punctuation or numbers.\n\n"
-     f"Title: {title}")
-  ]
+  slug_prompt = get_slug_prompt(title=title)
 
   try:
     emsg = llm.invoke(slug_prompt)
@@ -635,8 +626,8 @@ def save_and_render_slidev(state: State) -> Dict:
   except Exception:
     file_stem = _slugify_en(title) or "ai-latest-info"
 
-  slide_dir = Path(__file__).parent / "slides"
-  slide_dir.mkdir(parents=True, exist_ok=True)
+  # 統一設定からスライドディレクトリを取得
+  slide_dir = settings.SLIDES_DIR
   slide_md_path = slide_dir / f"{file_stem}_slidev.md"
   slide_md_path.write_text(slide_md, encoding="utf-8")
 
@@ -670,10 +661,46 @@ def save_and_render_slidev(state: State) -> Dict:
     else:
       log_msg = f"[slidev] rendering skipped (SLIDE_FORMAT={SLIDE_FORMAT}, only pdf supported)."
 
-  return {
+  # ──────────────────────────────────────────────────────────────────────────
+  # Supabase保存（オプショナル、失敗しても継続）
+  # Issue #24: ブラウザプレビュー + Supabase履歴管理
+  # ──────────────────────────────────────────────────────────────────────────
+  result = {
     "slide_path": out_path,
     "log": _log(state, log_msg)
   }
+
+  # 実行コンテキストからuser_idを取得（Read-Only）
+  user_id = state.get("user_id", "anonymous")
+  topic = state.get("topic", "AI最新情報")
+
+  try:
+    # PDFが生成された場合のみパスを渡す
+    pdf_path = None
+    if slidev and SLIDE_FORMAT == "pdf" and "pdf_file" in locals():
+      pdf_path = pdf_file
+
+    supabase_result = save_slide_to_supabase(
+      user_id=user_id,
+      title=title,
+      topic=topic,
+      slide_md=slide_md,
+      pdf_path=pdf_path
+    )
+
+    if "slide_id" in supabase_result:
+      result["slide_id"] = supabase_result["slide_id"]
+      result["pdf_url"] = supabase_result.get("pdf_url")
+      result["log"] = _log(state, f"[supabase] saved slide_id={supabase_result['slide_id']}")
+    elif "error" in supabase_result:
+      # Supabase未設定の場合もここに入る（警告のみ、継続）
+      result["log"] = _log(state, f"[supabase] {supabase_result['error']}")
+
+  except Exception as e:
+    # Supabase保存失敗してもワークフローは継続（クリティカルエラーではない）
+    result["log"] = _log(state, f"[supabase] save failed (non-critical): {str(e)[:100]}")
+
+  return result
 
 # -------------------
 # グラフ構築
@@ -683,6 +710,7 @@ graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
+graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 
