@@ -1,7 +1,8 @@
 # SlidePilot デプロイ計画（Firebase Hosting + Cloud Run + LangGraph Cloud）
 
-**最終更新**: 2025-11-03
-**戦略**: LangGraph Cloud（Developer Plan）採用
+**最終更新**: 2025-11-04
+**戦略**: LangGraph Cloud（Plus Plan）採用
+**現在フェーズ**: Phase 1-4完了（50%）
 
 ---
 
@@ -489,48 +490,80 @@ LIMIT 5;
 
 #### 1-2. LangGraphグラフをLangSmith Cloudにデプロイ（15分）
 
-**デプロイ方法**: GitHub連携（推奨）
+**実施内容**: ✅ 完了（2025-11-04）
 
-**手順**:
-1. LangSmith Dashboard → "Deployments" → "New Deployment"
-2. "Connect GitHub Repository" を選択
-3. リポジトリ設定:
+**デプロイ方法**: GitHub連携
+
+**実施手順**:
+1. ✅ LangSmith Dashboard → "Deployments" → "New Deployment"
+2. ✅ "Connect GitHub Repository" を選択
+3. ✅ リポジトリ設定:
    - Repository: `slide-pilot`
-   - Branch: `feature/27-deployment-phase0`（または`main`）
+   - Branch: `main`
    - Directory: `backend`
-4. 環境変数設定:
-   ```
-   OPENAI_API_KEY=sk-...
-   TAVILY_API_KEY=tvly-...
-   SUPABASE_URL=https://...
-   SUPABASE_SERVICE_KEY=...
-   LANGCHAIN_API_KEY=lsv2_...
-   ```
-5. "Deploy" をクリック（5-10分待機）
-6. デプロイURL取得: `https://api.smith.langchain.com/deployments/{deployment-id}`
+4. ✅ 環境変数設定:
+   - `OPENAI_API_KEY`
+   - `TAVILY_API_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_KEY`
+   - `LANGCHAIN_API_KEY`
+   - `POSTGRES_URI`（自動マイグレーション実行）
+5. ✅ デプロイ実行（約5分）
+6. ✅ デプロイURL取得
+
+**デプロイ結果**:
+- **Deployment URL**: `https://ht-indelible-butter-38-d617b23d72975313b7e6316cf615d8d0.us.langgraph.app`
+- **Deployment ID**: `ht-indelible-butter-38`
+- **Region**: `us-west1`
+- **Status**: ✅ Active
+- **PostgreSQL**: ✅ 50 migrations applied
+- **登録済みグラフ**:
+  - ✅ `react-agent` - ReAct agent for Gmail sending and slide generation
+  - ✅ `slide-workflow` - AI news slide generation workflow with quality evaluation
 
 **成功基準**:
-- [ ] デプロイメントが "Active" 状態
-- [ ] Deployment ID取得（後で使用）
-- [ ] 両グラフ登録確認（react-agent, slide-workflow）
+- [x] デプロイメントが "Active" 状態
+- [x] Deployment ID取得（後で使用）
+- [x] 両グラフ登録確認（react-agent, slide-workflow）
 
 ---
 
 #### 1-3. FastAPI修正（LangSmith Cloud接続）（10分）
 
+**実施内容**: ✅ 完了（2025-11-04）
+
 **修正ファイル**: `backend/app/routers/agent.py`
 
-**実施内容**: ✅ 完了（2025-11-03）
+**実施した変更**:
+1. ✅ 認証ヘッダー修正（4箇所）:
+   - 修正前: `headers["x-api-key"] = LANGCHAIN_API_KEY`
+   - 修正後: `headers["X-Api-Key"] = LANGCHAIN_API_KEY`
+   - 理由: LangSmith Cloud公式ドキュメントの仕様に合わせた大文字小文字修正
 
-**変更内容**:
-- LangGraph Cloud URL設定（環境変数から取得）
-- 認証ヘッダー追加（`x-api-key`）
-- ローカル/クラウド切り替えロジック実装
-- 全4エンドポイント対応（threads, assistants, runs, health）
+2. ✅ Deployment URL設定の改善:
+   - 修正前: `f"{LANGGRAPH_BASE_URL}/deployments/{DEPLOYMENT_ID}"`（URL組み立て）
+   - 修正後: `os.getenv("LANGGRAPH_CLOUD_URL")`（完全URL直接取得）
+   - 理由: LangSmith Cloudのデプロイメント固有URLを直接指定
+
+3. ✅ ローカル/クラウド切り替えロジック:
+   - `LANGGRAPH_DEPLOYMENT_ID=local` → `http://localhost:2024`
+   - それ以外 → `LANGGRAPH_CLOUD_URL`（環境変数必須）
+
+4. ✅ 全4エンドポイント対応:
+   - `/api/agent/threads` (create_thread)
+   - `/api/agent/assistants/search` (search_assistants)
+   - `/api/agent/threads/{thread_id}/runs/stream` (stream_run)
+   - `/api/agent/ok` (health_check)
+
+**接続テスト結果**:
+- ✅ `/ok` endpoint: 正常
+- ✅ `/assistants/search`: 2グラフ検出
+- ✅ `/threads`: Thread作成成功
+- ✅ `/threads/{id}/runs/stream`: スライド生成ワークフロー実行成功（Tavily検索開始確認）
 
 **成功基準**:
 - [x] 全エンドポイントで LangSmith Cloud URL使用
-- [x] 認証ヘッダーが正しく設定
+- [x] 認証ヘッダーが正しく設定（X-Api-Key）
 - [x] ローカル開発モードの切り替えロジック追加
 
 ---
