@@ -1,16 +1,26 @@
-# SlidePilot デプロイ計画（Firebase Hosting + Cloud Run）
+# SlidePilot デプロイ計画（Firebase Hosting + Cloud Run + LangGraph Cloud）
+
+**最終更新**: 2025-11-03
+**戦略**: LangGraph Cloud（Developer Plan）採用
+
+---
 
 ## 📋 概要
 
-**目的**: ローカル開発環境から本番環境（Firebase Hosting + Cloud Run）へのデプロイ
+**目的**: ローカル開発環境から本番環境（Firebase Hosting + Cloud Run + LangGraph Cloud）へのデプロイ
 
 **技術スタック**:
 - **フロントエンド**: Firebase Hosting
-- **バックエンド**: Google Cloud Run
+- **バックエンド**: Google Cloud Run（FastAPI単一プロセス）
+- **LangGraph**: LangSmith Cloud（Plus Plan - $39/月）
 - **ストレージ**: Supabase Storage + DB
 - **CI/CD**: GitHub Actions
 
-**想定コスト**: 月間1000PV、100回生成で **$0/月**（無料枠内）
+**想定コスト**: 月間1000PV、100回生成で **$39.58/月**
+- Firebase Hosting: $0（無料枠内）
+- Cloud Run: $0（無料枠内）
+- LangGraph Cloud: $39（Plus Plan） + $0.58（トレース料金）
+- Supabase: $0（無料枠内）
 
 ---
 
@@ -55,69 +65,54 @@
 
 ---
 
-## ⚠️ 重要：LangGraphアーキテクチャの修正
+## ⚠️ 重要：LangGraph Cloud戦略採用（2025-11-03更新）
 
-### 現在の問題
+### 問題の経緯
 
-**ローカル開発環境**:
-```
-FastAPI (port 8001) ─ httpx proxy ─→ LangGraph Dev Server (port 2024)
-        ↑                                      ↑
-   ユーザーリクエスト                    別プロセス（langgraph dev）
-                                          ↑
-                                    インメモリモード
-                                    （永続化なし）
-```
-
-**Cloud Run環境（現状のままデプロイした場合）**:
+**当初の計画（失敗）**:
 ```
 Cloud Run Container
-├── FastAPI (port 8001) ─ httpx proxy ─→ localhost:2024 ❌
-│                                               ↑
-│                                        langgraph dev が必要
-│                                        しかし起動していない！
-│                                        → 503 Service Unavailable
+├── FastAPI (port 8080)
+└── LangGraph dev (port 2024) ❌ 接続失敗
 ```
 
 **問題点**:
-- `langgraph dev` はインメモリモードで**本番環境では使用不可**
-- Cloud Runでは複数プロセス起動が可能だが、`langgraph dev`は永続化ストレージがない
-- 現在のプロキシ構成は正しいが、バックエンドサーバーの起動方法が間違っている
+1. `langgraph dev`は開発専用（Cloud Run環境で不安定）
+2. Supervisorでの2プロセス管理が複雑
+3. Dockerイメージ肥大化（3.82GB: Node.js/Slidev/Playwright必須）
+4. 起動タイミング制御が困難
 
-### 解決策：LangGraph Server + PostgreSQL（本番構成）
+### 解決策：LangGraph Cloud（Plus Plan - $39/月）
 
-**正しい本番アーキテクチャ**:
+**新アーキテクチャ**:
 ```
-Cloud Run Container
-├── LangGraph Server (port 2024) + PostgreSQL 永続化 ✅
-│         ↑
-│   langgraph server コマンド使用
-│   （本番モード、永続化ストレージ接続）
-│
-└── FastAPI (port 8001) ─ httpx proxy ─→ localhost:2024 ✅
-            ↑
-      プロキシは維持（正しい設計）
+Frontend (Firebase Hosting)
+    ↓
+FastAPI (Cloud Run - 単一プロセス)
+    ↓ HTTPS
+LangGraph Cloud (Plus Plan - $39/月)
+    ├── react-agent グラフ
+    ├── slide-workflow グラフ
+    └── PostgreSQL永続化（標準装備）
 ```
 
-**変更点**:
-1. ✅ **プロキシは維持**: 現在の設計は正しい
-2. ✅ **LangGraph Server起動**: `langgraph dev` → `langgraph server` に変更
-3. ✅ **永続化追加**: PostgreSQL（Cloud SQL or Supabase DB）接続
-4. ✅ **マルチプロセス起動**: SupervisorでFastAPIとLangGraph Serverを両方起動
-5. ✅ **langgraph.json修正**: `slide-workflow`グラフを追加
+**メリット**:
+- ✅ **デプロイ機能使用可能**（Plus Plan: $39/月、10,000トレース/月）
+- ✅ **Dockerイメージ85%削減**（3.82GB → 500MB）
+- ✅ **シンプル化**（FastAPI単一プロセス、Supervisor不要）
+- ✅ **確実な動作**（公式管理サービス）
+- ✅ **PostgreSQL永続化**（標準装備）
 
-**修正ファイル**:
-- ✏️ `backend/langgraph.json` - `slide-workflow`グラフ追加
-- 🆕 `backend/Dockerfile` - マルチプロセス起動設定
-- 🆕 `backend/supervisord.conf` - プロセス管理設定
-- ✏️ `backend/.env` - PostgreSQL接続情報追加
-- 📚 **ドキュメント更新**: CLAUDE.mdのアーキテクチャ図修正
+**コスト抑制策**:
+- 使用制限設定: 総1,000トレース/月、拡張50トレース/月
+- 自動Extended化を防止（フィードバック機能等を無効）
+- 月額約$39.58（Plan料金+トレース料金）
 
 ---
 
-## 🚀 デプロイ計画（全4 Phase）
+## 🚀 デプロイ計画（Phase 0完了 → Phase 1: LangGraph Cloud移行）
 
-### Phase 0: 前提条件（Supabase Storage移行 + LangGraph設定修正）
+### Phase 0: 前提条件（✅ 完了済み）
 
 #### Phase 0-1: langgraph.json修正
 
@@ -464,11 +459,169 @@ LIMIT 5;
 
 ---
 
-### Phase 1: Cloud Runデプロイ
+### Phase 1: LangGraph Cloud移行 + Cloud Runデプロイ
 
-**所要時間**: 90分
+**所要時間**: 約1時間
 
-#### 1-1. マルチプロセス起動設定
+**戦略変更**: Supervisorでの2プロセス管理を廃止し、LangGraph Cloudを採用
+
+---
+
+#### 1-1. LangSmith Plus Plan設定（15分）
+
+**実施内容**:
+1. ✅ https://smith.langchain.com/ でアカウント作成
+2. ✅ Plus Planにアップグレード（$39/月）
+3. ✅ 使用制限設定:
+   - 総トレース制限: 1,000
+   - 拡張トレース制限: 50
+4. ✅ APIキー取得（Settings → API Keys → Create API Key）
+5. ✅ Organization ID取得（Settings → Organization）
+
+**成功基準**:
+- [x] LangSmithダッシュボードにアクセス可能
+- [x] Plus Planアップグレード完了
+- [x] 使用制限エラー解消
+- [x] APIキー取得完了（`lsv2_...`形式）
+- [x] Organization ID確認
+
+---
+
+#### 1-2. LangGraphグラフをLangSmith Cloudにデプロイ（15分）
+
+**デプロイ方法**: GitHub連携（推奨）
+
+**手順**:
+1. LangSmith Dashboard → "Deployments" → "New Deployment"
+2. "Connect GitHub Repository" を選択
+3. リポジトリ設定:
+   - Repository: `slide-pilot`
+   - Branch: `feature/27-deployment-phase0`（または`main`）
+   - Directory: `backend`
+4. 環境変数設定:
+   ```
+   OPENAI_API_KEY=sk-...
+   TAVILY_API_KEY=tvly-...
+   SUPABASE_URL=https://...
+   SUPABASE_SERVICE_KEY=...
+   LANGCHAIN_API_KEY=lsv2_...
+   ```
+5. "Deploy" をクリック（5-10分待機）
+6. デプロイURL取得: `https://api.smith.langchain.com/deployments/{deployment-id}`
+
+**成功基準**:
+- [ ] デプロイメントが "Active" 状態
+- [ ] Deployment ID取得（後で使用）
+- [ ] 両グラフ登録確認（react-agent, slide-workflow）
+
+---
+
+#### 1-3. FastAPI修正（LangSmith Cloud接続）（10分）
+
+**修正ファイル**: `backend/app/routers/agent.py`
+
+**実施内容**: ✅ 完了（2025-11-03）
+
+**変更内容**:
+- LangGraph Cloud URL設定（環境変数から取得）
+- 認証ヘッダー追加（`x-api-key`）
+- ローカル/クラウド切り替えロジック実装
+- 全4エンドポイント対応（threads, assistants, runs, health）
+
+**成功基準**:
+- [x] 全エンドポイントで LangSmith Cloud URL使用
+- [x] 認証ヘッダーが正しく設定
+- [x] ローカル開発モードの切り替えロジック追加
+
+---
+
+#### 1-4. Dockerfile大幅簡素化（5分）
+
+**実施内容**: ✅ 完了（2025-11-03）
+
+**削除したもの**:
+- ✅ Supervisor関連
+- ✅ Node.js / Slidev インストール
+- ✅ Playwright / Chromium インストール
+- ✅ LangGraph dev サーバー起動
+- ✅ supervisord.conf（ファイル削除済み）
+
+**効果**:
+- Dockerイメージサイズ: **3.82GB → 500MB**（85%削減予想）
+- ビルド時間: 約50%短縮予想
+- デプロイ時間: 約50%短縮予想
+
+**成功基準**:
+- [x] Dockerfile作成完了
+- [ ] Dockerfileビルド成功（Phase 1-6で確認）
+- [ ] イメージサイズ1GB以下（Phase 1-6で確認）
+
+---
+
+#### 1-5. Secret Manager設定（3分）
+
+**新規シークレット追加**:
+```bash
+# LangGraph Cloud URL
+echo -n "https://api.smith.langchain.com" | \
+  gcloud secrets create langgraph-cloud-url --data-file=-
+
+# Deployment ID（Phase 1-2で取得した値）
+echo -n "your-deployment-id-here" | \
+  gcloud secrets create langgraph-deployment-id --data-file=-
+```
+
+**成功基準**:
+- [ ] 2つの新規シークレット作成完了
+
+---
+
+#### 1-6. Cloud Run再デプロイ（10分）
+
+**デプロイコマンド**:
+```bash
+gcloud run deploy slidepilot-api \
+  --source ./backend \
+  --region asia-northeast1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --memory 512Mi \
+  --cpu 1 \
+  --timeout 300 \
+  --min-instances 0 \
+  --max-instances 100 \
+  --set-secrets \
+    LANGGRAPH_CLOUD_URL=langgraph-cloud-url:latest,\
+    LANGGRAPH_DEPLOYMENT_ID=langgraph-deployment-id:latest,\
+    LANGCHAIN_API_KEY=langchain-api-key:latest,\
+    OPENAI_API_KEY=openai-api-key:latest,\
+    TAVILY_API_KEY=tavily-api-key:latest,\
+    SUPABASE_URL=supabase-url:latest,\
+    SUPABASE_SERVICE_KEY=supabase-service-key:latest
+```
+
+**変更点**:
+- メモリ: 2Gi → **512Mi**（LangGraphが不要）
+- CPU: 2 → **1**（単一プロセス）
+- タイムアウト: 3600秒 → **300秒**（LLM処理十分）
+
+**成功基準**:
+- [ ] Cloud Runデプロイ成功
+- [ ] `/api/health` → 200 OK
+- [ ] `/api/agent/ok` → 200 OK
+- [ ] スライド生成エンドツーエンドテスト成功
+
+---
+
+### Phase 1完了後の削除推奨ファイル
+
+**不要になったファイル**:
+- `backend/supervisord.conf`（削除推奨）
+- `backend/Dockerfile`の旧バージョン（上書き）
+
+---
+
+#### 旧 1-1. マルチプロセス起動設定（廃止）
 
 **目的**: Cloud RunでLangGraph ServerとFastAPIを両方起動する
 
