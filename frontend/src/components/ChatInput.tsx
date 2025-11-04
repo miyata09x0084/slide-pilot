@@ -1,7 +1,7 @@
 // チャット入力欄コンポーネント
 // メッセージ送信とローディング状態を管理
 
-import { useState, KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;  // メッセージ送信時のコールバック

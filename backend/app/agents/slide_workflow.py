@@ -2,9 +2,27 @@
 # スライド生成ワークフロー（PDF/YouTube/テキスト対応）
 # フロー: 情報収集 -> キーポイント抽出 -> 目次生成 -> スライド生成 -> 評価 -> 保存
 
-# 共通ロジックのインポート
+# 標準ライブラリ
+import os
+import re
+import json
+import shutil
+import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Optional, Dict, Any, Union, List
+
+# サードパーティライブラリ
+from typing_extensions import TypedDict
+from langsmith import traceable
+from langgraph.graph import StateGraph, START, END
+from langchain_core.runnables import RunnableConfig
+
+# ローカルモジュール
+from app.config import settings
 from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
 from app.core.llm import llm
+from app.core.supabase import save_slide_to_supabase
 from app.core.utils import (
     # ユーティリティ関数
     _log, _strip_bullets, _slugify_en, _find_json,
@@ -20,8 +38,7 @@ from app.core.utils import (
     # テストツール
     generate_slidev_test,
 )
-
-# プロンプト定義のインポート
+from app.prompts.evaluation_prompts import get_evaluation_prompt
 from app.prompts.slide_prompts import (
     get_key_points_map_prompt,
     get_key_points_reduce_prompt,
@@ -32,46 +49,50 @@ from app.prompts.slide_prompts import (
     get_slide_pdf_prompt,
     get_slug_prompt,
 )
-from app.prompts.evaluation_prompts import get_evaluation_prompt
-
-# ワークフロー固有のインポート
-from typing_extensions import TypedDict
-from typing import Optional, Dict, Any, Union, List
-from langsmith import traceable
-from langgraph.graph import StateGraph, START, END
-from langchain_core.runnables import RunnableConfig
 from app.tools.pdf import process_pdf
-import os
-import re
-import json
-import shutil
-import subprocess
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-from app.config import settings
 
 
 # -------------------
 # State
 # -------------------
-class State(TypedDict):
-  """LangGraphワークフローの状態管理"""
+class State(TypedDict, total=False):
+  """LangGraphワークフローの状態管理
 
+  NOTE: user_id は実行コンテキスト情報（Read-Only）であり、
+        ビジネスロジックデータではない。ノード内で変更禁止。
+        将来 LangGraph v0.6+ では context_schema に移行予定。
+
+  total=False を指定することで、全フィールドをオプショナルとし、
+  後方互換性を確保している。
+  """
+
+  # ══════════════════════════════════════════════════════════
+  # 実行コンテキスト（Read-Only、ノードで変更禁止）
+  # ══════════════════════════════════════════════════════════
+  user_id: str                                  # ユーザー識別子（デフォルト: "anonymous"）
+
+  # ══════════════════════════════════════════════════════════
   # 入力
+  # ══════════════════════════════════════════════════════════
   topic: str                                    # スライドの主題
 
+  # ══════════════════════════════════════════════════════════
   # 情報収集 (Node A)
+  # ══════════════════════════════════════════════════════════
   sources: Dict[str, List[Dict[str, str]]]      # Tavily検索結果
   context_md: str                               # 検索結果のMarkdown
 
+  # ══════════════════════════════════════════════════════════
   # コンテンツ生成 (Node B-D)
+  # ══════════════════════════════════════════════════════════
   key_points: List[str]                         # 重要ポイント5個
   toc: List[str]                                # 目次5-8項目
   slide_md: str                                 # Marpスライド本文
   title: str                                    # スライドタイトル
 
+  # ══════════════════════════════════════════════════════════
   # 評価 (Node E)
+  # ══════════════════════════════════════════════════════════
   score: float                                  # 総合スコア (0-10)
   subscores: Dict[str, float]                   # 項目別スコア
   reasons: Dict[str, str]                       # 評価理由
@@ -81,10 +102,21 @@ class State(TypedDict):
   feedback: str                                 # 総合フィードバック
   attempts: int                                 # リトライ回数 (最大3)
 
-  # 出力 (Node F)
-  slide_path: str                               # 保存ファイルパス
+  # ══════════════════════════════════════════════════════════
+  # 図解生成 (Node D.5) - Issue #25
+  # ══════════════════════════════════════════════════════════
+  diagrams: Dict[str, Any]                      # 生成された図解のメタデータ
 
+  # ══════════════════════════════════════════════════════════
+  # 出力 (Node F)
+  # ══════════════════════════════════════════════════════════
+  slide_path: str                               # ローカルファイルパス
+  slide_id: str                                 # Supabase slide ID（オプショナル）
+  pdf_url: str                                  # Supabase公開URL（オプショナル）
+
+  # ══════════════════════════════════════════════════════════
   # システム
+  # ══════════════════════════════════════════════════════════
   error: str                                    # エラーメッセージ
   log: List[str]                                # 実行ログ
 
@@ -318,6 +350,51 @@ def generate_toc(state: State) -> Dict:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
 # -------------------
+# Mermaid図解生成ヘルパー関数（Issue #25）
+# -------------------
+# 以下の関数は廃止（LLMがプロンプトから独自の図を生成するため不要）
+# def _generate_architecture_flowchart(key_points: List[str]) -> str:
+# def _generate_use_case_mindmap(key_points: List[str]) -> str:
+
+
+def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直後にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # "# section_title" または "## section_title" の後の "---" を見つけて挿入
+    # contentの先頭と末尾の改行を削除してから、区切りを追加して挿入
+    clean_content = content.strip('\n')
+    pattern = rf'(#+\s+{re.escape(section_title)}.*?\n---\s*\n)'
+
+    if re.search(pattern, slide_md, re.DOTALL):
+        return re.sub(pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+    else:
+        # フォールバック: 目次/Agendaの後に挿入
+        agenda_pattern = r'(#+\s+(?:目次|Agenda).*?\n---\s*\n)'
+        if re.search(agenda_pattern, slide_md, re.DOTALL):
+            return re.sub(agenda_pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+        return slide_md
+
+
+def _insert_before_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直前にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # contentの先頭と末尾の改行を削除
+    clean_content = content.strip('\n')
+
+    # パターン: --- の後に section_title がある箇所
+    # マッチグループ1: --- + 改行、グループ2: section_title
+    pattern = rf'(---\s*\n\n)(#+\s+{re.escape(section_title)})'
+
+    if re.search(pattern, slide_md):
+        # --- と section_title の間に図解を挿入
+        return re.sub(pattern, rf'\1{clean_content}\n\n---\n\n\2', slide_md, count=1)
+    else:
+        # セクションが見つからない場合は末尾に追加
+        return slide_md.rstrip('\n') + f'\n\n{clean_content}\n\n---\n\n'
+
+# -------------------
 # Node D: スライド本文（Slidev）生成
 # -------------------
 @traceable(run_name="d_generate_slide_slidev")
@@ -452,6 +529,16 @@ class: text-center
     }
 
 # -------------------
+# Node D.5: Mermaid図解生成（Issue #25）
+# -------------------
+@traceable(run_name="d5_generate_diagrams")
+# generate_diagrams ノードは廃止（LLMがプロンプトから独自の図を生成するため不要）
+# Issue #25: テンプレート図の強制挿入を削除し、LLMによる独自図生成に移行
+def generate_diagrams(state: State) -> Dict:
+    """[DEPRECATED] このノードは使用されていません"""
+    return {"log": _log(state, "[diagrams] deprecated - skipped")}
+
+# -------------------
 # Node E: 評価
 # -------------------
 MAX_ATTEMPTS = 3
@@ -574,10 +661,46 @@ def save_and_render_slidev(state: State) -> Dict:
     else:
       log_msg = f"[slidev] rendering skipped (SLIDE_FORMAT={SLIDE_FORMAT}, only pdf supported)."
 
-  return {
+  # ──────────────────────────────────────────────────────────────────────────
+  # Supabase保存（オプショナル、失敗しても継続）
+  # Issue #24: ブラウザプレビュー + Supabase履歴管理
+  # ──────────────────────────────────────────────────────────────────────────
+  result = {
     "slide_path": out_path,
     "log": _log(state, log_msg)
   }
+
+  # 実行コンテキストからuser_idを取得（Read-Only）
+  user_id = state.get("user_id", "anonymous")
+  topic = state.get("topic", "AI最新情報")
+
+  try:
+    # PDFが生成された場合のみパスを渡す
+    pdf_path = None
+    if slidev and SLIDE_FORMAT == "pdf" and "pdf_file" in locals():
+      pdf_path = pdf_file
+
+    supabase_result = save_slide_to_supabase(
+      user_id=user_id,
+      title=title,
+      topic=topic,
+      slide_md=slide_md,
+      pdf_path=pdf_path
+    )
+
+    if "slide_id" in supabase_result:
+      result["slide_id"] = supabase_result["slide_id"]
+      result["pdf_url"] = supabase_result.get("pdf_url")
+      result["log"] = _log(state, f"[supabase] saved slide_id={supabase_result['slide_id']}")
+    elif "error" in supabase_result:
+      # Supabase未設定の場合もここに入る（警告のみ、継続）
+      result["log"] = _log(state, f"[supabase] {supabase_result['error']}")
+
+  except Exception as e:
+    # Supabase保存失敗してもワークフローは継続（クリティカルエラーではない）
+    result["log"] = _log(state, f"[supabase] save failed (non-critical): {str(e)[:100]}")
+
+  return result
 
 # -------------------
 # グラフ構築
@@ -587,6 +710,7 @@ graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
+graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 

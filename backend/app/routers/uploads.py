@@ -5,7 +5,7 @@ PDFアップロードルーター
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pathlib import Path
 import uuid
-from dependencies import get_upload_dir, get_max_file_size
+from app.dependencies import get_upload_dir, get_max_file_size
 
 router = APIRouter()
 

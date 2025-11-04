@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, Depends
 from pathlib import Path
-from dependencies import get_upload_dir
+from app.dependencies import get_upload_dir
 
 router = APIRouter()
 

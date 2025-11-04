@@ -4,7 +4,7 @@ FastAPI依存性注入
 """
 
 from pathlib import Path
-from config import settings
+from app.config import settings
 
 
 def get_upload_dir() -> Path:
