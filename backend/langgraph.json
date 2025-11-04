@@ -1,0 +1,10 @@
+{
+  "dependencies": ["langgraph==0.5.2"],
+  "graphs": {
+    "react-agent": {
+      "path": "./app/agents/react_agent.py:graph",
+      "description": "ReAct agent for Gmail sending and slide generation"
+    }
+  },
+  "env": ".env"
+}
