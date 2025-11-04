@@ -15,10 +15,6 @@ from typing import Any, Dict
 router = APIRouter()
 
 # LangGraph Cloud設定
-LANGGRAPH_BASE_URL = os.getenv(
-    "LANGGRAPH_CLOUD_URL",
-    "https://api.smith.langchain.com"
-)
 DEPLOYMENT_ID = os.getenv("LANGGRAPH_DEPLOYMENT_ID", "local")
 
 # ローカル開発との切り替え
@@ -27,8 +23,10 @@ if DEPLOYMENT_ID == "local":
     LANGGRAPH_API_URL = "http://localhost:2024"
     print("[agent] Using local LangGraph dev server: http://localhost:2024")
 else:
-    # 本番: LangSmith Cloud使用
-    LANGGRAPH_API_URL = f"{LANGGRAPH_BASE_URL}/deployments/{DEPLOYMENT_ID}"
+    # 本番: LangSmith Cloud使用（完全なDeployment URLを環境変数から取得）
+    LANGGRAPH_API_URL = os.getenv("LANGGRAPH_CLOUD_URL")
+    if not LANGGRAPH_API_URL:
+        raise ValueError("LANGGRAPH_CLOUD_URL environment variable must be set for production deployment")
     print(f"[agent] Using LangSmith Cloud: {LANGGRAPH_API_URL}")
 
 # 認証ヘッダー
@@ -93,7 +91,7 @@ async def create_thread(request: Request):
         # 認証ヘッダー準備
         headers = {}
         if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
-            headers["x-api-key"] = LANGCHAIN_API_KEY
+            headers["X-Api-Key"] = LANGCHAIN_API_KEY
 
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
@@ -125,7 +123,7 @@ async def search_assistants(request: Request):
         # 認証ヘッダー準備
         headers = {}
         if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
-            headers["x-api-key"] = LANGCHAIN_API_KEY
+            headers["X-Api-Key"] = LANGCHAIN_API_KEY
 
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
@@ -180,7 +178,7 @@ async def stream_run(
         # 認証ヘッダー準備
         headers = {}
         if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
-            headers["x-api-key"] = LANGCHAIN_API_KEY
+            headers["X-Api-Key"] = LANGCHAIN_API_KEY
 
         async def stream_generator():
             """LangGraphからのSSEレスポンスをリアルタイムで転送"""
@@ -239,7 +237,7 @@ async def health_check():
             # LangSmith Cloud接続確認
             headers = {}
             if LANGCHAIN_API_KEY:
-                headers["x-api-key"] = LANGCHAIN_API_KEY
+                headers["X-Api-Key"] = LANGCHAIN_API_KEY
 
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(
