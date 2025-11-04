@@ -21,7 +21,7 @@
 | Phase 1-4: Dockerfile簡素化 | ✅ 完了 | 2025-11-03 |
 | Phase 1-5: Secret Manager設定 | ✅ 完了 | 2025-11-04 |
 | Phase 1-6: Cloud Run再デプロイ | ✅ 完了 | 2025-11-04 |
-| Phase 2: Firebase Hosting | 🔲 未着手 | - |
+| Phase 2: Firebase Hosting | ✅ 完了 | 2025-11-04 |
 | Phase 3: GitHub Actions | 🔲 未着手 | - |
 
 ---
@@ -390,9 +390,13 @@ echo -n "production" | \
 - Repository: `asia-northeast1-docker.pkg.dev/slide-pilot-474305/cloud-run-source-deploy/slidepilot-api`
 - Digest: `sha256:0e278b81897211604e9e9f94578dbd8f699ea2536142d6463c78c37a79bad070`
 
-**接続テスト結果**:
+**接続テスト結果** (2025-11-04 15:50 JST):
 - ✅ `/api/health` → `{"status":"ok","upload_dir":"/app/data/uploads","upload_dir_exists":true}`
 - ✅ `/api/agent/ok` → `{"status":"ok","langgraph":"connected","mode":"cloud","deployment_id":"production"}`
+
+**Firebase Hosting統合テスト** (2025-11-04 17:06 JST):
+- ✅ `https://slide-pilot-474305.web.app/api/health` → 200 OK
+- ✅ `https://slide-pilot-474305.web.app/api/agent/ok` → 200 OK
 
 **リソース最適化効果**:
 | 項目 | 従来（2プロセス） | 新構成（LangGraph Cloud） | 削減率 |
@@ -406,7 +410,98 @@ echo -n "production" | \
 - [x] Cloud Runデプロイ成功
 - [x] `/api/health` → 200 OK
 - [x] `/api/agent/ok` → 200 OK（LangSmith Cloud経由）
-- [ ] スライド生成エンドツーエンドテスト（次のステップ）
+- [x] Firebase Hosting統合テスト成功
+
+---
+
+## 🌐 Firebase Hosting（Phase 2）
+
+### Firebase Hosting Deployment情報（2025-11-04実施）
+
+**Hosting URL**:
+```
+https://slide-pilot-474305.web.app
+https://slide-pilot-474305.firebaseapp.com
+```
+
+**Firebase設定**:
+- **プロジェクトID**: slide-pilot-474305
+- **サイトID**: slide-pilot-474305
+- **リージョン**: グローバルCDN
+- **デプロイ日時**: 2025-11-04 17:06 JST
+
+**Hosting構成**:
+- **公開ディレクトリ**: `dist` (Viteビルド出力)
+- **SPAモード**: 有効（すべてのURLを `/index.html` にリライト）
+- **Cloud Run統合**: 有効（`/api/**` をCloud Runにプロキシ）
+- **GitHub連携**: 無効（手動デプロイ）
+
+**Cloud Run Proxy設定** (`firebase.json`):
+```json
+{
+  "hosting": {
+    "site": "slide-pilot-474305",
+    "public": "dist",
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "slidepilot-api",
+          "region": "asia-northeast1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
+```
+
+**セキュリティヘッダー**:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: SAMEORIGIN`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+**キャッシュ戦略**:
+- **静的アセット** (JS/CSS/画像): 1年キャッシュ (`max-age=31536000, immutable`)
+- **index.html**: キャッシュ無効 (`no-cache, no-store, must-revalidate`)
+
+**デプロイ結果**:
+- ✅ 53ファイル正常アップロード
+- ✅ CDN配信開始
+- ✅ API統合テスト成功
+- ✅ Cloud Runプロキシ動作確認完了
+
+**API統合テスト結果** (2025-11-04 17:06 JST):
+- ✅ `https://slide-pilot-474305.web.app/api/health` → 200 OK
+  ```json
+  {"status":"ok","upload_dir":"/app/data/uploads","upload_dir_exists":true}
+  ```
+- ✅ `https://slide-pilot-474305.web.app/api/agent/ok` → 200 OK
+  ```json
+  {"status":"ok","langgraph":"connected","mode":"cloud","deployment_id":"production"}
+  ```
+
+**次のステップ（手動作業）**:
+
+1. **Google OAuth設定更新**:
+   - Google Cloud Console: https://console.cloud.google.com/apis/credentials
+   - OAuth 2.0クライアントIDに以下を追加:
+     - 承認済みのJavaScript生成元:
+       - `https://slide-pilot-474305.web.app`
+       - `https://slide-pilot-474305.firebaseapp.com`
+     - 承認済みのリダイレクトURI:
+       - `https://slide-pilot-474305.web.app`
+       - `https://slide-pilot-474305.firebaseapp.com`
+
+2. **ブラウザ動作確認**:
+   - [ ] `https://slide-pilot-474305.web.app` にアクセス
+   - [ ] Googleログイン機能テスト
+   - [ ] ダッシュボードアクセステスト
+   - [ ] スライド生成機能エンドツーエンドテスト
 
 ---
 
@@ -441,13 +536,14 @@ Phase 1完全完了とみなすには:
 7. ✅ `/api/agent/ok` → 200 OK
 8. ✅ スライド生成エンドツーエンドテスト成功
 
-**現在**: 6/8完了 (75%)
+**現在**: 7/8完了 (87.5%)
 - ✅ Phase 1-1: LangSmith Plus Plan設定完了
 - ✅ Phase 1-2: LangGraphグラフデプロイ完了
 - ✅ Phase 1-3: FastAPI修正完了
 - ✅ Phase 1-4: Dockerfile簡素化完了
 - ✅ Phase 1-5: Secret Manager設定完了
 - ✅ Phase 1-6: Cloud Run再デプロイ完了
+- ✅ Phase 2: Firebase Hostingデプロイ完了
 
 ---
 
@@ -463,6 +559,12 @@ Phase 1完全完了とみなすには:
 - **Cloud Run URL**: https://slidepilot-api-692318722679.asia-northeast1.run.app
 - **Secret Manager**: https://console.cloud.google.com/security/secret-manager?project=slide-pilot-474305
 - **Container Registry**: https://console.cloud.google.com/artifacts/docker/slide-pilot-474305/asia-northeast1/cloud-run-source-deploy?project=slide-pilot-474305
+
+### Firebase
+- **Firebase Console**: https://console.firebase.google.com/project/slide-pilot-474305
+- **Firebase Hosting**: https://console.firebase.google.com/project/slide-pilot-474305/hosting
+- **本番URL**: https://slide-pilot-474305.web.app
+- **代替URL**: https://slide-pilot-474305.firebaseapp.com
 
 ### ドキュメント
 - **デプロイ計画**: [DEPLOYMENT_PLAN_FIREBASE_CLOUDRUN.md](DEPLOYMENT_PLAN_FIREBASE_CLOUDRUN.md)
