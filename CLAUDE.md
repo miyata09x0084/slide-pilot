@@ -15,21 +15,52 @@ SlidePilot is an AI-powered presentation slide generation system that automatica
 
 ### Backend Development
 
+**Important**: You need to run **two servers** for full functionality:
+
+#### 1. FastAPI Server (Port 8001) - Main API Gateway
+
 ```bash
-# Navigate to backend directory
+cd backend/app
+python3 main.py
+# Alternative: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+This server handles:
+- PDF upload and download
+- Slide download
+- **LangGraph API proxy** (routes `/api/agent/*` to LangGraph server)
+- Health checks
+
+#### 2. LangGraph Server (Port 2024) - AI Agent Engine
+
+```bash
 cd backend
+python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
 
-# Activate virtual environment
-source venv/bin/activate
+# または、Python 3.11がデフォルトの場合:
+# langgraph dev
+```
 
-# Install dependencies
-pip install -r requirements.txt
+**Note**:
+- Requires Python 3.11+ for LangGraph dev server
+- `langgraph dev` コマンドはPython 3.10では動作しません（`langgraph-api`が必要）
+- 確実に動作させるには `python3.11 -m langgraph_cli dev` を使用してください
 
-# Start LangGraph development server (port 2024)
-langgraph dev
+This server handles:
+- AI agent workflow execution
+- ReAct agent (Gmail + Slides)
+- SSE streaming for real-time progress
 
-# Direct execution (for testing the agent without the API server)
-python slide_agent.py
+**Architecture**:
+```
+Frontend (localhost:5173)
+    ↓ All requests to localhost:8001
+FastAPI (port 8001)
+    ├── /api/upload-pdf → Direct handling
+    ├── /api/slides/{fn} → Direct handling
+    └── /api/agent/* → Proxy to LangGraph (port 2024)
+            ↓
+    LangGraph (port 2024) - Internal service
 ```
 
 ### Frontend Development
@@ -55,7 +86,61 @@ npm run preview
 
 ## Architecture
 
-### LangGraph Workflow (backend/slide_agent.py)
+### Backend Directory Structure (FastAPI + LangGraph)
+
+```
+backend/
+├── app/
+│   ├── main.py          # FastAPI application entry point
+│   ├── config.py        # Unified settings (FastAPI + environment)
+│   ├── dependencies.py  # FastAPI dependency injection
+│   │
+│   ├── routers/         # FastAPI routers (follows official pattern)
+│   │   ├── health.py    # Health check endpoint
+│   │   ├── uploads.py   # PDF upload endpoint
+│   │   ├── slides.py    # Slide download endpoint
+│   │   └── agent.py     # LangGraph API proxy (NEW)
+│   │
+│   ├── agents/          # LangGraph workflow definitions
+│   │   ├── react_agent.py       # ReAct agent (Gmail + Slides)
+│   │   └── slide_workflow.py    # Slide generation workflow
+│   │
+│   ├── tools/           # Tool implementations
+│   │   ├── gmail.py     # Gmail sending
+│   │   ├── pdf.py       # PDF text extraction
+│   │   └── slides.py    # Slide generation tool wrapper
+│   │
+│   ├── core/            # Core utilities (LangGraph)
+│   │   ├── config.py    # Environment variables (legacy, for agents)
+│   │   ├── llm.py       # LLM client (OpenAI GPT-4)
+│   │   └── utils.py     # Shared utility functions
+│   │
+│   ├── prompts/         # Prompt definitions
+│   │   ├── slide_prompts.py       # Slide generation prompts
+│   │   └── evaluation_prompts.py  # Evaluation prompts
+│   │
+│   └── auth/            # Authentication
+│       └── gmail.py     # Gmail OAuth flow
+│
+├── data/
+│   ├── uploads/         # Uploaded PDF files
+│   └── slides/          # Generated slides
+│
+├── tests/               # Test files
+└── langgraph.json       # LangGraph configuration
+```
+
+**Key architectural decisions**:
+- **`routers/`** instead of `api/`: Follows FastAPI official documentation pattern
+- **Dependency injection**: Path configuration via `dependencies.py` (DRY principle)
+- **Unified settings**: `config.py` manages both FastAPI and environment variables
+- **Proxy pattern**: FastAPI proxies LangGraph API (`/api/agent/*` → `localhost:2024`)
+  - Frontend only connects to single endpoint (`localhost:8001`)
+  - CORS managed in one place (FastAPI)
+  - LangGraph runs as internal service
+  - Performance overhead: +1-2ms (negligible)
+
+### LangGraph Workflow (backend/app/agents/slide_workflow.py)
 
 The backend is a **stateful LangGraph agent** with quality evaluation (Phase 3):
 
@@ -190,9 +275,53 @@ Frontend parsing (App.tsx:122-151):
 4. Extract node names from JSON keys
 5. Map to human-readable progress messages via `nodeNames` lookup
 
+### Prompt Management (Issue #23 Phase 3)
+
+All prompts are externalized in `backend/app/prompts/`:
+
+**`slide_prompts.py`** - Slide generation prompts:
+- `get_key_points_map_prompt()` - PDF chunk → key points (Map phase)
+- `get_key_points_reduce_prompt()` - Consolidate key points to 5 (Reduce phase)
+- `get_key_points_ai_prompt()` - AI news → key points
+- `get_toc_pdf_prompt()` - PDF key points → table of contents
+- `get_toc_ai_prompt()` - AI key points → table of contents
+- `get_slide_title_prompt()` - Generate slide title from PDF
+- `get_slide_pdf_prompt()` - Generate Slidev markdown from PDF
+- `get_slug_prompt()` - Japanese title → English filename
+
+**`evaluation_prompts.py`** - Evaluation prompts:
+- `get_evaluation_prompt()` - Slide quality evaluation (switches criteria based on input type)
+
+**Design pattern**: Constants + Methods (Hybrid)
+- Prompt text defined as constants (easy to version control, readable diffs)
+- Methods provide type-safe interface with argument validation
+- Example:
+  ```python
+  # Constant
+  KEY_POINTS_MAP_USER = "以下のテキストから...{chunk}...{chunk_index}"
+
+  # Method
+  def get_key_points_map_prompt(chunk: str, chunk_index: int):
+      return [("system", SYSTEM), ("user", USER.format(chunk=chunk[:3000], chunk_index=chunk_index))]
+  ```
+
+**How to customize prompts**:
+1. Edit constants in `backend/app/prompts/*.py`
+2. No code changes needed in `slide_workflow.py`
+3. Restart `langgraph dev` to apply changes
+
 ### Evaluation Criteria (Phase 3)
 
-The `evaluate_slides_slidev` node uses weighted scoring:
+The `evaluate_slides_slidev` node uses weighted scoring with **different criteria based on input type**:
+
+**PDF input** (for educational slides):
+- **structure** (20%): Logical flow, one-message-per-slide principle
+- **comprehensiveness** (25%): Covers all important topics from PDF
+- **clarity** (25%): Middle-school friendly language, term explanations
+- **readability** (15%): Clarity, visual hierarchy, emoji usage
+- **engagement** (15%): Storytelling, conversation format, visual elements
+
+**AI news input** (for technical reports):
 - **structure** (20%): Logical flow, one-message-per-slide principle
 - **practicality** (25%): Actionable content, specific examples, warnings
 - **accuracy** (25%): Factual correctness, terminology
@@ -222,7 +351,24 @@ Each query is scoped to `include_domains` and `time_range: "month"` to ensure fr
 
 ## Testing the System
 
-### Backend Health Check
+### FastAPI Server Health Check
+
+```bash
+# Check root endpoint
+curl http://localhost:8001/
+
+# Check health endpoint
+curl http://localhost:8001/api/health
+
+# Upload PDF test
+curl -X POST http://localhost:8001/api/upload-pdf \
+  -F "file=@/path/to/test.pdf"
+
+# Access API documentation
+open http://localhost:8001/docs
+```
+
+### LangGraph Server Health Check
 
 ```bash
 # Check server is running
@@ -240,11 +386,18 @@ curl -N -X POST "http://localhost:2024/threads/{thread_id}/runs/stream" \
   -d '{"assistant_id": "{assistant_id}", "input": {"topic": "AI最新情報"}, "stream_mode": ["updates"]}'
 ```
 
-### Frontend Development URLs
+### Development URLs
 
 - **Frontend dev server**: http://localhost:5173
-- **LangGraph API**: http://localhost:2024
-- **LangGraph Studio**: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+- **FastAPI server** (main gateway): http://localhost:8001
+  - Swagger UI: http://localhost:8001/docs
+  - Health check: http://localhost:8001/api/health
+  - LangGraph proxy: http://localhost:8001/api/agent/*
+- **LangGraph API** (internal): http://localhost:2024
+  - Direct access: http://localhost:2024/ok
+  - LangGraph Studio: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+
+**Note**: Frontend should only connect to `http://localhost:8001` (FastAPI), which proxies LangGraph requests internally.
 
 ## Troubleshooting
 

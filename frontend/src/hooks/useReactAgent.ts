@@ -1,26 +1,39 @@
 // ReActエージェントとの通信を管理するカスタムフック
 // SSEストリーミングでメッセージ送受信と思考過程を取得
+// Recoilでグローバル状態管理（ページ間で状態共有）
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useRecoilState } from 'recoil';
 import type { Message } from '../components/ChatMessage';
-import type { ThinkingStep } from '../components/ThinkingIndicator';
+import {
+  messagesAtom,
+  thinkingStepsAtom,
+  isThinkingAtom,
+  threadIdAtom,
+  errorAtom,
+  slideDataAtom,
+} from '../store/reactAgentAtoms';
 
-const API_BASE_URL = 'http://localhost:2024';
+const API_BASE_URL = 'http://localhost:8001/api/agent';
 
 // スライドデータの型定義
 export interface SlideData {
-  path?: string;    // スライドファイルパス
-  title?: string;   // スライドタイトル
+  path?: string;      // スライドファイルパス（ローカル）
+  title?: string;     // スライドタイトル
+  slide_id?: string;  // Supabase slide ID（Issue #24）
+  pdf_url?: string;   // Supabase公開URL（Issue #24）
 }
 
 export function useReactAgent() {
-  const [messages, setMessages] = useState<Message[]>([]);        // チャット履歴
-  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);  // 思考過程
-  const [isThinking, setIsThinking] = useState(false);            // 思考中フラグ
-  const [threadId, setThreadId] = useState<string | null>(null);  // スレッドID
-  const [error, setError] = useState<string | null>(null);        // エラー状態
-  const [slideData, setSlideData] = useState<SlideData>({});      // スライドデータ
-  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);  // スライド生成中フラグ
+  const [messages, setMessages] = useRecoilState(messagesAtom);
+  const [thinkingSteps, setThinkingSteps] = useRecoilState(thinkingStepsAtom);
+  const [isThinking, setIsThinking] = useRecoilState(isThinkingAtom);
+  const [threadId, setThreadId] = useRecoilState(threadIdAtom);
+  const [error, setError] = useRecoilState(errorAtom);
+  const [slideData, setSlideData] = useRecoilState(slideDataAtom);
+
+  // スライド生成中フラグ（ローカル変数で管理）
+  let _isGeneratingSlides = false;
 
   // スレッド作成
   const createThread = useCallback(async () => {
@@ -56,7 +69,7 @@ export function useReactAgent() {
     setIsThinking(true);
     setThinkingSteps([]);
     setError(null);
-    setIsGeneratingSlides(false); // スライド生成フラグをリセット
+    _isGeneratingSlides = false; // スライド生成フラグをリセット
 
     try {
       // assistant_id取得
@@ -76,10 +89,19 @@ export function useReactAgent() {
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
 
+      // ──────────────────────────────────────────────────────────────
+      // ユーザー情報取得（Issue #24: Supabase統合）
+      // ──────────────────────────────────────────────────────────────
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = user.email || 'anonymous@example.com';
+
       // SSEストリーミング開始
       const response = await fetch(`${API_BASE_URL}/threads/${activeThreadId}/runs/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Email': userEmail  // ユーザー識別ヘッダー
+        },
         body: JSON.stringify({
           assistant_id: assistantId,
           input: {
@@ -127,7 +149,7 @@ export function useReactAgent() {
                       msg.tool_calls.forEach((call: any) => {
                         // generate_slidesツールの場合は1回だけ表示
                         if (call.name === 'generate_slides') {
-                          setIsGeneratingSlides(true);
+                          _isGeneratingSlides = true;
                           setThinkingSteps(prev => {
                             // 既に表示済みなら追加しない
                             const alreadyExists = prev.some(step =>
@@ -153,7 +175,7 @@ export function useReactAgent() {
 
                     // スライド生成ツールの結果からファイルパスを抽出
                     if ((msg.name === 'generate_slides' || msg.name === 'generate_slidev_test' || msg.name === 'generate_slidev_mvp1') && msg.content) {
-                      setIsGeneratingSlides(false); // スライド生成完了
+                      _isGeneratingSlides = false; // スライド生成完了
 
                       try {
                         // ツール結果をパース（JSON文字列の場合）
@@ -164,7 +186,9 @@ export function useReactAgent() {
                         if (result.slide_path || result.path) {
                           setSlideData({
                             path: result.slide_path || result.path,
-                            title: result.title || 'スライド'
+                            title: result.title || 'スライド',
+                            slide_id: result.slide_id,     // Supabase ID（Issue #24）
+                            pdf_url: result.pdf_url        // Supabase公開URL（Issue #24）
                           });
 
                           // 完了メッセージを追加
