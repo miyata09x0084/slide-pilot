@@ -103,6 +103,11 @@ class State(TypedDict, total=False):
   attempts: int                                 # リトライ回数 (最大3)
 
   # ══════════════════════════════════════════════════════════
+  # 図解生成 (Node D.5) - Issue #25
+  # ══════════════════════════════════════════════════════════
+  diagrams: Dict[str, Any]                      # 生成された図解のメタデータ
+
+  # ══════════════════════════════════════════════════════════
   # 出力 (Node F)
   # ══════════════════════════════════════════════════════════
   slide_path: str                               # ローカルファイルパス
@@ -345,6 +350,51 @@ def generate_toc(state: State) -> Dict:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
 # -------------------
+# Mermaid図解生成ヘルパー関数（Issue #25）
+# -------------------
+# 以下の関数は廃止（LLMがプロンプトから独自の図を生成するため不要）
+# def _generate_architecture_flowchart(key_points: List[str]) -> str:
+# def _generate_use_case_mindmap(key_points: List[str]) -> str:
+
+
+def _insert_after_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直後にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # "# section_title" または "## section_title" の後の "---" を見つけて挿入
+    # contentの先頭と末尾の改行を削除してから、区切りを追加して挿入
+    clean_content = content.strip('\n')
+    pattern = rf'(#+\s+{re.escape(section_title)}.*?\n---\s*\n)'
+
+    if re.search(pattern, slide_md, re.DOTALL):
+        return re.sub(pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+    else:
+        # フォールバック: 目次/Agendaの後に挿入
+        agenda_pattern = r'(#+\s+(?:目次|Agenda).*?\n---\s*\n)'
+        if re.search(agenda_pattern, slide_md, re.DOTALL):
+            return re.sub(agenda_pattern, rf'\1\n{clean_content}\n\n---\n\n', slide_md, count=1, flags=re.DOTALL)
+        return slide_md
+
+
+def _insert_before_section(slide_md: str, section_title: str, content: str) -> str:
+    """指定セクション直前にコンテンツを挿入（h1/h2/h3対応）"""
+    import re
+
+    # contentの先頭と末尾の改行を削除
+    clean_content = content.strip('\n')
+
+    # パターン: --- の後に section_title がある箇所
+    # マッチグループ1: --- + 改行、グループ2: section_title
+    pattern = rf'(---\s*\n\n)(#+\s+{re.escape(section_title)})'
+
+    if re.search(pattern, slide_md):
+        # --- と section_title の間に図解を挿入
+        return re.sub(pattern, rf'\1{clean_content}\n\n---\n\n\2', slide_md, count=1)
+    else:
+        # セクションが見つからない場合は末尾に追加
+        return slide_md.rstrip('\n') + f'\n\n{clean_content}\n\n---\n\n'
+
+# -------------------
 # Node D: スライド本文（Slidev）生成
 # -------------------
 @traceable(run_name="d_generate_slide_slidev")
@@ -477,6 +527,16 @@ class: text-center
       "error": f"slides_slidev_error: {e}",
       "log": _log(state, f"[slides_slidev] EXCEPTION {e} - using fallback")
     }
+
+# -------------------
+# Node D.5: Mermaid図解生成（Issue #25）
+# -------------------
+@traceable(run_name="d5_generate_diagrams")
+# generate_diagrams ノードは廃止（LLMがプロンプトから独自の図を生成するため不要）
+# Issue #25: テンプレート図の強制挿入を削除し、LLMによる独自図生成に移行
+def generate_diagrams(state: State) -> Dict:
+    """[DEPRECATED] このノードは使用されていません"""
+    return {"log": _log(state, "[diagrams] deprecated - skipped")}
 
 # -------------------
 # Node E: 評価
@@ -650,6 +710,7 @@ graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
+graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 

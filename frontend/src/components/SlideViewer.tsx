@@ -5,9 +5,42 @@
  * Supabaseから取得したMarkdownをreact-markdownで表示
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import mermaid from 'mermaid';
+
+// Mermaid初期化
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+});
+
+// Mermaidダイアグラムコンポーネント
+function MermaidDiagram({ chart, index }: { chart: string; index: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current && chart) {
+      const id = `mermaid-diagram-${index}`;
+      mermaid.render(id, chart)
+        .then(({ svg }) => {
+          if (ref.current) {
+            ref.current.innerHTML = svg;
+          }
+        })
+        .catch((err) => {
+          console.error('Mermaid render error:', err);
+          if (ref.current) {
+            ref.current.innerHTML = '<pre style="color: red;">図解のレンダリングに失敗しました</pre>';
+          }
+        });
+    }
+  }, [chart, index]);
+
+  return <div ref={ref} style={{ margin: '24px auto', textAlign: 'center' }} />;
+}
 
 interface SlideViewerProps {
   slideId: string;
@@ -111,8 +144,17 @@ export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
                     h3: ({ children }) => <h3 style={styles.h3}>{children}</h3>,
                     // コードブロック
                     code: (props) => {
-                      const { children, ...rest } = props;
+                      const { children, className, ...rest } = props;
+                      const match = /language-(\w+)/.exec(className || '');
+                      const language = match ? match[1] : '';
                       const inline = !String(children).includes('\n');
+
+                      // Mermaid図解の場合
+                      if (language === 'mermaid' && !inline) {
+                        return <MermaidDiagram chart={String(children).replace(/\n$/, '')} index={index} />;
+                      }
+
+                      // 通常のコードブロック
                       return inline ? (
                         <code style={styles.inlineCode} {...rest}>{children}</code>
                       ) : (

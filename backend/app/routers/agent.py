@@ -95,12 +95,14 @@ async def stream_run(
         body = await request.json()
 
         # ──────────────────────────────────────────────────────────────
-        # user_id を input に注入（Issue #24: Supabase統合）
+        # user_id を input に注入（Issue: スライド履歴プレビュー + user_id修正）
+        # LangGraph MessagesState の拡張フィールドとして渡す
         # ──────────────────────────────────────────────────────────────
         if x_user_email:
             if "input" not in body:
                 body["input"] = {}
             body["input"]["user_id"] = x_user_email
+            print(f"[agent] Injected user_id={x_user_email} into input")
 
         async def stream_generator():
             """LangGraphからのSSEレスポンスをリアルタイムで転送"""
