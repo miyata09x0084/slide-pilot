@@ -32,7 +32,13 @@ function Login({ onSuccess }: LoginProps) {
         <GoogleLogin
           onSuccess={onSuccess}
           onError={() => {
-            console.log('Login Failed');
+            console.error('❌ [Google OAuth] Login Failed');
+            console.error('  Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+            console.error('  Current Origin:', window.location.origin);
+            console.error('  Expected Origin: http://localhost:5173');
+            console.error('  Check Google Cloud Console:');
+            console.error('    - Authorized JavaScript origins should include: http://localhost:5173');
+            console.error('    - Settings may take 5 minutes to several hours to propagate');
           }}
         />
       </div>
