@@ -38,10 +38,20 @@ export function useReactAgent() {
   // スレッド作成
   const createThread = useCallback(async () => {
     try {
+      // ユーザー情報取得（localStorage から）
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = user.email || 'anonymous@example.com';
+
       const res = await fetch(`${API_BASE_URL}/threads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          metadata: {
+            user_email: userEmail,                    // ユーザー識別子
+            created_from: 'web_ui',                   // 作成元
+            created_at: new Date().toISOString()      // 作成日時
+          }
+        })
       });
 
       if (!res.ok) throw new Error(`Thread creation failed: ${res.statusText}`);
@@ -138,11 +148,6 @@ export function useReactAgent() {
                   if (msg.type === 'ai' && msg.content) {
                     // AIメッセージの最終contentを保存
                     assistantResponse = msg.content;
-
-                    // デバッグ: 最終メッセージのみログ出力
-                    if (msg.response_metadata?.finish_reason === 'stop') {
-                      console.log('✅ AI応答完了:', msg.content);
-                    }
 
                     // ツール呼び出しがあれば思考ステップに追加
                     if (msg.tool_calls && msg.tool_calls.length > 0) {

@@ -33,23 +33,40 @@ This server handles:
 
 #### 2. LangGraph Server (Port 2024) - AI Agent Engine
 
+**開発モード（インメモリ、ホットリロード）**:
 ```bash
-cd backend
+# リポジトリルートから実行（langgraph.jsonがルートに配置）
 python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
 
 # または、Python 3.11がデフォルトの場合:
 # langgraph dev
 ```
 
+**本番モード（PostgreSQL永続化、オプション）**:
+```bash
+# ローカルで本番環境と同じPostgreSQL永続化をテストする場合
+# リポジトリルートから実行
+python3.11 -m langgraph_cli up --postgres-uri "$(grep POSTGRES_URI backend/.env | cut -d= -f2-)" --port 2024 --watch
+```
+
 **Note**:
 - Requires Python 3.11+ for LangGraph dev server
 - `langgraph dev` コマンドはPython 3.10では動作しません（`langgraph-api`が必要）
 - 確実に動作させるには `python3.11 -m langgraph_cli dev` を使用してください
+- **開発時は`langgraph dev`を使用**（スレッドは再起動で消える）
+- **本番環境テスト時のみ`langgraph up`を使用**（PostgreSQL永続化）
+
+**`langgraph dev` vs `langgraph up`**:
+| コマンド | 用途 | 永続化 | ホットリロード |
+|---------|------|-------|---------------|
+| `langgraph dev` | ローカル開発 | ❌ インメモリ | ✅ 自動 |
+| `langgraph up` | 本番モード | ✅ PostgreSQL | ⚠️ `--watch`必要 |
 
 This server handles:
 - AI agent workflow execution
 - ReAct agent (Gmail + Slides)
 - SSE streaming for real-time progress
+- Thread persistence (本番モードのみ)
 
 **Architecture**:
 ```
@@ -126,8 +143,7 @@ backend/
 │   ├── uploads/         # Uploaded PDF files
 │   └── slides/          # Generated slides
 │
-├── tests/               # Test files
-└── langgraph.json       # LangGraph configuration
+└── tests/               # Test files
 ```
 
 **Key architectural decisions**:
@@ -232,10 +248,13 @@ VITE_GOOGLE_CLIENT_ID=...       # Required: Google OAuth 2.0 Client ID
 
 Get OAuth credentials from: https://console.cloud.google.com/apis/credentials
 
-### LangGraph Configuration (backend/langgraph.json)
+### LangGraph Configuration (langgraph.json)
 
-- Defines the graph export path: `react_agent.py:graph`
-- Graph ID: `react-agent`
+- **Location**: Repository root (`langgraph.json`)
+- Defines graph export paths:
+  - `react-agent`: `./backend/app/agents/react_agent.py:graph`
+  - `slide-workflow`: `./backend/app/agents/slide_workflow.py:graph`
+- Environment file: `backend/.env`
 - LangGraph version: 0.5.2
 
 ## Important Implementation Details

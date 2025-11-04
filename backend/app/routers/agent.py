@@ -8,15 +8,72 @@ LangGraphサーバー (localhost:2024) へのリクエストをプロキシし�
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 import httpx
+import asyncio
+import os
 from typing import Any, Dict
 
 router = APIRouter()
 
-# LangGraphサーバーのベースURL
-LANGGRAPH_BASE_URL = "http://localhost:2024"
+# LangGraph Cloud設定
+LANGGRAPH_BASE_URL = os.getenv(
+    "LANGGRAPH_CLOUD_URL",
+    "https://api.smith.langchain.com"
+)
+DEPLOYMENT_ID = os.getenv("LANGGRAPH_DEPLOYMENT_ID", "local")
+
+# ローカル開発との切り替え
+if DEPLOYMENT_ID == "local":
+    # ローカル開発: langgraph dev使用
+    LANGGRAPH_API_URL = "http://localhost:2024"
+    print("[agent] Using local LangGraph dev server: http://localhost:2024")
+else:
+    # 本番: LangSmith Cloud使用
+    LANGGRAPH_API_URL = f"{LANGGRAPH_BASE_URL}/deployments/{DEPLOYMENT_ID}"
+    print(f"[agent] Using LangSmith Cloud: {LANGGRAPH_API_URL}")
+
+# 認証ヘッダー
+LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 # タイムアウト設定（LLM処理が長時間かかる可能性があるため長めに設定）
 TIMEOUT = httpx.Timeout(300.0, connect=10.0)
+
+# リトライ設定（LangSmith Cloudでは不要だが、ローカル用に残す）
+MAX_RETRIES = 5
+RETRY_DELAY = 2  # seconds
+
+
+async def wait_for_langgraph(max_retries: int = MAX_RETRIES, retry_delay: float = RETRY_DELAY) -> bool:
+    """
+    LangGraphサーバーの起動を待つ
+
+    起動直後のコンテナで、LangGraphが完全起動するまで待機する。
+    最大10秒（5回 × 2秒）待機し、起動完了後にTrueを返す。
+
+    Args:
+        max_retries: 最大リトライ回数
+        retry_delay: リトライ間隔（秒）
+
+    Returns:
+        bool: 起動成功時True
+
+    Raises:
+        HTTPException: タイムアウト時503エラー
+    """
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{LANGGRAPH_BASE_URL}/ok")
+                if response.status_code == 200:
+                    return True
+        except (httpx.ConnectError, httpx.TimeoutException):
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+            else:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"LangGraphサーバーが起動していません。{max_retries * retry_delay}秒待機しましたが、接続できませんでした。"
+                )
+    return False
 
 
 @router.post("/threads")
@@ -27,12 +84,22 @@ async def create_thread(request: Request):
     LangGraphの /threads エンドポイントへプロキシ
     """
     try:
+        # ローカル開発の場合のみLangGraphの起動を待機
+        if DEPLOYMENT_ID == "local":
+            await wait_for_langgraph()
+
         body = await request.json()
+
+        # 認証ヘッダー準備
+        headers = {}
+        if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
+            headers["x-api-key"] = LANGCHAIN_API_KEY
 
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
-                f"{LANGGRAPH_BASE_URL}/threads",
-                json=body
+                f"{LANGGRAPH_API_URL}/threads",
+                json=body,
+                headers=headers
             )
             response.raise_for_status()
             return response.json()
@@ -55,10 +122,16 @@ async def search_assistants(request: Request):
     try:
         body = await request.json()
 
+        # 認証ヘッダー準備
+        headers = {}
+        if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
+            headers["x-api-key"] = LANGCHAIN_API_KEY
+
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             response = await client.post(
-                f"{LANGGRAPH_BASE_URL}/assistants/search",
-                json=body
+                f"{LANGGRAPH_API_URL}/assistants/search",
+                json=body,
+                headers=headers
             )
             response.raise_for_status()
             return response.json()
@@ -104,14 +177,20 @@ async def stream_run(
             body["input"]["user_id"] = x_user_email
             print(f"[agent] Injected user_id={x_user_email} into input")
 
+        # 認証ヘッダー準備
+        headers = {}
+        if LANGCHAIN_API_KEY and DEPLOYMENT_ID != "local":
+            headers["x-api-key"] = LANGCHAIN_API_KEY
+
         async def stream_generator():
             """LangGraphからのSSEレスポンスをリアルタイムで転送"""
             try:
                 async with httpx.AsyncClient(timeout=TIMEOUT) as client:
                     async with client.stream(
                         "POST",
-                        f"{LANGGRAPH_BASE_URL}/threads/{thread_id}/runs/stream",
-                        json=body
+                        f"{LANGGRAPH_API_URL}/threads/{thread_id}/runs/stream",
+                        json=body,
+                        headers=headers
                     ) as response:
                         response.raise_for_status()
 
@@ -147,17 +226,41 @@ async def stream_run(
 async def health_check():
     """
     LangGraphサーバーのヘルスチェック（プロキシ経由）
+
+    ローカル開発: リトライロジックを使用してLangGraphの起動を待機
+    本番環境: LangSmith Cloudに接続確認
     """
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-            response = await client.get(f"{LANGGRAPH_BASE_URL}/ok")
-            response.raise_for_status()
-            return {"status": "ok", "langgraph": "connected"}
+        # ローカル開発の場合のみLangGraphの起動を待機
+        if DEPLOYMENT_ID == "local":
+            await wait_for_langgraph()
+            return {"status": "ok", "langgraph": "connected", "mode": "local"}
+        else:
+            # LangSmith Cloud接続確認
+            headers = {}
+            if LANGCHAIN_API_KEY:
+                headers["x-api-key"] = LANGCHAIN_API_KEY
 
-    except httpx.RequestError:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{LANGGRAPH_API_URL}/ok",
+                    headers=headers
+                )
+                response.raise_for_status()
+                return {
+                    "status": "ok",
+                    "langgraph": "connected",
+                    "mode": "cloud",
+                    "deployment_id": DEPLOYMENT_ID
+                }
+
+    except HTTPException:
+        # wait_for_langgraph が投げる 503 エラーをそのまま再送
+        raise
+    except httpx.RequestError as e:
         raise HTTPException(
             status_code=503,
-            detail="LangGraphサーバーが起動していません。'langgraph dev' を実行してください。"
+            detail=f"LangGraphサーバーに接続できません: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ヘルスチェックエラー: {str(e)}")

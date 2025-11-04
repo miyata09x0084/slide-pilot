@@ -2,11 +2,19 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 
+# ---FastAPI (Issue #27: Cloud Run Deployment)---
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+
 # LangChain / LangGraph stack ---
 langchain-core>=0.3.64
 langchain-openai>=0.2.0,<0.3.0
 langgraph>=0.4.0
 langgraph-sdk>=0.2.0
+langgraph-cli>=0.1.0
+langgraph-api>=0.0.1
 langsmith>=0.3.45
 
 # ---Compatibility helpers---
