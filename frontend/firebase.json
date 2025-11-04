@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "slide-pilot-474305",
     "public": "dist",
     "ignore": [
       "firebase.json",
