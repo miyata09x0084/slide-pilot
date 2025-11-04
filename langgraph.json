@@ -1,5 +1,5 @@
 {
-  "dependencies": ["langgraph==0.5.2"],
+  "dependencies": ["langgraph==0.5.2", "./backend"],
   "graphs": {
     "react-agent": {
       "path": "./backend/app/agents/react_agent.py:graph",
