@@ -152,7 +152,9 @@ def detect_input_type(topic: str) -> str:
 # =======================
 @traceable(run_name="a_collect_info")
 def collect_info(state: State) -> State:
-  topic = state.get("topic") or "AI最新情報"
+  topic = state.get("topic", "AI最新情報")
+  if not topic or not topic.strip():
+    topic = "AI最新情報"
 
   # 入力タイプを自動判別
   input_type = detect_input_type(topic)
@@ -243,7 +245,9 @@ def collect_info(state: State) -> State:
 # -------------------
 @traceable(run_name="b_generate_key_points")
 def generate_key_points(state: State) -> Dict:
-  topic = state.get("topic") or "AI最新情報"
+  topic = state.get("topic", "AI最新情報")
+  if not topic or not topic.strip():
+    topic = "AI最新情報"
   ctx = state.get("context_md") or ""
   sources = state.get("sources") or {}
 
@@ -324,7 +328,9 @@ def generate_key_points(state: State) -> Dict:
 # -------------------
 @traceable(run_name="c_generate_toc")
 def generate_toc(state: State) -> Dict:
-  topic = state.get("topic") or ""
+  topic = state.get("topic", "AI最新情報")
+  if not topic or not topic.strip():
+    topic = "AI最新情報"
   key_points = state.get("key_points") or []
 
   # 入力タイプを判別
@@ -401,7 +407,9 @@ def _insert_before_section(slide_md: str, section_title: str, content: str) -> s
 def write_slides_slidev(state: State) -> Dict:
   """Slidev形式のスライドを生成（全6社対応 / PDF対応）"""
   sources = state.get("sources") or {}
-  topic = state.get("topic") or "AI最新情報"
+  topic = state.get("topic", "AI最新情報")
+  if not topic or not topic.strip():
+    topic = "AI最新情報"
   context_md = state.get("context_md") or ""
   key_points = state.get("key_points") or []
   toc = state.get("toc") or []
@@ -551,7 +559,9 @@ def evaluate_slides_slidev(state: State) -> Dict:
     return {}
   slide_md = state.get("slide_md") or ""
   toc = state.get("toc") or []
-  topic = state.get("topic") or ""
+  topic = state.get("topic", "AI最新情報")
+  if not topic or not topic.strip():
+    topic = "AI最新情報"
 
   # 入力タイプを判別してPDF特有の評価基準を追加
   input_type = detect_input_type(topic)

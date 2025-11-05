@@ -60,7 +60,7 @@ async def wait_for_langgraph(max_retries: int = MAX_RETRIES, retry_delay: float 
     for attempt in range(max_retries):
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{LANGGRAPH_BASE_URL}/ok")
+                response = await client.get(f"{LANGGRAPH_API_URL}/ok")
                 if response.status_code == 200:
                     return True
         except (httpx.ConnectError, httpx.TimeoutException):
