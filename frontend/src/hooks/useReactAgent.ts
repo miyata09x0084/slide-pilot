@@ -84,19 +84,24 @@ export function useReactAgent() {
     _isGeneratingSlides = false; // スライド生成フラグをリセット
 
     try {
-      // assistant_id取得
+      // assistant_id取得（react-agentを明示的に探す）
       const assistantRes = await fetch(`${API_BASE_URL}/assistants/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 1 })
+        body: JSON.stringify({ limit: 10 })
       });
 
       if (!assistantRes.ok) throw new Error('Failed to get assistant');
 
       const assistants = await assistantRes.json();
-      const assistantId = assistants[0]?.assistant_id;
 
-      if (!assistantId) throw new Error('No assistant found');
+      // react-agent を graph_id で検索
+      const reactAgent = assistants.find((a: { graph_id: string; assistant_id: string }) => a.graph_id === 'react-agent');
+      if (!reactAgent) {
+        throw new Error('ReAct agent not found. Please check LangGraph configuration.');
+      }
+
+      const assistantId = reactAgent.assistant_id;
 
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
