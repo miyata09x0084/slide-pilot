@@ -1,7 +1,7 @@
 {
   "hosting": {
     "site": "slide-pilot-474305",
-    "public": "public",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -10,18 +10,9 @@
 
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/maintenance.html"
-      }
-    ],
-
-    "_comment": "Original configuration (restore when maintenance is complete)",
-    "_original_public": "dist",
-    "_original_rewrites": [
-      {
         "source": "/api/**",
         "run": {
-          "serviceId": "slidepilot-api",
+          "serviceId": "slide-pilot-api",
           "region": "asia-northeast1"
         }
       },
