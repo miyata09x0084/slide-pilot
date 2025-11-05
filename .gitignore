@@ -195,3 +195,6 @@ backend/data/slides/*.html
 # Gmail API credentials (Issue #6)
 backend/credentials.json
 backend/token.json
+
+# Bug reports and internal investigation docs
+docs/bugs/
