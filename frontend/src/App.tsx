@@ -6,11 +6,10 @@
 
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { RecoilRoot } from 'recoil';
-import LoginPage from './pages/LoginPage';
+import { LoginPage, ProtectedRoute } from './features/auth';
 import DashboardPage from './pages/DashboardPage';
 import GenerationProgressPage from './pages/GenerationProgressPage';
 import SlideDetailPage from './pages/SlideDetailPage';
-import ProtectedRoute from './components/ProtectedRoute';
 import { dashboardLoader } from './loaders/dashboardLoader';
 
 const router = createBrowserRouter([

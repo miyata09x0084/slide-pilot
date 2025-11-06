@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import type { CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import Login from '../components/Login';
-import { useAuth } from '../hooks/useAuth';
+import Login from './components/Login';
+import { useAuth } from './hooks/useAuth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
