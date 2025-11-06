@@ -1,35 +1,51 @@
 /**
  * App.tsx (Phase 1: React Router対応 + Recoil状態管理)
  * ルーティング設定とRecoilRootラッパー
+ * React Router v6.4+ createBrowserRouter + loader使用
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { RecoilRoot } from 'recoil';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import GenerationProgressPage from './pages/GenerationProgressPage';
 import SlideDetailPage from './pages/SlideDetailPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import { dashboardLoader } from './loaders/dashboardLoader';
+
+const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/',
+        element: <DashboardPage />,
+        loader: dashboardLoader, // ページ表示前にデータ取得
+      },
+      {
+        path: '/generate/:threadId',
+        element: <GenerationProgressPage />,
+      },
+      {
+        path: '/slides/:slideId',
+        element: <SlideDetailPage />,
+      },
+    ],
+  },
+  {
+    path: '*',
+    element: <Navigate to="/" replace />,
+  },
+]);
 
 function App() {
   return (
     <RecoilRoot>
-      <BrowserRouter>
-        <Routes>
-          {/* 公開ルート */}
-          <Route path="/login" element={<LoginPage />} />
-
-          {/* 認証必須ルート */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/generate/:threadId" element={<GenerationProgressPage />} />
-            <Route path="/slides/:slideId" element={<SlideDetailPage />} />
-          </Route>
-
-          {/* 存在しないルート */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </RecoilRoot>
   );
 }

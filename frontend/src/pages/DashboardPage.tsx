@@ -1,10 +1,11 @@
 /**
  * DashboardPage - 統一カード形式のダッシュボード
  * 全ての要素を同じサイズのカードとして表示
+ * React Router Loader使用でページ表示前にデータ取得
  */
 
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useNavigate, useLoaderData } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useReactAgent } from "../hooks/useReactAgent";
 import UnifiedCard from "../components/UnifiedCard";
@@ -141,35 +142,13 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
-  const [slides, setSlides] = useState<Slide[]>([]);
+
+  // loaderから取得したデータ（ページ表示前に既に取得済み）
+  const { slides: initialSlides } = useLoaderData() as { slides: Slide[] };
+  const [slides] = useState<Slide[]>(initialSlides);
+
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
-
-  // スライド履歴を取得
-  useEffect(() => {
-    const fetchSlides = async () => {
-      if (!user?.email) return;
-
-      try {
-        const response = await fetch(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8001/api"
-          }/slides?user_id=${encodeURIComponent(user.email)}&limit=20`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch slides: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setSlides(data.slides || []);
-      } catch (err) {
-        console.error("Failed to fetch slides:", err);
-      }
-    };
-
-    fetchSlides();
-  }, [user?.email]);
 
   // ログアウト処理
   const handleLogout = () => {
