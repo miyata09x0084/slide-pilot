@@ -207,7 +207,11 @@ export default function DashboardPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/upload-pdf`, {
+      // user_idをクエリパラメータで送信
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const uploadUrl = `${apiUrl}/upload-pdf${user?.email ? `?user_id=${encodeURIComponent(user.email)}` : ''}`;
+
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       });

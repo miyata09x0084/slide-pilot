@@ -10,6 +10,7 @@ type UploadState = 'idle' | 'dragging' | 'uploading' | 'success' | 'error';
 interface DropzoneCardProps {
   onUploadSuccess: (data: { path: string }) => void;
   onUploadStart?: () => void;
+  userId?: string;  // ユーザーID（Google OAuth email等）
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -163,7 +164,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function DropzoneCard({ onUploadSuccess, onUploadStart }: DropzoneCardProps) {
+export default function DropzoneCard({ onUploadSuccess, onUploadStart, userId }: DropzoneCardProps) {
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string>('');
@@ -275,7 +276,11 @@ export default function DropzoneCard({ onUploadSuccess, onUploadStart }: Dropzon
         throw new Error('アップロードがタイムアウトしました');
       });
 
-      xhr.open('POST', `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/upload-pdf`);
+      // user_idをクエリパラメータで送信
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+      const uploadUrl = `${apiUrl}/upload-pdf${userId ? `?user_id=${encodeURIComponent(userId)}` : ''}`;
+
+      xhr.open('POST', uploadUrl);
       xhr.timeout = 60000; // 60秒
       xhr.send(formData);
     } catch (err: any) {
