@@ -268,12 +268,16 @@ export default function DropzoneCard({ onUploadSuccess, onUploadStart, userId }:
 
       // エラー
       xhr.addEventListener('error', () => {
-        throw new Error('ネットワークエラーが発生しました');
+        setError('ネットワークエラーが発生しました');
+        setState('error');
+        setProgress(0);
       });
 
       // タイムアウト
       xhr.addEventListener('timeout', () => {
-        throw new Error('アップロードがタイムアウトしました');
+        setError('アップロードがタイムアウトしました');
+        setState('error');
+        setProgress(0);
       });
 
       // user_idをクエリパラメータで送信

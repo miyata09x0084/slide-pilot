@@ -6,12 +6,10 @@
 
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { RecoilRoot } from 'recoil';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import GenerationProgressPage from './pages/GenerationProgressPage';
-import SlideDetailPage from './pages/SlideDetailPage';
-import ProtectedRoute from './components/ProtectedRoute';
-import { dashboardLoader } from './loaders/dashboardLoader';
+import { LoginPage, ProtectedRoute } from './features/auth';
+import { DashboardPage, dashboardLoader } from './features/dashboard';
+import { SlideDetailPage, slideDetailLoader } from './features/slide';
+import { GenerationProgressPage } from './features/generation';
 
 const router = createBrowserRouter([
   {
@@ -33,6 +31,7 @@ const router = createBrowserRouter([
       {
         path: '/slides/:slideId',
         element: <SlideDetailPage />,
+        loader: slideDetailLoader, // ページ表示前にデータ取得
       },
     ],
   },

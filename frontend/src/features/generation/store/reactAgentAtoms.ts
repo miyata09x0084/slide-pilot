@@ -4,7 +4,7 @@
  */
 
 import { atom } from 'recoil';
-import type { Message } from '../components/ChatMessage';
+import type { Message } from '../../../shared';
 import type { ThinkingStep } from '../components/ThinkingIndicator';
 import type { SlideData } from '../hooks/useReactAgent';
 

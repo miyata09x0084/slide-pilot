@@ -6,10 +6,10 @@
 
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
-import { useReactAgent } from "../hooks/useReactAgent";
-import UnifiedCard from "../components/UnifiedCard";
-import QuickActionMenu from "../components/QuickActionMenu";
+import { useAuth } from "../auth";
+import { useReactAgent } from "../generation";
+import UnifiedCard from "./components/UnifiedCard";
+import QuickActionMenu from "./components/QuickActionMenu";
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
