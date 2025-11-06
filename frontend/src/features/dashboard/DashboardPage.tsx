@@ -7,7 +7,7 @@
 import { useNavigate, useLoaderData } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../auth";
-import { useReactAgent } from "../../hooks/useReactAgent";
+import { useReactAgent } from "../generation";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
 

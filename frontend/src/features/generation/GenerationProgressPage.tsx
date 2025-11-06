@@ -5,8 +5,8 @@
 
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReactAgent } from '../hooks/useReactAgent';
-import ThinkingIndicator from '../components/ThinkingIndicator';
+import { useReactAgent } from './hooks/useReactAgent';
+import ThinkingIndicator from './components/ThinkingIndicator';
 
 export default function GenerationProgressPage() {
   const navigate = useNavigate();

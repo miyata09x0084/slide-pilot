@@ -9,7 +9,7 @@ import { RecoilRoot } from 'recoil';
 import { LoginPage, ProtectedRoute } from './features/auth';
 import { DashboardPage, dashboardLoader } from './features/dashboard';
 import { SlideDetailPage, slideDetailLoader } from './features/slide';
-import GenerationProgressPage from './pages/GenerationProgressPage';
+import { GenerationProgressPage } from './features/generation';
 
 const router = createBrowserRouter([
   {

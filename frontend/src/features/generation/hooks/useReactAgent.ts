@@ -4,7 +4,7 @@
 
 import { useCallback } from 'react';
 import { useRecoilState } from 'recoil';
-import type { Message } from '../components/ChatMessage';
+import type { Message } from '../../../components/ChatMessage';
 import {
   messagesAtom,
   thinkingStepsAtom,
