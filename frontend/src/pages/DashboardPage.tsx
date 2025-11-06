@@ -3,98 +3,99 @@
  * 全ての要素を同じサイズのカードとして表示
  */
 
-import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useReactAgent } from '../hooks/useReactAgent';
-import UnifiedCard from '../components/UnifiedCard';
-import QuickActionMenu from '../components/QuickActionMenu';
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { useReactAgent } from "../hooks/useReactAgent";
+import UnifiedCard from "../components/UnifiedCard";
+import QuickActionMenu from "../components/QuickActionMenu";
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: '100vh',
-    background: '#f9fafb',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    minHeight: "100vh",
+    background: "#f9fafb",
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 32px',
-    background: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 32px",
+    background: "white",
+    borderBottom: "1px solid #e5e7eb",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
   },
   logoSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
   },
   logoIcon: {
-    fontSize: '28px',
+    fontSize: "28px",
   },
   logo: {
     margin: 0,
-    fontSize: '22px',
-    fontWeight: '700',
-    color: '#1a1a1a',
-    letterSpacing: '-0.5px',
+    fontSize: "22px",
+    fontWeight: "700",
+    color: "#1a1a1a",
+    letterSpacing: "-0.5px",
   },
   userSection: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
   },
   avatar: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    border: '2px solid #e5e7eb',
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+    border: "2px solid #e5e7eb",
   },
   userName: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#374151",
   },
   logoutButton: {
-    padding: '8px 16px',
-    fontSize: '13px',
-    background: '#f3f4f6',
-    color: '#374151',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '600',
-    transition: 'all 0.2s',
+    padding: "8px 16px",
+    fontSize: "13px",
+    background: "#f3f4f6",
+    color: "#374151",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontWeight: "600",
+    transition: "all 0.2s",
   },
   gridContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gridAutoRows: 'minmax(200px, auto)',
-    gap: '20px',
-    padding: '32px',
-    maxWidth: '1440px',
-    margin: '0 auto',
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gridAutoRows: "minmax(200px, auto)",
+    gap: "20px",
+    padding: "32px",
+    maxWidth: "1440px",
+    margin: "0 auto",
   },
   emptyState: {
-    gridColumn: '1 / -1',
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: '#9ca3af',
+    gridColumn: "1 / -1",
+    textAlign: "center",
+    padding: "60px 20px",
+    color: "#9ca3af",
   },
   emptyIcon: {
-    fontSize: '64px',
-    marginBottom: '16px',
+    fontSize: "64px",
+    marginBottom: "16px",
   },
   emptyText: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: '8px',
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#6b7280",
+    marginBottom: "8px",
   },
   emptySubtext: {
-    fontSize: '14px',
-    color: '#9ca3af',
+    fontSize: "14px",
+    color: "#9ca3af",
   },
 };
 
@@ -151,7 +152,9 @@ export default function DashboardPage() {
 
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides?user_id=${encodeURIComponent(user.email)}&limit=20`
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:8001/api"
+          }/slides?user_id=${encodeURIComponent(user.email)}&limit=20`
         );
 
         if (!response.ok) {
@@ -161,7 +164,7 @@ export default function DashboardPage() {
         const data = await response.json();
         setSlides(data.slides || []);
       } catch (err) {
-        console.error('Failed to fetch slides:', err);
+        console.error("Failed to fetch slides:", err);
       }
     };
 
@@ -171,7 +174,7 @@ export default function DashboardPage() {
   // ログアウト処理
   const handleLogout = () => {
     logout();
-    navigate('/login', { replace: true });
+    navigate("/login", { replace: true });
   };
 
   // クイックメニューを開く
@@ -182,9 +185,9 @@ export default function DashboardPage() {
   // PDFアップロード選択時
   const handleSelectUpload = () => {
     // ファイル選択ダイアログを開く
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.pdf';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf";
     input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
@@ -198,26 +201,29 @@ export default function DashboardPage() {
   const uploadAndGenerate = async (file: File) => {
     // ファイルサイズチェック
     if (file.size > 100 * 1024 * 1024) {
-      alert('ファイルサイズは100MB以下にしてください');
+      alert("ファイルサイズは100MB以下にしてください");
       return;
     }
 
     try {
       // アップロード
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       // user_idをクエリパラメータで送信
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
-      const uploadUrl = `${apiUrl}/upload-pdf${user?.email ? `?user_id=${encodeURIComponent(user.email)}` : ''}`;
+      const apiUrl =
+        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+      const uploadUrl = `${apiUrl}/upload-pdf${
+        user?.email ? `?user_id=${encodeURIComponent(user.email)}` : ""
+      }`;
 
       const response = await fetch(uploadUrl, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('アップロードに失敗しました');
+        throw new Error("アップロードに失敗しました");
       }
 
       const data = await response.json();
@@ -230,17 +236,19 @@ export default function DashboardPage() {
         tid
       );
     } catch (err) {
-      console.error('❌ スライド生成エラー:', err);
-      alert('エラーが発生しました');
+      console.error("❌ スライド生成エラー:", err);
+      alert("エラーが発生しました");
     }
   };
 
   // テンプレートクリック
   const handleTemplateClick = async (templateId: string) => {
     const templates: Record<string, string> = {
-      'ai-news': 'AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください',
-      'ml-basics': '機械学習の基礎について、初心者向けのスライドを作成してください',
-      'textbook': '教科書の章立てから復習用スライドを作成してください',
+      "ai-news":
+        "AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください",
+      "ml-basics":
+        "機械学習の基礎について、初心者向けのスライドを作成してください",
+      textbook: "教科書の章立てから復習用スライドを作成してください",
     };
 
     const prompt = templates[templateId];
@@ -251,7 +259,7 @@ export default function DashboardPage() {
       navigate(`/generate/${tid}`, { state: { template: templateId } });
       await sendMessage(prompt, tid);
     } catch (err) {
-      console.error('❌ テンプレート処理エラー:', err);
+      console.error("❌ テンプレート処理エラー:", err);
     }
   };
 
@@ -278,21 +286,17 @@ export default function DashboardPage() {
         </div>
 
         <div style={styles.userSection}>
-          <img
-            src={user.picture}
-            alt={user.name}
-            style={styles.avatar}
-          />
+          <img src={user.picture} alt={user.name} style={styles.avatar} />
           <div style={styles.userName}>{user.name}</div>
           <button
             onClick={handleLogout}
             onMouseOver={(e) => {
-              e.currentTarget.style.background = '#e5e7eb';
-              e.currentTarget.style.borderColor = '#9ca3af';
+              e.currentTarget.style.background = "#e5e7eb";
+              e.currentTarget.style.borderColor = "#9ca3af";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.background = '#f3f4f6';
-              e.currentTarget.style.borderColor = '#d1d5db';
+              e.currentTarget.style.background = "#f3f4f6";
+              e.currentTarget.style.borderColor = "#d1d5db";
             }}
             style={styles.logoutButton}
           >
@@ -329,11 +333,14 @@ export default function DashboardPage() {
                 key={slide.id}
                 icon="📊"
                 title={slide.title}
-                subtitle={new Date(slide.created_at).toLocaleDateString('ja-JP', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                subtitle={new Date(slide.created_at).toLocaleDateString(
+                  "ja-JP",
+                  {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  }
+                )}
                 onClick={() => handleSlideClick(slide.id)}
                 variant="history"
                 className="card-default"
