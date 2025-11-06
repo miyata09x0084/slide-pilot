@@ -198,3 +198,4 @@ backend/token.json
 
 # Bug reports and internal investigation docs
 docs/bugs/
+frontend/.firebase/
