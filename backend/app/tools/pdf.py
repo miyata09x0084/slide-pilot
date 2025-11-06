@@ -38,8 +38,16 @@ def process_pdf(file_path: str) -> str:
     try:
         # Supabase Storageパスの場合（user_id/filename.pdfの形式）
         if '/' in file_path and not file_path.startswith('/'):
-            # Supabase Storageからダウンロード
+            # Supabase Storageからダウンロード（複数user_idを試行）
             pdf_data = download_from_storage(bucket="uploads", file_path=file_path)
+
+            # 指定されたパスでダウンロード失敗した場合、anonymous/も試す
+            if not pdf_data and not file_path.startswith("anonymous/"):
+                # ファイル名のみを抽出
+                filename = file_path.split('/')[-1]
+                fallback_path = f"anonymous/{filename}"
+                print(f"[process_pdf] Trying fallback path: {fallback_path}")
+                pdf_data = download_from_storage(bucket="uploads", file_path=fallback_path)
 
             if not pdf_data:
                 return json.dumps({

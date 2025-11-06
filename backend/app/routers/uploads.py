@@ -15,6 +15,7 @@ router = APIRouter()
 @router.post("/upload-pdf")
 async def upload_pdf(
     file: UploadFile = File(...),
+    user_id: str = "anonymous",
     max_file_size: int = Depends(get_max_file_size)
 ):
     """
@@ -22,6 +23,7 @@ async def upload_pdf(
 
     Args:
         file: アップロードされたPDFファイル
+        user_id: ユーザー識別子（クエリパラメータ、デフォルト: "anonymous"）
 
     Returns:
         {
@@ -54,9 +56,6 @@ async def upload_pdf(
 
     # 一意なファイル名を生成
     unique_name = f"{uuid.uuid4()}_{file.filename}"
-
-    # TODO: 認証実装後にJWTからuser_idを取得
-    user_id = "anonymous"
 
     # Supabase Storageにアップロード
     storage_path = f"{user_id}/{unique_name}"
