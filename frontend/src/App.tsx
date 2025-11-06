@@ -8,7 +8,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { RecoilRoot } from 'recoil';
 import { LoginPage, ProtectedRoute } from './features/auth';
 import { DashboardPage, dashboardLoader } from './features/dashboard';
-import { SlideDetailPage } from './features/slide';
+import { SlideDetailPage, slideDetailLoader } from './features/slide';
 import GenerationProgressPage from './pages/GenerationProgressPage';
 
 const router = createBrowserRouter([
@@ -31,6 +31,7 @@ const router = createBrowserRouter([
       {
         path: '/slides/:slideId',
         element: <SlideDetailPage />,
+        loader: slideDetailLoader, // ページ表示前にデータ取得
       },
     ],
   },
