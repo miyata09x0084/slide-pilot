@@ -2,14 +2,13 @@
 スライドダウンロード & Supabase統合ルーター
 
 Issue #24: ブラウザプレビュー + Supabase履歴管理
+Issue #29: Supabase Storage移行
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import FileResponse
-from pathlib import Path
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
 from typing import Dict, Any
 
-from app.dependencies import get_slides_dir
 from app.core.supabase import get_supabase_client, get_slides_by_user, get_slide_by_id
 
 router = APIRouter()
@@ -68,22 +67,35 @@ async def get_slide_markdown(slide_id: str) -> Dict[str, Any]:
 
 
 # ──────────────────────────────────────────────────────────────
-# ローカルファイルダウンロード（既存機能）
+# Supabase Storageダウンロード（Issue #29）
 # ──────────────────────────────────────────────────────────────
 
-@router.get("/slides/{filename}")
-async def download_slide(filename: str, slides_dir: Path = Depends(get_slides_dir)):
-    """生成されたスライドをダウンロード（ローカルファイル）"""
-    file_path = slides_dir / filename
+@router.get("/slides/{user_id}/{filename}")
+async def download_slide(user_id: str, filename: str):
+    """生成されたスライドをダウンロード（Supabase Storage）
 
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="スライドが見つかりません")
+    Args:
+        user_id: ユーザーID（anonymousまたはemail）
+        filename: ファイル名（例: ai-latest-info_slidev.pdf）
 
-    return FileResponse(
-        path=str(file_path),
-        filename=filename,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
-    )
+    Returns:
+        署名付きURLへのリダイレクト
+    """
+    client = get_supabase_client()
+    if not client:
+        raise HTTPException(status_code=503, detail="Storage service unavailable")
+
+    storage_path = f"{user_id}/{filename}"
+
+    try:
+        # 公開バケットなので直接公開URLを取得
+        public_url = client.storage.from_("slide-files").get_public_url(storage_path)
+
+        # 公開URLにリダイレクト
+        return RedirectResponse(url=public_url)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"File not found: {storage_path}"
+        )

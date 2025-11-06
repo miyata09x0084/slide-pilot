@@ -8,6 +8,7 @@ import re
 import json
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, Union, List
@@ -23,6 +24,7 @@ from app.config import settings
 from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
 from app.core.llm import llm
 from app.core.supabase import save_slide_to_supabase
+from app.core.storage import upload_to_storage
 from app.core.utils import (
     # ユーティリティ関数
     _log, _strip_bullets, _slugify_en, _find_json,
@@ -636,17 +638,17 @@ def save_and_render_slidev(state: State) -> Dict:
   except Exception:
     file_stem = _slugify_en(title) or "ai-latest-info"
 
-  # 統一設定からスライドディレクトリを取得
-  slide_dir = settings.SLIDES_DIR
-  slide_md_path = slide_dir / f"{file_stem}_slidev.md"
+  # 一時ディレクトリ作成（Cloud Runでも動作）
+  temp_dir = Path(tempfile.mkdtemp())
+  slide_md_path = temp_dir / f"{file_stem}_slidev.md"
   slide_md_path.write_text(slide_md, encoding="utf-8")
 
   # Slidev PDF生成
   slidev = shutil.which("slidev")
-  out_path = str(slide_md_path)
+  pdf_file = temp_dir / f"{file_stem}_slidev.pdf"
+  log_msg = ""
 
   if slidev and SLIDE_FORMAT == "pdf":
-    pdf_file = slide_dir / f"{file_stem}_slidev.pdf"
     try:
       subprocess.run(
         ["slidev", "export", str(slide_md_path),
@@ -658,7 +660,6 @@ def save_and_render_slidev(state: State) -> Dict:
         stderr=subprocess.PIPE,
         timeout=90  # プロセス全体のタイムアウト
       )
-      out_path = str(pdf_file)
       log_msg = f"[slidev] generated PDF -> {pdf_file.name}"
     except subprocess.TimeoutExpired:
       log_msg = f"[slidev] PDF generation timeout (90s) - MD saved at {slide_md_path.name}"
@@ -672,35 +673,66 @@ def save_and_render_slidev(state: State) -> Dict:
       log_msg = f"[slidev] rendering skipped (SLIDE_FORMAT={SLIDE_FORMAT}, only pdf supported)."
 
   # ──────────────────────────────────────────────────────────────────────────
-  # Supabase保存（オプショナル、失敗しても継続）
-  # Issue #24: ブラウザプレビュー + Supabase履歴管理
+  # Supabase Storage & DB保存（オプショナル、失敗しても継続）
+  # Issue #29: Supabase Storage移行
   # ──────────────────────────────────────────────────────────────────────────
-  result = {
-    "slide_path": out_path,
-    "log": _log(state, log_msg)
-  }
 
   # 実行コンテキストからuser_idを取得（Read-Only）
   user_id = state.get("user_id", "anonymous")
   topic = state.get("topic", "AI最新情報")
 
-  try:
-    # PDFが生成された場合のみパスを渡す
-    pdf_path = None
-    if slidev and SLIDE_FORMAT == "pdf" and "pdf_file" in locals():
-      pdf_path = pdf_file
+  # Supabase Storageにアップロード
+  pdf_url = None
+  md_url = None
 
+  try:
+    # PDFファイルをアップロード
+    if slidev and SLIDE_FORMAT == "pdf" and pdf_file.exists():
+      storage_path = f"{user_id}/{file_stem}_slidev.pdf"
+      pdf_url = upload_to_storage(
+        bucket="slide-files",
+        file_path=storage_path,
+        file_data=pdf_file.read_bytes(),
+        content_type="application/pdf"
+      )
+      log_msg += f" | PDF uploaded to Supabase Storage"
+
+    # Markdownファイルもアップロード（プレビュー用）
+    md_storage_path = f"{user_id}/{file_stem}_slidev.md"
+    md_url = upload_to_storage(
+      bucket="slide-files",
+      file_path=md_storage_path,
+      file_data=slide_md.encode("utf-8"),
+      content_type="text/markdown"
+    )
+    log_msg += f" | MD uploaded to Supabase Storage"
+
+    # 一時ファイル削除
+    shutil.rmtree(temp_dir)
+    log_msg += f" | Temp files cleaned"
+
+  except Exception as e:
+    log_msg += f" | Storage upload failed: {str(e)}"
+
+  # Supabase DBにメタデータ保存
+  result = {
+    "slide_path": pdf_url or md_url,
+    "log": _log(state, log_msg)
+  }
+
+  try:
     supabase_result = save_slide_to_supabase(
       user_id=user_id,
       title=title,
       topic=topic,
       slide_md=slide_md,
-      pdf_path=pdf_path
+      pdf_url=pdf_url  # StorageのURL
     )
 
     if "slide_id" in supabase_result:
       result["slide_id"] = supabase_result["slide_id"]
-      result["pdf_url"] = supabase_result.get("pdf_url")
+      result["pdf_url"] = pdf_url
+      result["md_url"] = md_url
       result["log"] = _log(state, f"[supabase] saved slide_id={supabase_result['slide_id']}")
     elif "error" in supabase_result:
       # Supabase未設定の場合もここに入る（警告のみ、継続）

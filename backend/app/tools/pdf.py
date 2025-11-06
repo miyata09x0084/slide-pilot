@@ -1,6 +1,8 @@
 """
-PDF処理ツール (Issue #17)
+PDF処理ツール (Issue #17, #29)
 PDFファイルからテキストを抽出して、スライド生成に適した形式に変換
+
+Issue #29: Supabase Storage対応
 """
 
 from langchain_core.tools import tool
@@ -8,7 +10,9 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pathlib import Path
 import json
+import tempfile
 from typing import Dict, Any
+from app.core.storage import download_from_storage
 
 
 @tool
@@ -16,8 +20,10 @@ def process_pdf(file_path: str) -> str:
     """
     PDFファイルからテキストを抽出して要約可能な形式に変換
 
+    Supabase Storageパス or ローカルパスに対応
+
     Args:
-        file_path: PDFファイルのパス
+        file_path: PDFファイルのパス（Storageパス: user_id/filename.pdf or ローカルパス）
 
     Returns:
         JSON文字列: {
@@ -28,14 +34,32 @@ def process_pdf(file_path: str) -> str:
             "message": str (エラーメッセージ、エラー時のみ)
         }
     """
+    temp_file = None
     try:
-        # パスの検証
-        pdf_path = Path(file_path)
-        if not pdf_path.exists():
-            return json.dumps({
-                "status": "error",
-                "message": f"ファイルが見つかりません: {file_path}"
-            }, ensure_ascii=False)
+        # Supabase Storageパスの場合（user_id/filename.pdfの形式）
+        if '/' in file_path and not file_path.startswith('/'):
+            # Supabase Storageからダウンロード
+            pdf_data = download_from_storage(bucket="uploads", file_path=file_path)
+
+            if not pdf_data:
+                return json.dumps({
+                    "status": "error",
+                    "message": f"Supabase Storageからファイルをダウンロードできません: {file_path}"
+                }, ensure_ascii=False)
+
+            # 一時ファイルに保存
+            temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+            temp_file.write(pdf_data)
+            temp_file.close()
+            pdf_path = Path(temp_file.name)
+        else:
+            # ローカルパスの場合
+            pdf_path = Path(file_path)
+            if not pdf_path.exists():
+                return json.dumps({
+                    "status": "error",
+                    "message": f"ファイルが見つかりません: {file_path}"
+                }, ensure_ascii=False)
 
         if not pdf_path.suffix.lower() == '.pdf':
             return json.dumps({
@@ -86,6 +110,10 @@ def process_pdf(file_path: str) -> str:
             "status": "error",
             "message": f"PDF処理中にエラーが発生しました: {str(e)}"
         }, ensure_ascii=False)
+    finally:
+        # 一時ファイルを削除
+        if temp_file and Path(temp_file.name).exists():
+            Path(temp_file.name).unlink()
 
 
 def test_pdf_processor(pdf_path: str) -> None:

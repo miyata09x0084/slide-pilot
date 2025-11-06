@@ -37,16 +37,16 @@ def save_slide_to_supabase(
     title: str,
     topic: str,
     slide_md: str,
-    pdf_path: Optional[Path] = None
+    pdf_url: Optional[str] = None
 ) -> Dict:
-    """スライドをSupabaseに保存（DB + Storage）
+    """スライドをSupabase DBに保存（Storageアップロードは別で実施済み）
 
     Args:
         user_id: ユーザー識別子（emailなど）
         title: スライドタイトル
         topic: スライドのトピック（入力値）
         slide_md: Markdownコンテンツ
-        pdf_path: PDFファイルパス（オプショナル）
+        pdf_url: PDFの公開URL（既にStorageにアップロード済み）
 
     Returns:
         成功時: {"slide_id": str, "pdf_url": str}
@@ -57,32 +57,13 @@ def save_slide_to_supabase(
         return {"error": "Supabase not configured"}
 
     try:
-        # PDF をStorageにアップロード（存在する場合）
-        pdf_url = None
-        if pdf_path and pdf_path.exists():
-            # ファイルパス: slide-files/{user_id}/{filename}
-            storage_path = f"{user_id}/{pdf_path.name}"
-
-            with open(pdf_path, "rb") as f:
-                pdf_data = f.read()
-
-            # Storageにアップロード（既存ファイルは上書き）
-            result = client.storage.from_("slide-files").upload(
-                path=storage_path,
-                file=pdf_data,
-                file_options={"content-type": "application/pdf", "upsert": "true"}
-            )
-
-            # 公開URLを取得
-            pdf_url = client.storage.from_("slide-files").get_public_url(storage_path)
-
-        # DBにメタデータを保存
+        # DBにメタデータを保存（Storageアップロードは呼び出し元で実施済み）
         data = {
             "user_id": user_id,
             "title": title,
             "topic": topic,
             "slide_md": slide_md,
-            "pdf_url": pdf_url
+            "pdf_url": pdf_url  # 既にStorageにアップロード済みのURL
         }
 
         response = client.table("slides").insert(data).execute()

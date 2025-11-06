@@ -1,20 +1,12 @@
 """
 FastAPI依存性注入
 共通の依存関係を定義
+
+Issue #29: Supabase Storage移行対応
+- UPLOAD_DIR, SLIDES_DIRは削除（Supabase Storage使用）
 """
 
-from pathlib import Path
 from app.config import settings
-
-
-def get_upload_dir() -> Path:
-    """アップロードディレクトリを取得"""
-    return settings.UPLOAD_DIR
-
-
-def get_slides_dir() -> Path:
-    """スライドディレクトリを取得"""
-    return settings.SLIDES_DIR
 
 
 def get_max_file_size() -> int:

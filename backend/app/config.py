@@ -1,6 +1,8 @@
 """
 統合設定ファイル
 環境変数とアプリケーション設定を一元管理
+
+Issue #29: Supabase Storage移行対応
 """
 
 from dotenv import load_dotenv
@@ -33,16 +35,18 @@ class Settings:
         "http://localhost:3000",  # Alternative frontend port
     ]
 
-    # データディレクトリ（環境変数で制御可能）
+    # データディレクトリ（tokensのみ使用、他はSupabase Storage）
     DATA_DIR: Path = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data")))
 
-    # ファイルパス設定（DATA_DIRベース）
-    UPLOAD_DIR: Path = DATA_DIR / "uploads"
-    SLIDES_DIR: Path = DATA_DIR / "slides"
+    # ファイルパス設定（tokensのみローカル、他はSupabase Storage）
     TOKENS_DIR: Path = DATA_DIR / "tokens"
 
-    # ファイルサイズ制限（100MB）
-    MAX_FILE_SIZE: int = 100 * 1024 * 1024
+    # Supabase設定（Storage使用）
+    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
+    SUPABASE_SERVICE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_KEY")
+
+    # ファイルサイズ制限（50MB - Supabase無料プランの上限）
+    MAX_FILE_SIZE: int = 50 * 1024 * 1024
 
     # LangSmith
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "true")
@@ -59,10 +63,7 @@ class Settings:
     MARP_PAGINATE: str = os.getenv("MARP_PAGINATE", "true")
 
     def __init__(self):
-        """ディレクトリを自動作成"""
-        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        self.SLIDES_DIR.mkdir(parents=True, exist_ok=True)
+        """必要最小限のディレクトリを作成"""
         self.TOKENS_DIR.mkdir(parents=True, exist_ok=True)
 
         # LangSmith環境変数設定
