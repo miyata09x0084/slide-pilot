@@ -1,9 +1,11 @@
 /**
- * SlideDetailPage (React Query対応)
+ * SlideDetailPage (React Query対応、Phase 3最適化済み)
  * スライド詳細ページ - React Queryでデータ取得とキャッシュ管理
+ * Phase 3: useCallback()でイベントハンドラーをメモ化
  */
 
 import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback } from 'react';
 import { useSlideDetail } from './hooks/useSlideDetail';
 import SlideDetailLayout from './components/SlideDetailLayout';
 import ChatPanel from './components/ChatPanel';
@@ -39,7 +41,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontWeight: '600',
     transition: 'background 0.2s',
-  },
+  } as React.CSSProperties,
   title: {
     margin: 0,
     fontSize: '20px',
@@ -62,11 +64,22 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
     transition: 'background 0.2s',
     display: 'inline-block',
-  },
+  } as React.CSSProperties,
   slideViewerWrapper: {
     height: '100%',
   },
 };
+
+// ホバースタイル（Phase 3: パフォーマンス最適化）
+const hoverStyles = `
+  .back-button:hover {
+    background: #5a6268 !important;
+  }
+
+  .action-button:hover {
+    background: #218838 !important;
+  }
+`;
 
 export default function SlideDetailPage() {
   const { slideId } = useParams<{ slideId: string }>();
@@ -75,13 +88,19 @@ export default function SlideDetailPage() {
   // React Queryでスライド詳細を取得（キャッシュあり）
   const { data: slide, isLoading, error } = useSlideDetail(slideId || '');
 
+  // ナビゲーションハンドラー（メモ化）
+  const handleBackToDashboard = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
   // ローディング状態
   if (isLoading) {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
           <button
-            onClick={() => navigate('/')}
+            onClick={handleBackToDashboard}
+            className="back-button"
             style={styles.backButton}
           >
             ← Dashboard
@@ -120,7 +139,8 @@ export default function SlideDetailPage() {
       <div style={styles.container}>
         <div style={styles.header}>
           <button
-            onClick={() => navigate('/')}
+            onClick={handleBackToDashboard}
+            className="back-button"
             style={styles.backButton}
           >
             ← Dashboard
@@ -150,9 +170,8 @@ export default function SlideDetailPage() {
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <button
-            onClick={() => navigate('/')}
-            onMouseOver={(e) => (e.currentTarget.style.background = '#5a6268')}
-            onMouseOut={(e) => (e.currentTarget.style.background = '#6c757d')}
+            onClick={handleBackToDashboard}
+            className="back-button"
             style={styles.backButton}
           >
             ← Dashboard
@@ -166,8 +185,7 @@ export default function SlideDetailPage() {
               href={slide.pdf_url}
               target="_blank"
               rel="noopener noreferrer"
-              onMouseOver={(e) => (e.currentTarget.style.background = '#218838')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '#28a745')}
+              className="action-button"
               style={styles.actionButton}
             >
               📄 PDF を開く
@@ -185,6 +203,8 @@ export default function SlideDetailPage() {
         }
         chatPane={<ChatPanel slideId={slide.id} />}
       />
+
+      <style>{hoverStyles}</style>
     </div>
   );
 }
