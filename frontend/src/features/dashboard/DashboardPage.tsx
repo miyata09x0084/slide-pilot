@@ -1,13 +1,14 @@
 /**
  * DashboardPage - 統一カード形式のダッシュボード
  * 全ての要素を同じサイズのカードとして表示
- * React Router Loader使用でページ表示前にデータ取得
+ * React Query使用でデータ取得とキャッシュ管理
  */
 
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
+import { useSlides } from "./hooks/useSlides";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
 
@@ -132,20 +133,13 @@ const responsiveStyles = `
   }
 `;
 
-interface Slide {
-  id: string;
-  title: string;
-  created_at: string;
-}
-
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
 
-  // loaderから取得したデータ（ページ表示前に既に取得済み）
-  const { slides: initialSlides } = useLoaderData() as { slides: Slide[] };
-  const [slides] = useState<Slide[]>(initialSlides);
+  // React Queryでスライド一覧を取得（キャッシュあり）
+  const { data: slides = [], isLoading, error } = useSlides(user?.email || '', 20);
 
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
@@ -249,6 +243,56 @@ export default function DashboardPage() {
 
   if (!user) {
     return null;
+  }
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.logoSection}>
+            <span style={styles.logoIcon}>📊</span>
+            <h1 style={styles.logo}>SlidePilot</h1>
+          </div>
+        </div>
+        <div style={{ ...styles.emptyState, padding: '120px 20px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 24px',
+          }} />
+          <div style={styles.emptyText}>読み込み中...</div>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.logoSection}>
+            <span style={styles.logoIcon}>📊</span>
+            <h1 style={styles.logo}>SlidePilot</h1>
+          </div>
+        </div>
+        <div style={{ ...styles.emptyState, padding: '120px 20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px', color: '#ef4444' }}>✕</div>
+          <div style={{ ...styles.emptyText, color: '#ef4444' }}>エラーが発生しました</div>
+          <div style={styles.emptySubtext}>{error.message}</div>
+        </div>
+      </div>
+    );
   }
 
   // 表示するスライド数

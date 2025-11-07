@@ -1,13 +1,13 @@
 /**
- * SlideDetailPage (Phase 4修正: React Router Loader対応)
- * スライド詳細ページ
+ * SlideDetailPage (React Query対応)
+ * スライド詳細ページ - React Queryでデータ取得とキャッシュ管理
  */
 
-import { useLoaderData, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useSlideDetail } from './hooks/useSlideDetail';
 import SlideDetailLayout from './components/SlideDetailLayout';
 import ChatPanel from './components/ChatPanel';
 import { SlideContentViewer } from './components/SlideContentViewer';
-import type { SlideDetail } from './loaders/slideDetailLoader';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -69,8 +69,80 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default function SlideDetailPage() {
-  const { slide } = useLoaderData() as { slide: SlideDetail };
+  const { slideId } = useParams<{ slideId: string }>();
   const navigate = useNavigate();
+
+  // React Queryでスライド詳細を取得（キャッシュあり）
+  const { data: slide, isLoading, error } = useSlideDetail(slideId || '');
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <button
+            onClick={() => navigate('/')}
+            style={styles.backButton}
+          >
+            ← Dashboard
+          </button>
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 'calc(100vh - 64px)',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+          }} />
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>読み込み中...</div>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error || !slide) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <button
+            onClick={() => navigate('/')}
+            style={styles.backButton}
+          >
+            ← Dashboard
+          </button>
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: 'calc(100vh - 64px)',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{ fontSize: '48px', color: '#ef4444' }}>✕</div>
+          <div style={{ color: '#ef4444', fontSize: '16px', fontWeight: '600' }}>エラーが発生しました</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>
+            {error?.message || 'スライドが見つかりません'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
