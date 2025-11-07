@@ -1,11 +1,15 @@
 /**
- * App.tsx (Phase 1: React Router対応 + Recoil状態管理)
+ * App.tsx (Phase 1: React Router対応 + Recoil状態管理 + React Query)
  * ルーティング設定とRecoilRootラッパー
  * React Router v6.4+ createBrowserRouter + loader使用
+ * React Query統合でデータフェッチ最適化
  */
 
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { RecoilRoot } from 'recoil';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/react-query';
 import { LoginPage, ProtectedRoute } from './features/auth';
 import { DashboardPage, dashboardLoader } from './features/dashboard';
 import { SlideDetailPage, slideDetailLoader } from './features/slide';
@@ -43,9 +47,14 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <RecoilRoot>
-      <RouterProvider router={router} />
-    </RecoilRoot>
+    <QueryClientProvider client={queryClient}>
+      <RecoilRoot>
+        <RouterProvider router={router} />
+      </RecoilRoot>
+
+      {/* 開発環境のみReact Query DevToolsを表示 */}
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </QueryClientProvider>
   );
 }
 
