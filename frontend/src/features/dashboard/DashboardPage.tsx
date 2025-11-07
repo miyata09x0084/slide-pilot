@@ -1,13 +1,15 @@
 /**
- * DashboardPage - 統一カード形式のダッシュボード
+ * DashboardPage - 統一カード形式のダッシュボード (Phase 3最適化済み)
  * 全ての要素を同じサイズのカードとして表示
- * React Router Loader使用でページ表示前にデータ取得
+ * React Query使用でデータ取得とキャッシュ管理
+ * Phase 3: useCallback()でイベントハンドラーをメモ化、不要な再レンダリング防止
  */
 
-import { useNavigate, useLoaderData } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useState, useCallback } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
+import { useSlides } from "./hooks/useSlides";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
 
@@ -68,7 +70,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontWeight: "600",
     transition: "all 0.2s",
-  },
+  } as React.CSSProperties,
   gridContainer: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -100,8 +102,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// レスポンシブ対応のCSS
+// レスポンシブ対応とホバースタイルのCSS（Phase 3: パフォーマンス最適化）
 const responsiveStyles = `
+  /* ログアウトボタンのホバースタイル */
+  .logout-button:hover {
+    background: #e5e7eb !important;
+    border-color: #9ca3af !important;
+  }
+
+  /* レスポンシブグリッド */
   @media (max-width: 639px) {
     .dashboard-grid {
       grid-template-columns: 1fr !important;
@@ -132,52 +141,30 @@ const responsiveStyles = `
   }
 `;
 
-interface Slide {
-  id: string;
-  title: string;
-  created_at: string;
-}
-
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
 
-  // loaderから取得したデータ（ページ表示前に既に取得済み）
-  const { slides: initialSlides } = useLoaderData() as { slides: Slide[] };
-  const [slides] = useState<Slide[]>(initialSlides);
+  // React Queryでスライド一覧を取得（キャッシュあり）
+  const { data: slides = [], isLoading, error } = useSlides(user?.email || '', 20);
 
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
 
-  // ログアウト処理
-  const handleLogout = () => {
+  // ログアウト処理（メモ化）
+  const handleLogout = useCallback(() => {
     logout();
     navigate("/login", { replace: true });
-  };
+  }, [logout, navigate]);
 
-  // クイックメニューを開く
-  const handleNewSlide = () => {
+  // クイックメニューを開く（メモ化）
+  const handleNewSlide = useCallback(() => {
     setShowQuickMenu(true);
-  };
+  }, []);
 
-  // PDFアップロード選択時
-  const handleSelectUpload = () => {
-    // ファイル選択ダイアログを開く
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".pdf";
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        await uploadAndGenerate(file);
-      }
-    };
-    input.click();
-  };
-
-  // PDFアップロードとスライド生成
-  const uploadAndGenerate = async (file: File) => {
+  // PDFアップロードとスライド生成（メモ化）
+  const uploadAndGenerate = useCallback(async (file: File) => {
     // ファイルサイズチェック
     if (file.size > 100 * 1024 * 1024) {
       alert("ファイルサイズは100MB以下にしてください");
@@ -218,10 +205,25 @@ export default function DashboardPage() {
       console.error("❌ スライド生成エラー:", err);
       alert("エラーが発生しました");
     }
-  };
+  }, [user?.email, createThread, navigate, sendMessage]);
 
-  // テンプレートクリック
-  const handleTemplateClick = async (templateId: string) => {
+  // PDFアップロード選択時（メモ化）
+  const handleSelectUpload = useCallback(() => {
+    // ファイル選択ダイアログを開く
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf";
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        await uploadAndGenerate(file);
+      }
+    };
+    input.click();
+  }, [uploadAndGenerate]);
+
+  // テンプレートクリック（メモ化）
+  const handleTemplateClick = useCallback(async (templateId: string) => {
     const templates: Record<string, string> = {
       "ai-news":
         "AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください",
@@ -240,15 +242,71 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("❌ テンプレート処理エラー:", err);
     }
-  };
+  }, [createThread, navigate, sendMessage]);
 
-  // スライドクリック
-  const handleSlideClick = (slideId: string) => {
-    navigate(`/slides/${slideId}`);
-  };
+  // イベント委譲: グリッド全体でクリックを処理（メモ化）
+  const handleGridClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // クリックされた要素から最も近い data-slide-id を持つ要素を探す
+    const card = target.closest('[data-slide-id]') as HTMLElement;
+
+    if (card && card.dataset.slideId) {
+      navigate(`/slides/${card.dataset.slideId}`);
+    }
+  }, [navigate]);
 
   if (!user) {
     return null;
+  }
+
+  // ローディング状態
+  if (isLoading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.logoSection}>
+            <span style={styles.logoIcon}>📊</span>
+            <h1 style={styles.logo}>SlidePilot</h1>
+          </div>
+        </div>
+        <div style={{ ...styles.emptyState, padding: '120px 20px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 24px',
+          }} />
+          <div style={styles.emptyText}>読み込み中...</div>
+          <style>{`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.logoSection}>
+            <span style={styles.logoIcon}>📊</span>
+            <h1 style={styles.logo}>SlidePilot</h1>
+          </div>
+        </div>
+        <div style={{ ...styles.emptyState, padding: '120px 20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px', color: '#ef4444' }}>✕</div>
+          <div style={{ ...styles.emptyText, color: '#ef4444' }}>エラーが発生しました</div>
+          <div style={styles.emptySubtext}>{error.message}</div>
+        </div>
+      </div>
+    );
   }
 
   // 表示するスライド数
@@ -269,14 +327,7 @@ export default function DashboardPage() {
           <div style={styles.userName}>{user.name}</div>
           <button
             onClick={handleLogout}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = "#e5e7eb";
-              e.currentTarget.style.borderColor = "#9ca3af";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "#f3f4f6";
-              e.currentTarget.style.borderColor = "#d1d5db";
-            }}
+            className="logout-button"
             style={styles.logoutButton}
           >
             ログアウト
@@ -284,8 +335,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* カードグリッド */}
-      <div className="dashboard-grid" style={styles.gridContainer}>
+      {/* カードグリッド（イベント委譲でスライドクリックを処理） */}
+      <div
+        className="dashboard-grid"
+        style={styles.gridContainer}
+        onClick={handleGridClick}
+      >
         {/* 新規作成 */}
         <UnifiedCard
           icon="+"
@@ -320,7 +375,7 @@ export default function DashboardPage() {
                     day: "numeric",
                   }
                 )}
-                onClick={() => handleSlideClick(slide.id)}
+                data-slide-id={slide.id}
                 variant="history"
                 className="card-default"
               />

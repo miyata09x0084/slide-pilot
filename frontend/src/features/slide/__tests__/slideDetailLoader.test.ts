@@ -1,13 +1,18 @@
 /**
  * slideDetailLoader のテスト
- * React Router Loader によるスライド詳細取得
+ * React Query統合: キャッシュへの事前取得のみ行う
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { slideDetailLoader } from '../loaders/slideDetailLoader';
+import { queryClient } from '@/lib/react-query';
 
-// グローバル fetch をモック
-global.fetch = vi.fn();
+// queryClient.ensureQueryData をモック
+vi.mock('@/lib/react-query', () => ({
+  queryClient: {
+    ensureQueryData: vi.fn(),
+  },
+}));
 
 describe('slideDetailLoader', () => {
   beforeEach(() => {
@@ -15,74 +20,32 @@ describe('slideDetailLoader', () => {
   });
 
   describe('正常系', () => {
-    it('正常にスライド詳細を取得できる', async () => {
-      const mockData = {
-        slide_id: 'slide-123',
-        title: 'テストスライド',
-        created_at: '2025-11-06T00:00:00Z',
-        pdf_url: 'https://example.com/slide.pdf',
-      };
-
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      } as Response);
-
+    it('React QueryのensureQueryDataを呼び出す', async () => {
       const result = await slideDetailLoader({
         params: { slideId: 'slide-123' },
       } as any);
 
-      expect(global.fetch).toHaveBeenCalledTimes(1);
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8001/api/slides/slide-123/markdown'
+      // ensureQueryDataが正しく呼び出されたか確認
+      expect(queryClient.ensureQueryData).toHaveBeenCalledTimes(1);
+      expect(queryClient.ensureQueryData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: ['slide', 'detail', 'slide-123'],
+        })
       );
-      expect(result).toEqual({
-        slide: {
-          id: 'slide-123',
-          title: 'テストスライド',
-          topic: 'テストスライド',
-          created_at: '2025-11-06T00:00:00Z',
-          pdf_url: 'https://example.com/slide.pdf',
-        },
-      });
+
+      // loaderはnullを返す（データはReact Queryから取得）
+      expect(result).toBeNull();
     });
 
-    it('pdf_url が存在しない場合も正常に処理できる', async () => {
-      const mockData = {
-        slide_id: 'slide-456',
-        title: 'PDFなしスライド',
-        created_at: '2025-11-06T01:00:00Z',
-      };
-
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      } as Response);
-
-      const result = await slideDetailLoader({
-        params: { slideId: 'slide-456' },
-      } as any);
-
-      expect(result.slide.pdf_url).toBeUndefined();
-      expect(result.slide.id).toBe('slide-456');
-    });
-
-    it('デフォルトで http://localhost:8001/api を使用する', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          slide_id: '1',
-          title: 'Test',
-          created_at: '2025-11-06T00:00:00Z',
-        }),
-      } as Response);
-
+    it('正しいslideIdでクエリキーを生成する', async () => {
       await slideDetailLoader({
-        params: { slideId: '1' },
+        params: { slideId: 'test-slide-456' },
       } as any);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('http://localhost:8001/api/slides')
+      expect(queryClient.ensureQueryData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: ['slide', 'detail', 'test-slide-456'],
+        })
       );
     });
   });
@@ -93,24 +56,26 @@ describe('slideDetailLoader', () => {
         slideDetailLoader({ params: {} } as any)
       ).rejects.toThrow('Slide ID is required');
 
-      expect(global.fetch).not.toHaveBeenCalled();
+      // ensureQueryDataは呼ばれない
+      expect(queryClient.ensureQueryData).not.toHaveBeenCalled();
     });
 
-    it('fetchが失敗した場合、エラーをthrowする', async () => {
+    it('ensureQueryDataが失敗した場合、エラーをthrowする', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Not Found',
-      } as Response);
+      // ensureQueryDataがエラーをthrowするようにモック
+      const mockError = new Error('Failed to fetch slide: Not Found');
+      (queryClient.ensureQueryData as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        mockError
+      );
 
       await expect(
         slideDetailLoader({ params: { slideId: 'slide-999' } } as any)
       ).rejects.toThrow('Failed to fetch slide: Not Found');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to fetch slide:',
-        expect.any(Error)
+        'Failed to prefetch slide:',
+        mockError
       );
 
       consoleErrorSpy.mockRestore();
@@ -119,8 +84,9 @@ describe('slideDetailLoader', () => {
     it('ネットワークエラーの場合、エラーをthrowする', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error('Network error')
+      const mockError = new Error('Network error');
+      (queryClient.ensureQueryData as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        mockError
       );
 
       await expect(
@@ -128,30 +94,8 @@ describe('slideDetailLoader', () => {
       ).rejects.toThrow('Network error');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to fetch slide:',
-        expect.any(Error)
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('response.json() が失敗した場合、エラーをthrowする', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON');
-        },
-      } as unknown as Response);
-
-      await expect(
-        slideDetailLoader({ params: { slideId: 'slide-999' } } as any)
-      ).rejects.toThrow('Invalid JSON');
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to fetch slide:',
-        expect.any(Error)
+        'Failed to prefetch slide:',
+        mockError
       );
 
       consoleErrorSpy.mockRestore();

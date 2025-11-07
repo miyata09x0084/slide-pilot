@@ -1,15 +1,19 @@
 /**
- * UnifiedCard - 統一カードコンポーネント
+ * UnifiedCard - 統一カードコンポーネント (React.memo最適化済み)
  * 全ての要素を同じサイズ・同じ形のカードとして表示
+ * Phase 3: React.memoで不要な再レンダリングを防止
  */
+
+import { memo, useCallback } from 'react';
 
 interface UnifiedCardProps {
   icon: string;
   title: string;
   subtitle?: string;
-  onClick: () => void;
+  onClick?: () => void;  // イベント委譲時は不要になるのでoptional
   variant?: 'primary' | 'default' | 'history' | 'more';
   className?: string;
+  'data-slide-id'?: string;  // イベント委譲用のdata属性
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -118,13 +122,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function UnifiedCard({
+const UnifiedCard = memo(function UnifiedCard({
   icon,
   title,
   subtitle,
   onClick,
   variant = 'default',
   className = '',
+  'data-slide-id': dataSlideId,
 }: UnifiedCardProps) {
   const isPrimary = variant === 'primary';
   const isHistory = variant === 'history';
@@ -141,7 +146,8 @@ export default function UnifiedCard({
   const titleStyle = isPrimary ? styles.titlePrimary : styles.title;
   const subtitleStyle = isPrimary ? styles.subtitlePrimary : styles.subtitle;
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+  // メモ化されたイベントハンドラー
+  const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderColor = '#3b82f6';
     e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.12)';
     if (isPrimary) {
@@ -153,9 +159,9 @@ export default function UnifiedCard({
     } else {
       e.currentTarget.style.background = '#f9fafb';
     }
-  };
+  }, [isPrimary, isHistory, isMore]);
 
-  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (isPrimary) {
       e.currentTarget.style.borderColor = '#3b82f6';
       e.currentTarget.style.background = '#eff6ff';
@@ -170,15 +176,25 @@ export default function UnifiedCard({
       e.currentTarget.style.background = '#ffffff';
     }
     e.currentTarget.style.boxShadow = 'none';
-  };
+  }, [isPrimary, isHistory, isMore]);
+
+  // クリックハンドラー: onClickがある場合はイベントの伝播を止める
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (onClick) {
+      e.stopPropagation(); // 親のイベント委譲をスキップ
+      onClick();
+    }
+    // data-slide-idのみの場合は伝播させる（親で処理）
+  }, [onClick]);
 
   return (
     <div
       className={className}
       style={cardStyle}
-      onClick={onClick}
+      onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      data-slide-id={dataSlideId}
     >
       <div style={iconStyle}>{icon}</div>
       <div style={styles.content}>
@@ -187,4 +203,6 @@ export default function UnifiedCard({
       </div>
     </div>
   );
-}
+});
+
+export default UnifiedCard;

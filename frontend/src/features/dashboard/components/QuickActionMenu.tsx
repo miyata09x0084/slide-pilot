@@ -1,9 +1,10 @@
 /**
- * QuickActionMenu - 新規作成時のクイックアクションメニュー
+ * QuickActionMenu - 新規作成時のクイックアクションメニュー (Phase 3最適化済み)
  * PDFアップロードとテンプレート選択を統合
+ * Phase 3: React.memoとuseCallbackで不要な再レンダリングを防止
  */
 
-import { useRef } from 'react';
+import { useRef, useCallback, memo } from 'react';
 
 interface QuickActionMenuProps {
   onClose: () => void;
@@ -117,7 +118,7 @@ const templates = [
   },
 ];
 
-export default function QuickActionMenu({
+const QuickActionMenu = memo(function QuickActionMenu({
   onClose,
   onSelectUpload,
   onSelectTemplate,
@@ -125,21 +126,21 @@ export default function QuickActionMenu({
   // @ts-ignore - Reserved for future use
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
+  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
-  };
+  }, [onClose]);
 
-  const handleUploadClick = () => {
+  const handleUploadClick = useCallback(() => {
     onClose();
     onSelectUpload();
-  };
+  }, [onClose, onSelectUpload]);
 
-  const handleTemplateClick = (templateId: string) => {
+  const handleTemplateClick = useCallback((templateId: string) => {
     onClose();
     onSelectTemplate(templateId);
-  };
+  }, [onClose, onSelectTemplate]);
 
   return (
     <div style={styles.overlay} onClick={handleOverlayClick}>
@@ -202,4 +203,6 @@ export default function QuickActionMenu({
       </div>
     </div>
   );
-}
+});
+
+export default QuickActionMenu;
