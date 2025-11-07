@@ -1,12 +1,12 @@
 /**
- * ProtectedRoute
+ * AuthGuard
  * 認証が必要なルートを保護するコンポーネント
  */
 
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-export default function ProtectedRoute() {
+export default function AuthGuard() {
   const { isAuthenticated, loading } = useAuth();
 
   // 認証状態の読み込み中はローディング表示
