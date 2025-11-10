@@ -30,20 +30,6 @@ const { GenerationProgressPage } = lazyImport(
   "GenerationProgressPage"
 );
 
-// ヘルパー関数: loader+Componentを遅延ロード（loaderが必要なページ用）
-const createLazyRouteWithLoader = (
-  featurePath: string,
-  loaderName: string,
-  componentName: string
-) => {
-  return async () => {
-    const module = await import(featurePath);
-    return {
-      loader: module[loaderName],
-      Component: module[componentName],
-    };
-  };
-};
 
 const router = createBrowserRouter([
   {
@@ -62,14 +48,16 @@ const router = createBrowserRouter([
     ),
     // 認証したユーザーのみアクセス可能なルート
     children: [
-      // Dashboard: lazyImport関数はComponentのみ対応のため、lazyプロパティでloader+Componentを遅延ロード
+      // Dashboard: loader+Componentを遅延ロード（文字列リテラルで直接記述）
       {
         path: "/",
-        lazy: createLazyRouteWithLoader(
-          "./features/dashboard",
-          "lazyDashboardLoader",
-          "lazyDashboardComponent"
-        ),
+        lazy: async () => {
+          const module = await import("./features/dashboard");
+          return {
+            loader: module.lazyDashboardLoader,
+            Component: module.lazyDashboardComponent,
+          };
+        },
       },
       // スライド生成
       {
@@ -80,14 +68,16 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      // スライド詳細: lazyImport関数はComponentのみ対応のため、lazyプロパティでloader+Componentを遅延ロード
+      // スライド詳細: loader+Componentを遅延ロード（文字列リテラルで直接記述）
       {
         path: "/slides/:slideId",
-        lazy: createLazyRouteWithLoader(
-          "./features/slide",
-          "lazySlideDetailLoader",
-          "lazySlideDetailComponent"
-        ),
+        lazy: async () => {
+          const module = await import("./features/slide");
+          return {
+            loader: module.lazySlideDetailLoader,
+            Component: module.lazySlideDetailComponent,
+          };
+        },
       },
     ],
   },
