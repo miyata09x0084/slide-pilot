@@ -17,8 +17,10 @@ import {
   slideDataAtom,
 } from '../store/reactAgentAtoms';
 
-// 環境変数からAPIベースURLを取得（本番環境では相対パス /api を使用）
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/agent`;
+// 環境変数からAPIベースURLを取得
+// 本番環境ではCloud Run直接接続でFirebase Hostingのタイムアウト回避
+// 開発環境では '/api/agent' でViteプロキシ経由
+const API_BASE_URL = import.meta.env.VITE_LANGGRAPH_PROXY_URL || '/api/agent';
 
 // スライドデータの型定義
 export interface SlideData {
