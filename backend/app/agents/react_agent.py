@@ -51,10 +51,10 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 - **generate_slides**: スライド自動生成（PDF/YouTube/AI最新情報対応）
   - 引数: topic のみを指定してください
   - user_idは自動的にLangGraphから注入されます（明示的に渡す必要はありません）
-  - **PDFファイルパス**（例: "/path/to/file.pdf"）→ PDFテキスト抽出してスライド生成
+  - **PDFファイル**（Storage形式: "user_id/filename.pdf" または "anonymous/filename.pdf"）→ PDFテキスト抽出してスライド生成
   - **YouTube URL**（例: "https://youtube.com/..."）→ 字幕取得してスライド生成（準備中）
   - **テキスト**（例: "AI最新情報"）→ Tavily検索でAI Industry Report生成
-  - 入力は自動判別されます（`.pdf`で終わる/`/uploads/`を含む → PDF、`youtube.com` → YouTube、その他 → テキスト）
+  - 入力は自動判別されます（`.pdf`で終わる → PDF、`youtube.com` → YouTube、その他 → テキスト）
   - LangGraphワークフローで品質評価（score ≥ 8.0）を実施
   - 評価基準: structure, practicality, accuracy, readability, conciseness
 
@@ -86,8 +86,8 @@ SYSTEM_PROMPT = """あなたは親切なAIアシスタントです。
 
 ## 実行例
 
-ユーザー: 「このPDFから中学生向けのわかりやすいスライドを作成してください: /path/to/file.pdf」
-→ generate_slides(topic="/path/to/file.pdf") を実行  ← user_idは渡さない
+ユーザー: 「このPDFから中学生向けのわかりやすいスライドを作成してください: anonymous/document.pdf」
+→ generate_slides(topic="anonymous/document.pdf") を実行  ← user_idは渡さない
 
 ユーザー: 「AI最新情報のスライド作って」
 → generate_slides(topic="AI最新情報") を実行  ← user_idは渡さない
