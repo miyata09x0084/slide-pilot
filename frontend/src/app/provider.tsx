@@ -12,26 +12,21 @@ import { RecoilRoot } from 'recoil';
 import { ErrorBoundary } from '../components/error/ErrorBoundary';
 import { Spinner } from '../components/error/Spinner';
 import { queryClient } from '../lib/react-query';
+import { env } from '../config/env';
 
 interface AppProviderProps {
   children: ReactNode;
 }
 
 export function AppProvider({ children }: AppProviderProps) {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-  if (!clientId) {
-    console.error('❌ VITE_GOOGLE_CLIENT_ID is not set in .env.local');
-  }
-
   return (
     <ErrorBoundary>
-      <GoogleOAuthProvider clientId={clientId}>
+      <GoogleOAuthProvider clientId={env.GOOGLE_CLIENT_ID}>
         <QueryClientProvider client={queryClient}>
           <RecoilRoot>
             <Suspense fallback={<Spinner />}>{children}</Suspense>
           </RecoilRoot>
-          {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+          {env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
         </QueryClientProvider>
       </GoogleOAuthProvider>
     </ErrorBoundary>

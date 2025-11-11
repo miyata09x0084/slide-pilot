@@ -13,9 +13,12 @@ import {
   errorAtom,
   slideDataAtom,
 } from '../store/reactAgentAtoms';
+import { createThread } from '../api/create-thread';
+import { findAssistantByGraphId } from '../api/get-assistants';
+import { env } from '@/config/env';
 
-// 環境変数からAPIベースURLを取得（本番環境では相対パス /api を使用）
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/agent`;
+// SSE用のAPI URL（fetchで直接呼び出す）
+const API_BASE_URL = `${env.API_URL}/agent`;
 
 // スライドデータの型定義
 export interface SlideData {
@@ -38,27 +41,20 @@ export function useReactAgent() {
   let _isGeneratingSlides = false;
 
   // スレッド作成
-  const createThread = useCallback(async () => {
+  const createThreadHandler = useCallback(async () => {
     try {
       // ユーザー情報取得（localStorage から）
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const userEmail = user.email || 'anonymous@example.com';
 
-      const res = await fetch(`${API_BASE_URL}/threads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          metadata: {
-            user_email: userEmail,                    // ユーザー識別子
-            created_from: 'web_ui',                   // 作成元
-            created_at: new Date().toISOString()      // 作成日時
-          }
-        })
+      const data = await createThread({
+        metadata: {
+          user_email: userEmail,
+          created_from: 'web_ui',
+          created_at: new Date().toISOString()
+        }
       });
 
-      if (!res.ok) throw new Error(`Thread creation failed: ${res.statusText}`);
-
-      const data = await res.json();
       setThreadId(data.thread_id);
       setError(null);
       return data.thread_id;
@@ -85,18 +81,7 @@ export function useReactAgent() {
 
     try {
       // assistant_id取得（react-agentを明示的に探す）
-      const assistantRes = await fetch(`${API_BASE_URL}/assistants/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 10 })
-      });
-
-      if (!assistantRes.ok) throw new Error('Failed to get assistant');
-
-      const assistants = await assistantRes.json();
-
-      // react-agent を graph_id で検索
-      const reactAgent = assistants.find((a: { graph_id: string; assistant_id: string }) => a.graph_id === 'react-agent');
+      const reactAgent = await findAssistantByGraphId('react-agent');
       if (!reactAgent) {
         throw new Error('ReAct agent not found. Please check LangGraph configuration.');
       }
@@ -304,7 +289,7 @@ export function useReactAgent() {
     threadId,
     error,
     slideData,
-    createThread,
+    createThread: createThreadHandler,
     sendMessage,
     resetChat
   };

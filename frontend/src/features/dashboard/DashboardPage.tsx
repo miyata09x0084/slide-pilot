@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
 import { useSlides } from "./api/get-slides";
+import { uploadPdf } from "./api/upload-pdf";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
 
@@ -184,26 +185,10 @@ export default function DashboardPage() {
 
     try {
       // アップロード
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // user_idをクエリパラメータで送信
-      const apiUrl =
-        import.meta.env.VITE_API_URL || "http://localhost:8001/api";
-      const uploadUrl = `${apiUrl}/upload-pdf${
-        user?.email ? `?user_id=${encodeURIComponent(user.email)}` : ""
-      }`;
-
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
+      const data = await uploadPdf({
+        file,
+        user_id: user?.email,
       });
-
-      if (!response.ok) {
-        throw new Error("アップロードに失敗しました");
-      }
-
-      const data = await response.json();
 
       // スライド生成開始
       const tid = await createThread();
