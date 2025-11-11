@@ -1,34 +1,44 @@
 /**
  * Router Configuration
  * Defines all application routes using React Router v7
- * Phase 2: Removed loaders, using React Query instead
+ * Phase 5: File-based routing structure with app/routes/
+ * Phase 5.1: React Query prefetch loaders integration
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { LoginPage, ProtectedRoute } from '../features/auth';
-import { DashboardPage } from '../features/dashboard';
-import { SlideDetailPage } from '../features/slide';
-import { GenerationProgressPage } from '../features/generation';
+import { queryClient } from '@/lib/react-query';
+import { LoginRoute } from './routes/login';
+import { DashboardRoute } from './routes';
+import { ProtectedLayout } from './routes/app/root';
+import { GenerateRoute } from './routes/app/generate';
+import { SlidesRoute } from './routes/app/slides';
+
+// Loaderファクトリー関数をimport
+import { createDashboardLoader } from '@/features/dashboard/loaders/dashboardLoader';
+import { createSlideDetailLoader } from '@/features/slide/loaders/slideDetailLoader';
 
 export const router = createBrowserRouter([
   {
     path: '/login',
-    element: <LoginPage />,
+    element: <LoginRoute />,
   },
   {
-    element: <ProtectedRoute />,
+    element: <ProtectedLayout />,
     children: [
       {
         path: '/',
-        element: <DashboardPage />,
+        element: <DashboardRoute />,
+        loader: createDashboardLoader(queryClient), // プリフェッチ追加
       },
       {
         path: '/generate/:threadId',
-        element: <GenerationProgressPage />,
+        element: <GenerateRoute />,
+        // このページはSSEストリーミングのためプリフェッチ不要
       },
       {
         path: '/slides/:slideId',
-        element: <SlideDetailPage />,
+        element: <SlidesRoute />,
+        loader: createSlideDetailLoader(queryClient), // プリフェッチ追加
       },
     ],
   },
