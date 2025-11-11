@@ -5,16 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-
-// Slide detail type definition
-export interface SlideDetail {
-  id: string;
-  title: string;
-  topic: string;
-  created_at: string;
-  pdf_url?: string;
-  markdown?: string;
-}
+import type { SlideDetail } from '@/types';
 
 // API response type
 interface GetSlideDetailResponse {

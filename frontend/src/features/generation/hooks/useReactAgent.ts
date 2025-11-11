@@ -4,7 +4,7 @@
 
 import { useCallback } from 'react';
 import { useRecoilState } from 'recoil';
-import type { Message } from '../../../shared';
+import type { Message } from '@/types';
 import {
   messagesAtom,
   thinkingStepsAtom,
@@ -19,14 +19,6 @@ import { env } from '@/config/env';
 
 // SSE用のAPI URL（fetchで直接呼び出す）
 const API_BASE_URL = `${env.API_URL}/agent`;
-
-// スライドデータの型定義
-export interface SlideData {
-  path?: string;      // スライドファイルパス（ローカル）
-  title?: string;     // スライドタイトル
-  slide_id?: string;  // Supabase slide ID（Issue #24）
-  pdf_url?: string;   // Supabase公開URL（Issue #24）
-}
 
 export function useReactAgent() {
   const [messages, setMessages] = useRecoilState(messagesAtom);

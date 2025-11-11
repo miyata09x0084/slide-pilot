@@ -4,9 +4,7 @@
  */
 
 import { atom } from 'recoil';
-import type { Message } from '../../../shared';
-import type { ThinkingStep } from '../components/ThinkingIndicator';
-import type { SlideData } from '../hooks/useReactAgent';
+import type { Message, ThinkingStep, SlideData } from '@/types';
 
 // チャットメッセージ履歴
 export const messagesAtom = atom<Message[]>({

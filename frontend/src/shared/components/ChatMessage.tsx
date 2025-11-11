@@ -1,10 +1,7 @@
 // メッセージ表示コンポーネント
 // ユーザーとアシスタントのメッセージを区別して表示
 
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import type { Message } from '@/types';
 
 interface ChatMessageProps {
   message: Message;

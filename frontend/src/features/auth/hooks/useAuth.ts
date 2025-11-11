@@ -4,12 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-
-export interface UserInfo {
-  name: string;
-  email: string;
-  picture: string;
-}
+import type { UserInfo } from '@/types';
 
 export function useAuth() {
   const [user, setUser] = useState<UserInfo | null>(null);

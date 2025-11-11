@@ -1,10 +1,7 @@
 // ReActエージェントの思考過程を可視化するコンポーネント
 // ツール呼び出しやLLMの推論ステップをリアルタイム表示
 
-export interface ThinkingStep {
-  type: 'thinking' | 'action' | 'observation';  // ステップの種類
-  content: string;                              // 表示内容
-}
+import type { ThinkingStep } from '@/types';
 
 interface ThinkingIndicatorProps {
   steps: ThinkingStep[];   // 思考ステップの配列

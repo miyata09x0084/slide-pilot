@@ -5,15 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-
-// Slide type definition
-export interface Slide {
-  id: string;
-  title: string;
-  created_at: string;
-  pdf_url?: string;
-  thumbnail_url?: string;
-}
+import type { Slide } from '@/types';
 
 // API response type
 interface GetSlidesResponse {

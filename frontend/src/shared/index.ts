@@ -5,4 +5,3 @@
 
 export { default as ChatInput } from './components/ChatInput';
 export { default as ChatMessage } from './components/ChatMessage';
-export type { Message } from './components/ChatMessage';

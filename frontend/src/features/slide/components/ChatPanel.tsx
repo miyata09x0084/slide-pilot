@@ -4,7 +4,8 @@
  */
 
 import { useState } from 'react';
-import { ChatMessage, type Message } from '../../../shared';
+import { ChatMessage } from '../../../shared';
+import type { Message } from '@/types';
 
 interface ChatPanelProps {
   slideId: string;
