@@ -1,13 +1,13 @@
 /**
- * SlideDetailPage (Phase 4修正: React Router Loader対応)
+ * SlideDetailPage (Phase 2: React Query対応)
  * スライド詳細ページ
  */
 
-import { useLoaderData, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import SlideDetailLayout from './components/SlideDetailLayout';
 import ChatPanel from './components/ChatPanel';
 import { SlideContentViewer } from './components/SlideContentViewer';
-import type { SlideDetail } from './loaders/slideDetailLoader';
+import { useSlideDetail } from './api/get-slide-detail';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -69,8 +69,19 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default function SlideDetailPage() {
-  const { slide } = useLoaderData() as { slide: SlideDetail };
+  const { slideId } = useParams<{ slideId: string }>();
   const navigate = useNavigate();
+
+  // React Queryでスライド詳細を取得
+  const { data: slide, isLoading, error } = useSlideDetail(slideId || '');
+
+  if (isLoading) {
+    return <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
+  }
+
+  if (error || !slide) {
+    return <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Error loading slide</div>;
+  }
 
   return (
     <div style={styles.container}>

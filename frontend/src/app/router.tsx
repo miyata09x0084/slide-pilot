@@ -1,12 +1,13 @@
 /**
  * Router Configuration
  * Defines all application routes using React Router v7
+ * Phase 2: Removed loaders, using React Query instead
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage, ProtectedRoute } from '../features/auth';
-import { DashboardPage, dashboardLoader } from '../features/dashboard';
-import { SlideDetailPage, slideDetailLoader } from '../features/slide';
+import { DashboardPage } from '../features/dashboard';
+import { SlideDetailPage } from '../features/slide';
 import { GenerationProgressPage } from '../features/generation';
 
 export const router = createBrowserRouter([
@@ -20,7 +21,6 @@ export const router = createBrowserRouter([
       {
         path: '/',
         element: <DashboardPage />,
-        loader: dashboardLoader,
       },
       {
         path: '/generate/:threadId',
@@ -29,7 +29,6 @@ export const router = createBrowserRouter([
       {
         path: '/slides/:slideId',
         element: <SlideDetailPage />,
-        loader: slideDetailLoader,
       },
     ],
   },

@@ -1,13 +1,14 @@
 /**
  * DashboardPage - 統一カード形式のダッシュボード
  * 全ての要素を同じサイズのカードとして表示
- * React Router Loader使用でページ表示前にデータ取得
+ * React Query使用でデータ取得
  */
 
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
+import { useSlides } from "./api/get-slides";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
 
@@ -132,20 +133,17 @@ const responsiveStyles = `
   }
 `;
 
-interface Slide {
-  id: string;
-  title: string;
-  created_at: string;
-}
-
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
 
-  // loaderから取得したデータ（ページ表示前に既に取得済み）
-  const { slides: initialSlides } = useLoaderData() as { slides: Slide[] };
-  const [slides] = useState<Slide[]>(initialSlides);
+  // React Queryでスライド履歴を取得
+  const { data } = useSlides(
+    { user_id: user?.email || '', limit: 20 },
+    { enabled: !!user?.email }
+  );
+  const slides = data?.slides || [];
 
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
