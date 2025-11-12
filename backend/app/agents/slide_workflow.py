@@ -150,6 +150,42 @@ def detect_input_type(topic: str) -> str:
     return "text"
 
 # =======================
+# タイトル抽出ヘルパー関数
+# =======================
+def extract_clean_title(raw_title: str, fallback: str = "資料") -> str:
+    """LLMレスポンスからタイトルを抽出（説明文・記号除去）
+
+    Args:
+        raw_title: LLMの生のレスポンス
+        fallback: 抽出失敗時のフォールバックタイトル
+
+    Returns:
+        クリーンなタイトル（15文字以内）
+    """
+    if not raw_title or not raw_title.strip():
+        return fallback
+
+    # 説明文パターンを除去（「タイトル:」「このPDFは」等）
+    cleaned = re.sub(r'^(?:タイトル[:：]|このPDFは|本資料は|内容[:：])\s*', '', raw_title.strip())
+
+    # 引用符・改行を除去
+    cleaned = cleaned.replace('"', '').replace("'", '').replace('\n', ' ').strip()
+
+    # 複数行の場合は最初の行のみ使用
+    if '\n' in cleaned:
+        cleaned = cleaned.split('\n')[0].strip()
+
+    # 15文字制限
+    if len(cleaned) > 15:
+        cleaned = cleaned[:15]
+
+    # 最終検証: 空または短すぎる場合はフォールバック
+    if not cleaned or len(cleaned) < 3:
+        return fallback
+
+    return cleaned
+
+# =======================
 # Node A: 情報収集（PDF/YouTube/Tavily対応）
 # =======================
 @traceable(run_name="a_collect_info")
@@ -431,22 +467,29 @@ def write_slides_slidev(state: State) -> Dict:
         full_content = context_md.replace("# PDF: ", "").split("\n\n", 1)[-1]
         chunks = full_content.split("\n\n---\n\n")
 
+      # PDFファイル名からフォールバックタイトルを準備
+      if topic.endswith('.pdf') or '/uploads/' in topic:
+          pdf_filename = Path(topic).name.replace('.pdf', '')
+          # UUID部分を除去（パターン: uuid_filename）
+          if '_' in pdf_filename:
+              parts = pdf_filename.split('_', 1)
+              if len(parts) > 1 and len(parts[0]) > 30:  # UUIDっぽい長い文字列
+                  pdf_filename = parts[1]
+          fallback_title = pdf_filename[:15] if pdf_filename else "PDF資料"
+      else:
+          fallback_title = "資料"
+
       # PDFの内容からLLMでタイトルを生成
       title_prompt = get_slide_title_prompt(chunks=chunks, key_points=key_points)
 
       try:
         title_msg = llm.invoke(title_prompt)
-        ja_title = title_msg.content.strip().replace('"', '').replace("'", '')
-        # タイトルが長すぎる場合は切り詰め
-        if len(ja_title) > 30:
-          ja_title = ja_title[:30] + "..."
+        raw_title = title_msg.content.strip()
+        ja_title = extract_clean_title(raw_title, fallback=fallback_title)
       except Exception as e:
-        # フォールバック: ファイル名から生成
-        pdf_filename = Path(topic).stem if topic.endswith('.pdf') else "PDF資料"
-        # UUIDを除去
-        if '_' in pdf_filename:
-          pdf_filename = pdf_filename.split('_', 1)[1] if len(pdf_filename.split('_', 1)) > 1 else pdf_filename
-        ja_title = f"{pdf_filename}"
+        ja_title = fallback_title
+        # エラーログ追加
+        print(f"[slide_workflow] タイトル生成エラー (fallback使用): {str(e)[:100]}")
 
       # チャンクを直接使用（要約なし・コスト削減版）
       chunk_texts = []
