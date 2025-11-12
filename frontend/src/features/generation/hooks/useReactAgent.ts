@@ -2,7 +2,7 @@
 // SSEストリーミングでメッセージ送受信と思考過程を取得
 // Recoilでグローバル状態管理（ページ間で状態共有）
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRecoilState } from 'recoil';
 import type { Message } from '@/types';
 import {
@@ -27,6 +27,7 @@ export function useReactAgent() {
   const [threadId, setThreadId] = useRecoilState(threadIdAtom);
   const [error, setError] = useRecoilState(errorAtom);
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
+  const [cachedAssistantId, setCachedAssistantId] = useState<string | null>(null);
 
   // スライド生成中フラグ（ローカル変数で管理）
   // @ts-ignore - Used in closure but TypeScript doesn't detect it
@@ -54,7 +55,7 @@ export function useReactAgent() {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [setThreadId, setError]);
 
   // メッセージ送信（オプションでスレッドIDを渡せる）
   const sendMessage = useCallback(async (content: string, customThreadId?: string) => {
@@ -72,13 +73,16 @@ export function useReactAgent() {
     _isGeneratingSlides = false; // スライド生成フラグをリセット
 
     try {
-      // assistant_id取得（react-agentを明示的に探す）
-      const reactAgent = await findAssistantByGraphId('react-agent');
-      if (!reactAgent) {
-        throw new Error('ReAct agent not found. Please check LangGraph configuration.');
+      // assistant_id取得（キャッシュを優先）
+      let assistantId = cachedAssistantId;
+      if (!assistantId) {
+        const reactAgent = await findAssistantByGraphId('react-agent');
+        if (!reactAgent) {
+          throw new Error('ReAct agent not found. Please check LangGraph configuration.');
+        }
+        assistantId = reactAgent.assistant_id;
+        setCachedAssistantId(assistantId);  // キャッシュに保存
       }
-
-      const assistantId = reactAgent.assistant_id;
 
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
@@ -225,7 +229,7 @@ export function useReactAgent() {
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, [threadId, messages]);
+  }, [cachedAssistantId, threadId, messages, setMessages, setThinkingSteps, setIsThinking, setError, setSlideData]);
 
   // ReActステップを解析して思考過程に追加
   const parseReActSteps = (data: any) => {
@@ -272,7 +276,7 @@ export function useReactAgent() {
     setThreadId(null);
     setError(null);
     setSlideData({});
-  }, []);
+  }, [setMessages, setThinkingSteps, setIsThinking, setThreadId, setError, setSlideData]);
 
   return {
     messages,

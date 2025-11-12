@@ -194,7 +194,8 @@ export default function DashboardPage() {
       // スライド生成開始
       const tid = await createThread();
       navigate(`/generate/${tid}`, { state: { pdfPath: data.path } });
-      await sendMessage(
+      // navigate後は即座に遷移、sendMessageはバックグラウンドで実行
+      sendMessage(
         `このPDFから中学生向けのわかりやすいスライドを作成してください: ${data.path}`,
         tid
       );

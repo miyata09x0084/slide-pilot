@@ -255,11 +255,7 @@ export default function DropzoneCard({ onUploadSuccess, onUploadStart, userId }:
           const data = JSON.parse(xhr.responseText);
           setState('success');
           setProgress(100);
-
-          // 1秒後にコールバック実行（成功状態を見せるため）
-          setTimeout(() => {
-            onUploadSuccess(data);
-          }, 1000);
+          onUploadSuccess(data);
         } else {
           const errorData = JSON.parse(xhr.responseText);
           throw new Error(errorData.detail || 'アップロード失敗');
