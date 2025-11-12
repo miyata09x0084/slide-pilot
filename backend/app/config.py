@@ -21,9 +21,9 @@ class Settings:
     """アプリケーション設定クラス"""
 
     # API設定
-    API_TITLE: str = "SlidePilot API"
+    API_TITLE: str = "Rakuyomi Assistant AI API"
     API_VERSION: str = "1.0.0"
-    API_DESCRIPTION: str = "AI-powered presentation slide generation API"
+    API_DESCRIPTION: str = "Your personal learning assistant - digest difficult content easily with multimodal AI"
 
     # サーバー設定
     HOST: str = "0.0.0.0"

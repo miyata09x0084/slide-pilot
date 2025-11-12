@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SlidePilot is an AI-powered presentation slide generation system that automatically creates Slidev slides about AI industry news. It uses:
+ラクヨミ アシスタントAI (Rakuyomi Assistant AI) is a multimodal learning assistant that helps users digest difficult content with reduced cognitive load. It transforms complex documents (PDFs, papers, technical materials) into easy-to-understand formats. It uses:
 - **LangGraph** for orchestrating a multi-step AI agent workflow with quality evaluation
-- **OpenAI GPT-4** for content generation
-- **Tavily** for real-time web search (recent AI news from major vendors)
-- **Slidev** for slide rendering (Markdown → PDF/HTML with modern design)
+- **OpenAI GPT-4** for content generation and simplification
+- **Tavily** for real-time information gathering (when generating AI news summaries)
+- **Slidev** for multimodal output (Markdown → PDF/HTML slides with modern design)
 - **React + TypeScript** frontend with Google OAuth authentication
+
+**Core Concept**: Transform complex documents into easy-to-understand formats, enabling efficient learning with minimal cognitive burden. The assistant breaks down difficult content into digestible pieces, making specialized knowledge accessible to everyone.
 
 ## Commands
 

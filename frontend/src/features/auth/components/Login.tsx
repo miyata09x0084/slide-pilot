@@ -23,10 +23,16 @@ function Login({ onSuccess }: LoginProps) {
         textAlign: 'center'
       }}>
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          SlidePilot
+          ラクヨミ アシスタントAI
         </h1>
-        <p style={{ marginBottom: '30px', color: '#666' }}>
-          AIスライド生成ツール
+        <p style={{ marginBottom: '8px', color: '#666', fontWeight: '600' }}>
+          あなた専用の学習パートナー
+        </p>
+        <p style={{ marginBottom: '6px', color: '#888', fontSize: '14px' }}>
+          PDFをアップロードして、難しい資料を楽に読む
+        </p>
+        <p style={{ marginBottom: '30px', color: '#999', fontSize: '12px' }}>
+          📄 対応形式: PDF
         </p>
         {/* Note: Gmail scope は Google Cloud Console の OAuth consent screen で設定が必要 */}
         <GoogleLogin

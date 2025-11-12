@@ -249,8 +249,8 @@ export default function DashboardPage() {
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={styles.logoSection}>
-          <span style={styles.logoIcon}>📊</span>
-          <h1 style={styles.logo}>SlidePilot</h1>
+          <span style={styles.logoIcon}>📚</span>
+          <h1 style={styles.logo}>ラクヨミ アシスタントAI</h1>
         </div>
 
         <div style={styles.userSection}>
@@ -277,9 +277,9 @@ export default function DashboardPage() {
       <div className="dashboard-grid" style={styles.gridContainer}>
         {/* 新規作成 */}
         <UnifiedCard
-          icon="+"
+          icon="📄"
           title="新規作成"
-          subtitle="スライドを作成"
+          subtitle="PDFを理解する"
           onClick={handleNewSlide}
           variant="primary"
           className="card-default"

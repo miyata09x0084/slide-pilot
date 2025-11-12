@@ -38,7 +38,7 @@ app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
 async def root():
     """ルートエンドポイント"""
     return {
-        "message": "SlidePilot API",
+        "message": "Rakuyomi Assistant AI API",
         "docs": "/docs",
         "health": "/api/health"
     }
