@@ -16,31 +16,25 @@ mermaid.initialize({
   securityLevel: 'loose',
 });
 
-// テーマカラーパレット（Issue #20: 教育向けテーマ）
+// テーマカラーパレット（Issue #20: 色弱対応・アクセシビリティ配色）
+// 色弱の方でも区別しやすい色の組み合わせ
+// 参考: 岡部正隆・伊藤啓「色覚バリアフリー」
 const THEME_COLORS = {
   science: {
-    primary: '#4A90E2',
-    secondary: '#5BC0EB',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    accent: '#9333ea'
+    primary: '#0075C2',           // 明るい青（色弱でも識別しやすい）
+    cardBackground: '#E8F4F8',    // 淡い青背景（コントラスト比4.5:1以上）
   },
   story: {
-    primary: '#F5A623',
-    secondary: '#FDD835',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    accent: '#ec4899'
+    primary: '#C95F15',           // 黄みがかったオレンジ（赤緑色弱でも区別可能）
+    cardBackground: '#FFF4E6',    // 淡いベージュ背景
   },
   math: {
-    primary: '#7ED321',
-    secondary: '#50E3C2',
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    accent: '#10b981'
+    primary: '#03A89E',           // 青緑（シアン系、全ての色弱タイプで識別可能）
+    cardBackground: '#E6F7F7',    // 淡い青緑背景
   },
   default: {
-    primary: '#6c757d',
-    secondary: '#adb5bd',
-    gradient: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)',
-    accent: '#6b7280'
+    primary: '#595959',           // ダークグレー（明度差で識別）
+    cardBackground: '#F5F5F5',    // ライトグレー背景（高コントラスト）
   }
 } as const;
 
@@ -204,7 +198,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
     .filter(s => s.length > 0);
 
   // テーマカラーを取得
-  const templateType = slide?.template_type || 'default';
+  const templateType = slide?.template_type || 'story';
   const themeColors = THEME_COLORS[templateType];
 
   return (
@@ -224,7 +218,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
             data-slide-index={index}
             style={{
               ...styles.slideCard,
-              background: themeColors.gradient
+              background: themeColors.cardBackground
             }}
           >
             <div style={styles.slideContent}>
