@@ -161,7 +161,24 @@ export default function DashboardPage() {
     setShowQuickMenu(true);
   }, []);
 
-  // PDFアップロード選択時
+  // PDFアップロード成功時の処理
+  const handlePdfUploadSuccess = async (uploadData: { path: string }) => {
+    try {
+      // アップロード済みなので、すぐにスライド生成開始
+      const tid = await createThread();
+      navigate(`/generate/${tid}`, { state: { pdfPath: uploadData.path } });
+      // navigate後は即座に遷移、sendMessageはバックグラウンドで実行
+      sendMessage(
+        `このPDFから中学生向けのわかりやすいスライドを作成してください: ${uploadData.path}`,
+        tid
+      );
+    } catch (err) {
+      console.error("❌ スライド生成エラー:", err);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // QuickActionMenuからのPDFアップロード選択時
   const handleSelectUpload = () => {
     // ファイル選択ダイアログを開く
     const input = document.createElement("input");
@@ -170,39 +187,28 @@ export default function DashboardPage() {
     input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        await uploadAndGenerate(file);
+        // ファイルサイズチェック
+        if (file.size > 100 * 1024 * 1024) {
+          alert("ファイルサイズは100MB以下にしてください");
+          return;
+        }
+
+        try {
+          // アップロード
+          const data = await uploadPdf({
+            file,
+            user_id: user?.email,
+          });
+
+          // アップロード成功後、同じハンドラーを呼び出す
+          await handlePdfUploadSuccess(data);
+        } catch (err) {
+          console.error("❌ アップロードエラー:", err);
+          alert("アップロードに失敗しました");
+        }
       }
     };
     input.click();
-  };
-
-  // PDFアップロードとスライド生成
-  const uploadAndGenerate = async (file: File) => {
-    // ファイルサイズチェック
-    if (file.size > 100 * 1024 * 1024) {
-      alert("ファイルサイズは100MB以下にしてください");
-      return;
-    }
-
-    try {
-      // アップロード
-      const data = await uploadPdf({
-        file,
-        user_id: user?.email,
-      });
-
-      // スライド生成開始
-      const tid = await createThread();
-      navigate(`/generate/${tid}`, { state: { pdfPath: data.path } });
-      // navigate後は即座に遷移、sendMessageはバックグラウンドで実行
-      sendMessage(
-        `このPDFから中学生向けのわかりやすいスライドを作成してください: ${data.path}`,
-        tid
-      );
-    } catch (err) {
-      console.error("❌ スライド生成エラー:", err);
-      alert("エラーが発生しました");
-    }
   };
 
   // テンプレートクリック
