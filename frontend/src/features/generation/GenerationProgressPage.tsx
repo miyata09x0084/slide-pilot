@@ -4,14 +4,35 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useReactAgent } from './hooks/useReactAgent';
 import ThinkingIndicator from './components/ThinkingIndicator';
 
 export default function GenerationProgressPage() {
   const navigate = useNavigate();
-  const { thinkingSteps, isThinking, slideData, error } = useReactAgent();
+  const location = useLocation();
+  const { pdfPath, autoStart } = (location.state as { pdfPath?: string; autoStart?: boolean }) || {};
+  const { thinkingSteps, isThinking, slideData, error, createThread, sendMessage, threadId } = useReactAgent();
   const hasRedirected = useRef(false);
+  const hasStarted = useRef(false);
+
+  // PDF自動開始処理（アップロード完了時）
+  useEffect(() => {
+    if (autoStart && pdfPath && !threadId && !hasStarted.current) {
+      hasStarted.current = true;
+      (async () => {
+        try {
+          const tid = await createThread();
+          await sendMessage(
+            `このPDFから中学生向けのわかりやすいスライドを作成してください: ${pdfPath}`,
+            tid
+          );
+        } catch (err) {
+          console.error('❌ スレッド作成エラー:', err);
+        }
+      })();
+    }
+  }, [autoStart, pdfPath, threadId, createThread, sendMessage]);
 
   // スライド生成完了時に詳細ページへ自動遷移
   useEffect(() => {

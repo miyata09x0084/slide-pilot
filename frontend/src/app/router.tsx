@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
         loader: createDashboardLoader(queryClient), // プリフェッチ追加
       },
       {
-        path: '/generate/:threadId',
+        path: '/generate/:threadId?',  // threadIdをオプショナルに
         element: <GenerateRoute />,
         // このページはSSEストリーミングのためプリフェッチ不要
       },

@@ -162,20 +162,14 @@ export default function DashboardPage() {
   }, []);
 
   // PDFアップロード成功時の処理
-  const handlePdfUploadSuccess = async (uploadData: { path: string }) => {
-    try {
-      // アップロード済みなので、すぐにスライド生成開始
-      const tid = await createThread();
-      navigate(`/generate/${tid}`, { state: { pdfPath: uploadData.path } });
-      // navigate後は即座に遷移、sendMessageはバックグラウンドで実行
-      sendMessage(
-        `このPDFから中学生向けのわかりやすいスライドを作成してください: ${uploadData.path}`,
-        tid
-      );
-    } catch (err) {
-      console.error("❌ スライド生成エラー:", err);
-      alert("エラーが発生しました");
-    }
+  const handlePdfUploadSuccess = (uploadData: { path: string }) => {
+    // 即座にローディング画面へ遷移（楽観的UI更新）
+    navigate('/generate', {
+      state: {
+        pdfPath: uploadData.path,
+        autoStart: true  // 自動開始フラグ
+      }
+    });
   };
 
   // QuickActionMenuからのPDFアップロード選択時
