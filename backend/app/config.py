@@ -33,6 +33,8 @@ class Settings:
     CORS_ORIGINS: list = [
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative frontend port
+        "https://slide-pilot-474305.web.app",  # Firebase Hosting (本番)
+        "https://slide-pilot-474305.firebaseapp.com",  # Firebase Hosting (代替URL)
     ]
 
     # データディレクトリ（tokensのみ使用、他はSupabase Storage）
