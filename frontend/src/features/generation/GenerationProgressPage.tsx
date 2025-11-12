@@ -3,36 +3,65 @@
  * スライド生成進行状況をリアルタイム表示
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useReactAgent } from './hooks/useReactAgent';
+import { uploadPdf } from '../dashboard/api/upload-pdf';
 import ThinkingIndicator from './components/ThinkingIndicator';
+
+// 処理ステータス
+type ProcessingStatus = 'uploading' | 'creating_thread' | 'generating' | 'completed' | 'error';
 
 export default function GenerationProgressPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { pdfPath, autoStart } = (location.state as { pdfPath?: string; autoStart?: boolean }) || {};
+  const { pdfPath, pdfFile, autoStart } = (location.state as { pdfPath?: string; pdfFile?: File; autoStart?: boolean }) || {};
   const { thinkingSteps, isThinking, slideData, error, createThread, sendMessage, threadId } = useReactAgent();
   const hasRedirected = useRef(false);
   const hasStarted = useRef(false);
+  const [status, setStatus] = useState<ProcessingStatus>('uploading');
+  const [uploadedPath, setUploadedPath] = useState<string | null>(pdfPath || null);
 
   // PDF自動開始処理（アップロード完了時）
   useEffect(() => {
-    if (autoStart && pdfPath && !threadId && !hasStarted.current) {
-      hasStarted.current = true;
-      (async () => {
-        try {
-          const tid = await createThread();
-          await sendMessage(
-            `このPDFから中学生向けのわかりやすいスライドを作成してください: ${pdfPath}`,
-            tid
-          );
-        } catch (err) {
-          console.error('❌ スレッド作成エラー:', err);
+    if (!autoStart || hasStarted.current) return;
+    hasStarted.current = true;
+
+    (async () => {
+      try {
+        // Phase 1: PDFアップロード（ファイルオブジェクトが渡された場合）
+        let finalPath = pdfPath;
+        if (pdfFile && !pdfPath) {
+          setStatus('uploading');
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const uploadResult = await uploadPdf({
+            file: pdfFile,
+            user_id: user?.email,
+          });
+          finalPath = uploadResult.path;
+          setUploadedPath(finalPath);
         }
-      })();
-    }
-  }, [autoStart, pdfPath, threadId, createThread, sendMessage]);
+
+        if (!finalPath) {
+          throw new Error('PDFパスが取得できませんでした');
+        }
+
+        // Phase 2: スレッド作成
+        setStatus('creating_thread');
+        const tid = await createThread();
+
+        // Phase 3: スライド生成開始
+        setStatus('generating');
+        await sendMessage(
+          `このPDFから中学生向けのわかりやすいスライドを作成してください: ${finalPath}`,
+          tid
+        );
+      } catch (err) {
+        console.error('❌ 処理エラー:', err);
+        setStatus('error');
+      }
+    })();
+  }, [autoStart, pdfPath, pdfFile, threadId, createThread, sendMessage]);
 
   // スライド生成完了時に詳細ページへ自動遷移
   useEffect(() => {
@@ -115,19 +144,31 @@ export default function GenerationProgressPage() {
               borderRadius: '50%',
               animation: 'spin 1s linear infinite'
             }} />
+
+            {/* 動的ステータス表示 */}
             <h2 style={{
               fontSize: '24px',
               fontWeight: 'bold',
               color: '#333',
               marginBottom: '8px'
             }}>
-              スライドを生成しています
+              {status === 'uploading' && 'PDFアップロード中...'}
+              {status === 'creating_thread' && '準備中...'}
+              {status === 'generating' && 'スライドを生成しています'}
+              {status === 'completed' && '完了しました'}
+              {status === 'error' && 'エラーが発生しました'}
             </h2>
+
+            {/* ステータス別の説明文 */}
             <p style={{
               fontSize: '14px',
               color: '#666'
             }}>
-              処理には2〜3分程度かかります
+              {status === 'uploading' && 'PDFファイルをアップロードしています'}
+              {status === 'creating_thread' && 'スライド生成の準備をしています'}
+              {status === 'generating' && '処理には2〜3分程度かかります'}
+              {status === 'completed' && 'まもなくスライドページに移動します'}
+              {status === 'error' && (error || '不明なエラーが発生しました')}
             </p>
           </div>
 

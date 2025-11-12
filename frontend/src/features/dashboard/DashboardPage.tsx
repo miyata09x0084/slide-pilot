@@ -161,16 +161,6 @@ export default function DashboardPage() {
     setShowQuickMenu(true);
   }, []);
 
-  // PDFアップロード成功時の処理
-  const handlePdfUploadSuccess = (uploadData: { path: string }) => {
-    // 即座にローディング画面へ遷移（楽観的UI更新）
-    navigate('/generate', {
-      state: {
-        pdfPath: uploadData.path,
-        autoStart: true  // 自動開始フラグ
-      }
-    });
-  };
 
   // QuickActionMenuからのPDFアップロード選択時
   const handleSelectUpload = () => {
@@ -187,18 +177,27 @@ export default function DashboardPage() {
           return;
         }
 
+        // 楽観的UI更新: 即座にローディング画面へ遷移
+        navigate('/generate', {
+          state: {
+            pdfFile: file,  // ファイルオブジェクトを渡す
+            autoStart: true
+          }
+        });
+
+        // バックグラウンドでアップロード処理（非同期）
+        // エラー時のみユーザーに通知
         try {
-          // アップロード
-          const data = await uploadPdf({
+          await uploadPdf({
             file,
             user_id: user?.email,
           });
-
-          // アップロード成功後、同じハンドラーを呼び出す
-          await handlePdfUploadSuccess(data);
+          // アップロード成功（プログレス画面で状態更新される）
         } catch (err) {
           console.error("❌ アップロードエラー:", err);
+          // エラー時はダッシュボードに戻る
           alert("アップロードに失敗しました");
+          navigate('/', { replace: true });
         }
       }
     };
