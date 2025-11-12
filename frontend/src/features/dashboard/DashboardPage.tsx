@@ -313,7 +313,8 @@ export default function DashboardPage() {
                   icon="📊"
                   title={slide.title}
                   subtitle={formattedDate}
-                  onClick={() => handleSlideClick(slide.id)}
+                  onClickWithArg={handleSlideClick}
+                  clickArg={slide.id}
                   variant="history"
                   className="card-default"
                 />

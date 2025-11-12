@@ -10,7 +10,9 @@ interface UnifiedCardProps {
   icon: string;
   title: string;
   subtitle?: string;
-  onClick: () => void;
+  onClick?: () => void;
+  onClickWithArg?: (arg: string) => void;
+  clickArg?: string;
   variant?: 'primary' | 'default' | 'history' | 'more';
   className?: string;
 }
@@ -126,6 +128,8 @@ const UnifiedCard = memo(function UnifiedCard({
   title,
   subtitle,
   onClick,
+  onClickWithArg,
+  clickArg,
   variant = 'default',
   className = '',
 }: UnifiedCardProps) {
@@ -143,6 +147,15 @@ const UnifiedCard = memo(function UnifiedCard({
   const iconStyle = isPrimary ? styles.iconPrimary : styles.icon;
   const titleStyle = isPrimary ? styles.titlePrimary : styles.title;
   const subtitleStyle = isPrimary ? styles.subtitlePrimary : styles.subtitle;
+
+  // クリックハンドラー: onClickWithArgが指定されている場合はそちらを優先
+  const handleClick = () => {
+    if (onClickWithArg && clickArg) {
+      onClickWithArg(clickArg);
+    } else if (onClick) {
+      onClick();
+    }
+  };
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderColor = '#3b82f6';
@@ -179,7 +192,7 @@ const UnifiedCard = memo(function UnifiedCard({
     <div
       className={className}
       style={cardStyle}
-      onClick={onClick}
+      onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
