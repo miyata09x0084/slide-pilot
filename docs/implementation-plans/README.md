@@ -21,6 +21,7 @@
 
 ## 既存の実装計画
 
+- [Issue #20: 教育向けブラウザテーマ](./IMPLEMENTATION_PLAN_ISSUE20.md) - カラーパレット、進捗バー、アニメーション対応
 - [Issue #25: Mermaid図解統合](./IMPLEMENTATION_PLAN_ISSUE25.md)
 - [スライド履歴プレビュー機能 + user_id問題修正](./IMPLEMENTATION_PLAN_HISTORY_PREVIEW.md)
 - [Supabase Storage移行計画](./SUPABASE_STORAGE_MIGRATION.md) - Cloud Run対応のための永続化
