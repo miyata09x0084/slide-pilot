@@ -105,22 +105,29 @@ export default function GenerationProgressPage() {
             textAlign: 'center',
             marginBottom: '32px'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>
-              🤖
-            </div>
+            {/* 回転スピナー */}
+            <div style={{
+              width: '60px',
+              height: '60px',
+              margin: '0 auto 20px',
+              border: '4px solid #e5e7eb',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
             <h2 style={{
               fontSize: '24px',
               fontWeight: 'bold',
               color: '#333',
               marginBottom: '8px'
             }}>
-              AIアシスタントが作業中
+              スライドを生成しています
             </h2>
             <p style={{
               fontSize: '14px',
               color: '#666'
             }}>
-              スライドを生成しています。しばらくお待ちください...
+              処理には2〜3分程度かかります
             </p>
           </div>
 
@@ -178,6 +185,14 @@ export default function GenerationProgressPage() {
           )}
         </div>
       </div>
+
+      {/* CSSアニメーション */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
