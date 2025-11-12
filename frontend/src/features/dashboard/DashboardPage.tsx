@@ -2,10 +2,11 @@
  * DashboardPage - 統一カード形式のダッシュボード
  * 全ての要素を同じサイズのカードとして表示
  * React Query使用でデータ取得
+ * React.memo + useCallback で再レンダリング最適化
  */
 
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
 import { useSlides } from "./api/get-slides";
@@ -156,9 +157,9 @@ export default function DashboardPage() {
   };
 
   // クイックメニューを開く
-  const handleNewSlide = () => {
+  const handleNewSlide = useCallback(() => {
     setShowQuickMenu(true);
-  };
+  }, []);
 
   // PDFアップロード選択時
   const handleSelectUpload = () => {
@@ -226,9 +227,14 @@ export default function DashboardPage() {
   };
 
   // スライドクリック
-  const handleSlideClick = (slideId: string) => {
+  const handleSlideClick = useCallback((slideId: string) => {
     navigate(`/slides/${slideId}`);
-  };
+  }, [navigate]);
+
+  // もっと読み込むクリック
+  const handleShowAll = useCallback(() => {
+    setShowAll(true);
+  }, []);
 
   if (!user) {
     return null;
@@ -290,24 +296,29 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {displayedSlides.map((slide) => (
-              <UnifiedCard
-                key={slide.id}
-                icon="📊"
-                title={slide.title}
-                subtitle={new Date(slide.created_at).toLocaleDateString(
-                  "ja-JP",
-                  {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  }
-                )}
-                onClick={() => handleSlideClick(slide.id)}
-                variant="history"
-                className="card-default"
-              />
-            ))}
+            {displayedSlides.map((slide) => {
+              // 日付フォーマットをメモ化するためにコンポーネント外で計算
+              const formattedDate = new Date(slide.created_at).toLocaleDateString(
+                "ja-JP",
+                {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                }
+              );
+
+              return (
+                <UnifiedCard
+                  key={slide.id}
+                  icon="📊"
+                  title={slide.title}
+                  subtitle={formattedDate}
+                  onClick={() => handleSlideClick(slide.id)}
+                  variant="history"
+                  className="card-default"
+                />
+              );
+            })}
 
             {/* もっと読み込むカード */}
             {remainingCount > 0 && !showAll && (
@@ -315,7 +326,7 @@ export default function DashboardPage() {
                 icon="⬇️"
                 title="もっと読み込む"
                 subtitle={`残り${remainingCount}件`}
-                onClick={() => setShowAll(true)}
+                onClick={handleShowAll}
                 variant="more"
                 className="card-default"
               />

@@ -1,7 +1,10 @@
 /**
  * UnifiedCard - 統一カードコンポーネント
  * 全ての要素を同じサイズ・同じ形のカードとして表示
+ * React.memoで最適化: propsが変わらない限り再レンダリングをスキップ
  */
+
+import { memo } from 'react';
 
 interface UnifiedCardProps {
   icon: string;
@@ -118,7 +121,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-export default function UnifiedCard({
+const UnifiedCard = memo(function UnifiedCard({
   icon,
   title,
   subtitle,
@@ -187,4 +190,6 @@ export default function UnifiedCard({
       </div>
     </div>
   );
-}
+});
+
+export default UnifiedCard;
