@@ -529,16 +529,42 @@ def write_slides_slidev(state: State) -> Dict:
       )
 
       msg = llm.invoke(prompt)
-      slide_md = msg.content.strip()
+      raw_content = msg.content.strip()
 
-      # コードブロックがあれば除去
-      slide_md = _strip_whole_code_fence(slide_md)
+      # ═══════════════════════════════════════════════════════════
+      # 構造制御（Python側で機械的に実施）
+      # 設計方針: docs/architecture/SLIDE_GENERATION_DESIGN.md
+      # ═══════════════════════════════════════════════════════════
+
+      # Step 1: コードブロック除去（既存）
+      raw_content = _strip_whole_code_fence(raw_content)
+
+      # Step 2: 既存のフロントマター削除（LLMが勝手に生成した場合の保険）
+      raw_content = re.sub(r'^---[\s\S]*?---\s*', '', raw_content.strip(), count=1)
+
+      # Step 3: YAMLフロントマター生成（Python側で制御）
+      frontmatter = """---
+theme: apple-basic
+highlighter: shiki
+class: text-center
+---
+
+"""
+
+      # Step 4: 見出し（## ）前に `---` を機械的に挿入
+      content_with_separators = _insert_separators(raw_content)
+
+      # Step 5: 連続した --- を圧縮（安全装置）
+      content_with_separators = _double_separators(content_with_separators)
+
+      # Step 6: 最終的なMarkdown生成
+      slide_md = frontmatter + content_with_separators
 
       return {
         "slide_md": slide_md,
         "title": ja_title,
         "error": "",
-        "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from {len(chunk_texts)} chunks (cost-optimized, no LLM summary)")
+        "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from {len(chunk_texts)} chunks with mechanical structure control")
       }
 
     # AI最新情報（Tavily）の場合は既存のマルチベンダー生成
