@@ -305,14 +305,24 @@ def generate_key_points(state: State) -> Dict:
         chunks = full_content.split("\n\n---\n\n")
 
       # Map: 各チャンクから重要ポイントを抽出（最大3個）
+      # 並列処理で高速化（llm.batch使用）
+      valid_chunks = [(i+1, chunk) for i, chunk in enumerate(chunks[:20]) if chunk.strip()]
+
+      if not valid_chunks:
+        return {"error": "No valid chunks to process", "log": _log(state, "[key_points_map] no valid chunks")}
+
+      # バッチプロンプト生成
+      batch_prompts = [
+        get_key_points_map_prompt(chunk=chunk, chunk_index=idx)
+        for idx, chunk in valid_chunks
+      ]
+
+      # 並列実行（最大5並列）
+      responses = llm.batch(batch_prompts, config={"max_concurrency": 5})
+
+      # 結果を統合
       chunk_points = []
-      for i, chunk in enumerate(chunks[:20]):  # 最大20チャンク（LLMコスト削減）
-        if not chunk.strip():
-          continue
-
-        map_prompt = get_key_points_map_prompt(chunk=chunk, chunk_index=i+1)
-
-        msg = llm.invoke(map_prompt)
+      for msg in responses:
         points = _strip_bullets(msg.content.splitlines())[:3]
         chunk_points.extend(points)
 

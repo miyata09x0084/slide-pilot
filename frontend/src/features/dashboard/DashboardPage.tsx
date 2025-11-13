@@ -138,7 +138,7 @@ const responsiveStyles = `
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { createThread, sendMessage } = useReactAgent();
+  const { createThread, sendMessage, resetChat } = useReactAgent();
 
   // React Queryでスライド履歴を取得（JWTから自動的にuser_idを取得）
   const { data } = useSlides(
@@ -164,6 +164,9 @@ export default function DashboardPage() {
 
   // QuickActionMenuからのPDFアップロード選択時
   const handleSelectUpload = () => {
+    // 過去の状態をクリア（Issue: 新規作成時にキャッシュが残る問題を修正）
+    resetChat();
+
     // ファイル選択ダイアログを開く
     const input = document.createElement("input");
     input.type = "file";
@@ -203,6 +206,9 @@ export default function DashboardPage() {
 
   // テンプレートクリック
   const handleTemplateClick = async (templateId: string) => {
+    // 過去の状態をクリア（Issue: 新規作成時にキャッシュが残る問題を修正）
+    resetChat();
+
     const templates: Record<string, string> = {
       "ai-news":
         "AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください",

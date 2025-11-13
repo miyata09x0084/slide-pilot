@@ -16,10 +16,11 @@ export default function GenerationProgressPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { pdfPath, pdfFile, autoStart } = (location.state as { pdfPath?: string; pdfFile?: File; autoStart?: boolean }) || {};
-  const { thinkingSteps, isThinking, slideData, error, createThread, sendMessage, threadId } = useReactAgent();
+  const { thinkingSteps, isThinking, slideData, error, createThread, sendMessage } = useReactAgent();
   const hasRedirected = useRef(false);
   const hasStarted = useRef(false);
   const [status, setStatus] = useState<ProcessingStatus>('uploading');
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   // PDF自動開始処理（アップロード完了時）
   useEffect(() => {
@@ -57,7 +58,8 @@ export default function GenerationProgressPage() {
         setStatus('error');
       }
     })();
-  }, [autoStart, pdfPath, pdfFile, threadId, createThread, sendMessage]);
+    // 依存配列からthreadIdを削除（古い値での再実行を防ぐ）
+  }, [autoStart, pdfPath, pdfFile, createThread, sendMessage]);
 
   // スライド生成完了時に詳細ページへ自動遷移
   useEffect(() => {
@@ -162,7 +164,7 @@ export default function GenerationProgressPage() {
             }}>
               {status === 'uploading' && 'PDFファイルをアップロードしています'}
               {status === 'creating_thread' && 'スライド生成の準備をしています'}
-              {status === 'generating' && '処理には2〜3分程度かかります'}
+              {status === 'generating' && 'PDFを分析してスライドを生成中...（約1分）'}
               {status === 'completed' && 'まもなくスライドページに移動します'}
               {status === 'error' && (error || '不明なエラーが発生しました')}
             </p>

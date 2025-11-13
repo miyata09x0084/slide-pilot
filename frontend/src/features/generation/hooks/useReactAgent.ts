@@ -37,6 +37,13 @@ export function useReactAgent() {
   // スレッド作成
   const createThreadHandler = useCallback(async () => {
     try {
+      // 防御的プログラミング: 新しいスレッド作成時に古い状態をクリア
+      setMessages([]);
+      setThinkingSteps([]);
+      setIsThinking(false);
+      setError(null);
+      setSlideData({});
+
       // ユーザー情報取得（localStorage から）
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const userEmail = user.email || 'anonymous@example.com';
@@ -50,13 +57,12 @@ export function useReactAgent() {
       });
 
       setThreadId(data.thread_id);
-      setError(null);
       return data.thread_id;
     } catch (err: any) {
       setError(err.message);
       throw err;
     }
-  }, [setThreadId, setError]);
+  }, [setThreadId, setError, setMessages, setThinkingSteps, setIsThinking, setSlideData]);
 
   // メッセージ送信（オプションでスレッドIDを渡せる）
   const sendMessage = useCallback(async (content: string, customThreadId?: string) => {
