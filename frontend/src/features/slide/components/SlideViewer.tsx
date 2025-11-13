@@ -5,10 +5,11 @@
  * Supabaseから取得したMarkdownをreact-markdownで表示
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
+import { useSlideDetail } from '../api/get-slide-detail';
 
 // Mermaid初期化
 mermaid.initialize({
@@ -47,39 +48,9 @@ interface SlideViewerProps {
   onClose: () => void;
 }
 
-interface SlideContent {
-  slide_id: string;
-  title: string;
-  markdown: string;
-  created_at: string;
-  pdf_url?: string;
-}
-
 export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
-  const [slide, setSlide] = useState<SlideContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchSlide = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides/${slideId}/markdown`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch slide: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setSlide(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSlide();
-  }, [slideId]);
+  // React Queryフックでスライド詳細を取得
+  const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
 
   if (loading) {
     return (
@@ -96,7 +67,7 @@ export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
       <div style={styles.overlay}>
         <div style={styles.modal}>
           <h2>エラー</h2>
-          <p>{error}</p>
+          <p>{error.message || 'スライドの読み込みに失敗しました'}</p>
           <button onClick={onClose} style={styles.closeButton}>
             閉じる
           </button>
@@ -111,7 +82,7 @@ export function SlideViewer({ slideId, onClose }: SlideViewerProps) {
 
   // Markdownを `---` で分割してスライドに変換
   // 最初の `---` で囲まれたYAML frontmatterを除去
-  const contentWithoutFrontmatter = slide.markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
+  const contentWithoutFrontmatter = slide.markdown?.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '') || '';
 
   // 残りを `\n---\n` で分割
   const slides = contentWithoutFrontmatter

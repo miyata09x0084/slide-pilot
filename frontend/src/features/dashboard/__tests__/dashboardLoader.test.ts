@@ -98,6 +98,7 @@ describe('dashboardLoader with prefetch', () => {
       // getSlides関数をモック
       vi.spyOn(getSlidesModule, 'getSlides').mockResolvedValueOnce({
         slides: mockSlides,
+        message: '2件のスライドを取得しました',
       });
 
       const loader = createDashboardLoader(queryClient);
@@ -106,7 +107,6 @@ describe('dashboardLoader with prefetch', () => {
       // prefetchQueryが正しく呼び出されたことを確認
       expect(getSlidesModule.getSlides).toHaveBeenCalledTimes(1);
       expect(getSlidesModule.getSlides).toHaveBeenCalledWith({
-        user_id: 'test@example.com',
         limit: 20,
       });
 
@@ -114,20 +114,21 @@ describe('dashboardLoader with prefetch', () => {
       expect(result).toBeNull();
 
       // キャッシュにデータが保存されていることを確認
-      const cachedData = queryClient.getQueryData(['slides', 'test@example.com', 20]);
-      expect(cachedData).toEqual({ slides: mockSlides });
+      const cachedData = queryClient.getQueryData(['slides', 20]);
+      expect(cachedData).toEqual({ slides: mockSlides, message: '2件のスライドを取得しました' });
     });
 
     it('スライドが0件の場合もキャッシュに保存される', async () => {
       vi.spyOn(getSlidesModule, 'getSlides').mockResolvedValueOnce({
         slides: [],
+        message: '0件のスライドを取得しました',
       });
 
       const loader = createDashboardLoader(queryClient);
       await loader();
 
-      const cachedData = queryClient.getQueryData(['slides', 'test@example.com', 20]);
-      expect(cachedData).toEqual({ slides: [] });
+      const cachedData = queryClient.getQueryData(['slides', 20]);
+      expect(cachedData).toEqual({ slides: [], message: '0件のスライドを取得しました' });
     });
   });
 
@@ -154,7 +155,7 @@ describe('dashboardLoader with prefetch', () => {
       expect(result).toBeNull();
 
       // キャッシュにはデータが保存されていないことを確認
-      const cachedData = queryClient.getQueryData(['slides', 'test@example.com', 20]);
+      const cachedData = queryClient.getQueryData(['slides', 20]);
       expect(cachedData).toBeUndefined();
     });
 
@@ -176,7 +177,10 @@ describe('dashboardLoader with prefetch', () => {
       };
       localStorage.setItem('user', JSON.stringify(testUser));
 
-      const mockData = { slides: [{ id: '1', title: 'Test', created_at: '2025-11-06T00:00:00Z' }] };
+      const mockData = {
+        slides: [{ id: '1', title: 'Test', created_at: '2025-11-06T00:00:00Z' }],
+        message: '1件のスライドを取得しました',
+      };
       vi.spyOn(getSlidesModule, 'getSlides').mockResolvedValueOnce(mockData);
 
       const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
@@ -185,12 +189,12 @@ describe('dashboardLoader with prefetch', () => {
       await loader();
 
       expect(prefetchSpy).toHaveBeenCalledWith({
-        queryKey: ['slides', 'cache@example.com', 20],
+        queryKey: ['slides', 20],
         queryFn: expect.any(Function),
       });
 
       // キャッシュからデータを取得できることを確認
-      const cachedData = queryClient.getQueryData(['slides', 'cache@example.com', 20]);
+      const cachedData = queryClient.getQueryData(['slides', 20]);
       expect(cachedData).toEqual(mockData);
     });
   });

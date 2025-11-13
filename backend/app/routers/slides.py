@@ -3,13 +3,15 @@
 
 Issue #24: ブラウザプレビュー + Supabase履歴管理
 Issue #29: Supabase Storage移行
+Issue: Supabase Auth統合
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from typing import Dict, Any
 
 from app.core.supabase import get_supabase_client, get_slides_by_user, get_slide_by_id
+from app.auth.middleware import verify_token
 
 router = APIRouter()
 
@@ -19,12 +21,18 @@ router = APIRouter()
 # ──────────────────────────────────────────────────────────────
 
 @router.get("/slides")
-async def list_slides(user_id: str = "anonymous", limit: int = 20) -> Dict[str, Any]:
-    """ユーザーのスライド一覧を取得（Supabase）
+async def list_slides(
+    user_id: str = Depends(verify_token),
+    limit: int = 20
+) -> Dict[str, Any]:
+    """認証ユーザーのスライド一覧を取得
+
+    認証: 必須（JWT）
+    RLS: Supabase が自動的に user_id でフィルタ
 
     Args:
-        user_id: ユーザー識別子（デフォルト: "anonymous"）
-        limit: 取得件数上限（デフォルト: 20）
+        user_id: JWT検証で取得したユーザーID
+        limit: 取得件数上限
 
     Returns:
         {"slides": [...], "message": str}
@@ -38,11 +46,18 @@ async def list_slides(user_id: str = "anonymous", limit: int = 20) -> Dict[str, 
 
 
 @router.get("/slides/{slide_id}/markdown")
-async def get_slide_markdown(slide_id: str) -> Dict[str, Any]:
-    """スライドのMarkdownを取得（Supabaseからプレビュー用）
+async def get_slide_markdown(
+    slide_id: str,
+    user_id: str = Depends(verify_token)
+) -> Dict[str, Any]:
+    """スライドのMarkdownを取得（認証必須、RLSで保護）
+
+    認証: 必須（JWT）
+    RLS: Supabaseが自動的にuser_idでフィルタ
 
     Args:
         slide_id: スライドID（UUID）
+        user_id: JWT検証で取得したユーザーID
 
     Returns:
         {
@@ -56,6 +71,10 @@ async def get_slide_markdown(slide_id: str) -> Dict[str, Any]:
     slide = get_slide_by_id(slide_id)
     if not slide:
         raise HTTPException(status_code=404, detail="スライドが見つかりません")
+
+    # RLS + 念のためユーザーID照合
+    if slide.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="アクセス権限がありません")
 
     return {
         "slide_id": slide["id"],
@@ -71,16 +90,34 @@ async def get_slide_markdown(slide_id: str) -> Dict[str, Any]:
 # ──────────────────────────────────────────────────────────────
 
 @router.get("/slides/{user_id}/{filename}")
-async def download_slide(user_id: str, filename: str):
-    """生成されたスライドをダウンロード（Supabase Storage）
+async def download_slide(
+    user_id: str,
+    filename: str,
+    authenticated_user_id: str = Depends(verify_token)
+):
+    """スライドダウンロード（認証必須、user_id照合）
+
+    認証: 必須（JWT）
+    セキュリティ: URLのuser_idとJWTのuser_idを照合
 
     Args:
-        user_id: ユーザーID（anonymousまたはemail）
+        user_id: URLパラメータのユーザーID
         filename: ファイル名（例: ai-latest-info_slidev.pdf）
+        authenticated_user_id: JWT検証で取得したユーザーID
 
     Returns:
         署名付きURLへのリダイレクト
+
+    Raises:
+        HTTPException: user_id不一致時403エラー
     """
+    # JWTから取得したuser_idとパスのuser_idを照合（セキュリティ Critical）
+    if user_id != authenticated_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="他のユーザーのファイルにはアクセスできません"
+        )
+
     client = get_supabase_client()
     if not client:
         raise HTTPException(status_code=503, detail="Storage service unavailable")

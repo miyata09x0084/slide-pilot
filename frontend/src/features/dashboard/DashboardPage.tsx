@@ -45,6 +45,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#1a1a1a",
     letterSpacing: "-0.5px",
   },
+  alphaBadge: {
+    display: "inline-block",
+    marginLeft: "10px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#6b7280",
+    background: "#f3f4f6",
+    border: "1px solid #d1d5db",
+    borderRadius: "4px",
+    letterSpacing: "0.5px",
+  },
   userSection: {
     display: "flex",
     alignItems: "center",
@@ -138,12 +150,12 @@ const responsiveStyles = `
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { createThread, sendMessage } = useReactAgent();
+  const { createThread, sendMessage, resetChat } = useReactAgent();
 
-  // React Queryでスライド履歴を取得
+  // React Queryでスライド履歴を取得（JWTから自動的にuser_idを取得）
   const { data } = useSlides(
-    { user_id: user?.email || '', limit: 20 },
-    { enabled: !!user?.email }
+    { limit: 20 },
+    { enabled: !!user }
   );
   const slides = data?.slides || [];
 
@@ -161,8 +173,12 @@ export default function DashboardPage() {
     setShowQuickMenu(true);
   }, []);
 
-  // PDFアップロード選択時
+
+  // QuickActionMenuからのPDFアップロード選択時
   const handleSelectUpload = () => {
+    // 過去の状態をクリア（Issue: 新規作成時にキャッシュが残る問題を修正）
+    resetChat();
+
     // ファイル選択ダイアログを開く
     const input = document.createElement("input");
     input.type = "file";
@@ -170,42 +186,41 @@ export default function DashboardPage() {
     input.onchange = async (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        await uploadAndGenerate(file);
+        // ファイルサイズチェック
+        if (file.size > 100 * 1024 * 1024) {
+          alert("ファイルサイズは100MB以下にしてください");
+          return;
+        }
+
+        // 楽観的UI更新: 即座にローディング画面へ遷移
+        navigate('/generate', {
+          state: {
+            pdfFile: file,  // ファイルオブジェクトを渡す
+            autoStart: true
+          }
+        });
+
+        // バックグラウンドでアップロード処理（非同期）
+        // エラー時のみユーザーに通知
+        try {
+          await uploadPdf({ file });
+          // アップロード成功（プログレス画面で状態更新される）
+        } catch (err) {
+          console.error("❌ アップロードエラー:", err);
+          // エラー時はダッシュボードに戻る
+          alert("アップロードに失敗しました");
+          navigate('/', { replace: true });
+        }
       }
     };
     input.click();
   };
 
-  // PDFアップロードとスライド生成
-  const uploadAndGenerate = async (file: File) => {
-    // ファイルサイズチェック
-    if (file.size > 100 * 1024 * 1024) {
-      alert("ファイルサイズは100MB以下にしてください");
-      return;
-    }
-
-    try {
-      // アップロード
-      const data = await uploadPdf({
-        file,
-        user_id: user?.email,
-      });
-
-      // スライド生成開始
-      const tid = await createThread();
-      navigate(`/generate/${tid}`, { state: { pdfPath: data.path } });
-      await sendMessage(
-        `このPDFから中学生向けのわかりやすいスライドを作成してください: ${data.path}`,
-        tid
-      );
-    } catch (err) {
-      console.error("❌ スライド生成エラー:", err);
-      alert("エラーが発生しました");
-    }
-  };
-
   // テンプレートクリック
   const handleTemplateClick = async (templateId: string) => {
+    // 過去の状態をクリア（Issue: 新規作成時にキャッシュが残る問題を修正）
+    resetChat();
+
     const templates: Record<string, string> = {
       "ai-news":
         "AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください",
@@ -249,8 +264,11 @@ export default function DashboardPage() {
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={styles.logoSection}>
-          <span style={styles.logoIcon}>📊</span>
-          <h1 style={styles.logo}>SlidePilot</h1>
+          <span style={styles.logoIcon}>📚</span>
+          <h1 style={styles.logo}>
+            ラクヨミ アシスタントAI
+            <span style={styles.alphaBadge}>α版</span>
+          </h1>
         </div>
 
         <div style={styles.userSection}>
@@ -277,9 +295,9 @@ export default function DashboardPage() {
       <div className="dashboard-grid" style={styles.gridContainer}>
         {/* 新規作成 */}
         <UnifiedCard
-          icon="+"
+          icon="📄"
           title="新規作成"
-          subtitle="スライドを作成"
+          subtitle="PDFを理解する"
           onClick={handleNewSlide}
           variant="primary"
           className="card-default"

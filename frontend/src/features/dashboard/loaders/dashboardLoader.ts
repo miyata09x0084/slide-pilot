@@ -8,18 +8,17 @@ import { getSlides } from '../api/get-slides';
 
 export const createDashboardLoader = (queryClient: QueryClient) => {
   return async () => {
-    // localStorageからユーザー情報取得
+    // localStorageからユーザー情報取得（認証確認のみ）
     const savedUser = localStorage.getItem('user');
     if (!savedUser) return null;
 
     try {
-      const user = JSON.parse(savedUser);
-
       // React Queryキャッシュにプリフェッチ
       // prefetchQueryはエラーを無視するため、APIエラー時もnullを返す
+      // user_idはJWTから自動取得されるため不要
       await queryClient.prefetchQuery({
-        queryKey: ['slides', user.email, 20],
-        queryFn: () => getSlides({ user_id: user.email, limit: 20 }),
+        queryKey: ['slides', 20],
+        queryFn: () => getSlides({ limit: 20 }),
       });
 
       return null; // Loaderからデータを返さない（キャッシュのみ使用）

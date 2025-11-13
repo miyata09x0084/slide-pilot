@@ -2,7 +2,7 @@
 // SSEストリーミングでメッセージ送受信と思考過程を取得
 // Recoilでグローバル状態管理（ページ間で状態共有）
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRecoilState } from 'recoil';
 import type { Message } from '@/types';
 import {
@@ -16,6 +16,7 @@ import {
 import { createThread } from '../api/create-thread';
 import { findAssistantByGraphId } from '../api/get-assistants';
 import { env } from '@/config/env';
+import { supabase } from '@/lib/supabase';
 
 // SSE用のAPI URL（fetchで直接呼び出す）
 const API_BASE_URL = `${env.API_URL}/agent`;
@@ -27,6 +28,7 @@ export function useReactAgent() {
   const [threadId, setThreadId] = useRecoilState(threadIdAtom);
   const [error, setError] = useRecoilState(errorAtom);
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
+  const [cachedAssistantId, setCachedAssistantId] = useState<string | null>(null);
 
   // スライド生成中フラグ（ローカル変数で管理）
   // @ts-ignore - Used in closure but TypeScript doesn't detect it
@@ -35,6 +37,13 @@ export function useReactAgent() {
   // スレッド作成
   const createThreadHandler = useCallback(async () => {
     try {
+      // 防御的プログラミング: 新しいスレッド作成時に古い状態をクリア
+      setMessages([]);
+      setThinkingSteps([]);
+      setIsThinking(false);
+      setError(null);
+      setSlideData({});
+
       // ユーザー情報取得（localStorage から）
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const userEmail = user.email || 'anonymous@example.com';
@@ -48,13 +57,12 @@ export function useReactAgent() {
       });
 
       setThreadId(data.thread_id);
-      setError(null);
       return data.thread_id;
     } catch (err: any) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [setThreadId, setError, setMessages, setThinkingSteps, setIsThinking, setSlideData]);
 
   // メッセージ送信（オプションでスレッドIDを渡せる）
   const sendMessage = useCallback(async (content: string, customThreadId?: string) => {
@@ -72,29 +80,31 @@ export function useReactAgent() {
     _isGeneratingSlides = false; // スライド生成フラグをリセット
 
     try {
-      // assistant_id取得（react-agentを明示的に探す）
-      const reactAgent = await findAssistantByGraphId('react-agent');
-      if (!reactAgent) {
-        throw new Error('ReAct agent not found. Please check LangGraph configuration.');
+      // assistant_id取得（キャッシュを優先）
+      let assistantId = cachedAssistantId;
+      if (!assistantId) {
+        const reactAgent = await findAssistantByGraphId('react-agent');
+        if (!reactAgent) {
+          throw new Error('ReAct agent not found. Please check LangGraph configuration.');
+        }
+        assistantId = reactAgent.assistant_id;
+        setCachedAssistantId(assistantId);  // キャッシュに保存
       }
-
-      const assistantId = reactAgent.assistant_id;
 
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
 
       // ──────────────────────────────────────────────────────────────
-      // ユーザー情報取得（Issue #24: Supabase統合）
+      // JWT取得（Issue #24: Supabase統合）
       // ──────────────────────────────────────────────────────────────
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const userEmail = user.email || 'anonymous@example.com';
+      const { data: { session } } = await supabase.auth.getSession();
 
       // SSEストリーミング開始
       const response = await fetch(`${API_BASE_URL}/threads/${activeThreadId}/runs/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Email': userEmail  // ユーザー識別ヘッダー
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         },
         body: JSON.stringify({
           assistant_id: assistantId,
@@ -225,7 +235,7 @@ export function useReactAgent() {
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-  }, [threadId, messages]);
+  }, [cachedAssistantId, threadId, messages, setMessages, setThinkingSteps, setIsThinking, setError, setSlideData]);
 
   // ReActステップを解析して思考過程に追加
   const parseReActSteps = (data: any) => {
@@ -272,7 +282,7 @@ export function useReactAgent() {
     setThreadId(null);
     setError(null);
     setSlideData({});
-  }, []);
+  }, [setMessages, setThinkingSteps, setIsThinking, setThreadId, setError, setSlideData]);
 
   return {
     messages,

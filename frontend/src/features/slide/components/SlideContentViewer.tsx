@@ -7,6 +7,8 @@ import { useEffect, useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
+import { ProgressBar } from './ProgressBar';
+import { useSlideDetail } from '../api/get-slide-detail';
 
 // Mermaid初期化
 mermaid.initialize({
@@ -14,6 +16,65 @@ mermaid.initialize({
   theme: 'default',
   securityLevel: 'loose',
 });
+
+// テーマカラーパレット（Issue #20: 色弱対応・アクセシビリティ配色）
+// 色弱の方でも区別しやすい色の組み合わせ
+// 参考: 岡部正隆・伊藤啓「色覚バリアフリー」
+const THEME_COLORS = {
+  science: {
+    primary: '#0075C2',           // 明るい青（色弱でも識別しやすい）
+    cardBackground: '#E8F4F8',    // 淡い青背景（コントラスト比4.5:1以上）
+  },
+  story: {
+    primary: '#C95F15',           // 黄みがかったオレンジ（赤緑色弱でも区別可能）
+    cardBackground: '#FFF4E6',    // 淡いベージュ背景
+  },
+  math: {
+    primary: '#03A89E',           // 青緑（シアン系、全ての色弱タイプで識別可能）
+    cardBackground: '#E6F7F7',    // 淡い青緑背景
+  },
+  default: {
+    primary: '#595959',           // ダークグレー（明度差で識別）
+    cardBackground: '#F5F5F5',    // ライトグレー背景（高コントラスト）
+  }
+} as const;
+
+// 絵文字正規表現（Unicode範囲）
+const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+
+// テキストコンテンツを絵文字強調版に変換
+function enhanceEmojis(children: React.ReactNode): React.ReactNode {
+  if (typeof children !== 'string') return children;
+
+  const parts: string[] = [];
+  const emojis: string[] = [];
+  let lastIndex = 0;
+
+  // 絵文字を検出して分割
+  const matches = [...children.matchAll(EMOJI_REGEX)];
+  matches.forEach(match => {
+    if (match.index !== undefined) {
+      parts.push(children.slice(lastIndex, match.index));
+      emojis.push(match[0]);
+      lastIndex = match.index + match[0].length;
+    }
+  });
+  parts.push(children.slice(lastIndex));
+
+  // 絵文字を<span>でラップ
+  return (
+    <>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {part}
+          {emojis[i] && (
+            <span style={styles.emojiLarge}>{emojis[i]}</span>
+          )}
+        </span>
+      ))}
+    </>
+  );
+}
 
 // Mermaidダイアグラムコンポーネント
 function MermaidDiagram({ chart, index }: { chart: string; index: number }) {
@@ -44,39 +105,36 @@ interface SlideContentViewerProps {
   slideId: string;
 }
 
-interface SlideContent {
-  slide_id: string;
-  title: string;
-  markdown: string;
-  created_at: string;
-  pdf_url?: string;
-}
-
 export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
-  const [slide, setSlide] = useState<SlideContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // React Queryフックでスライド詳細を取得
+  const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
+  const [currentSlide, setCurrentSlide] = useState(0); // Issue #20: 進捗バー用の現在位置
 
+  // Intersection Observer でスライド位置を追跡
   useEffect(() => {
-    const fetchSlide = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides/${slideId}/markdown`);
+    if (!slide) return;
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch slide: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setSlide(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+    const observerOptions = {
+      root: null,
+      rootMargin: '-50% 0px -50% 0px',
+      threshold: 0
     };
 
-    fetchSlide();
-  }, [slideId]);
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const index = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
+          setCurrentSlide(index);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    const slideElements = document.querySelectorAll('[data-slide-index]');
+    slideElements.forEach(el => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [slide]);
 
   if (loading) {
     return (
@@ -91,7 +149,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
       <div style={styles.container}>
         <div style={styles.errorCard}>
           <h2 style={styles.errorTitle}>エラー</h2>
-          <p style={styles.errorText}>{error}</p>
+          <p style={styles.errorText}>{error.message || 'スライドの読み込みに失敗しました'}</p>
         </div>
       </div>
     );
@@ -102,25 +160,43 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
   }
 
   // Markdownを `---` で分割してスライドに変換
-  const contentWithoutFrontmatter = slide.markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
+  const contentWithoutFrontmatter = slide.markdown?.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '') || '';
   const slides = contentWithoutFrontmatter
     .split(/\n---\n/)
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
+  // テーマカラーを取得（デフォルトは'story'）
+  const templateType = 'story'; // TODO: SlideDetailにtemplate_type追加後に有効化
+  const themeColors = THEME_COLORS[templateType];
+
   return (
     <div style={styles.container}>
+      {/* 進捗バー */}
+      <ProgressBar
+        current={currentSlide + 1}
+        total={slides.length}
+        themeColor={themeColors.primary}
+      />
+
       {/* スライドコンテンツ */}
       <div style={styles.slidesContainer}>
         {slides.map((slideContent, index) => (
-          <div key={index} style={styles.slideCard}>
+          <div
+            key={index}
+            data-slide-index={index}
+            style={{
+              ...styles.slideCard,
+              background: themeColors.cardBackground
+            }}
+          >
             <div style={styles.slideContent}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  h1: ({ children }) => <h1 style={styles.h1}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={styles.h2}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={styles.h3}>{children}</h3>,
+                  h1: ({ children }) => <h1 style={styles.h1}>{enhanceEmojis(children)}</h1>,
+                  h2: ({ children }) => <h2 style={styles.h2}>{enhanceEmojis(children)}</h2>,
+                  h3: ({ children }) => <h3 style={styles.h3}>{enhanceEmojis(children)}</h3>,
                   code: (props) => {
                     const { children, className, ...rest } = props;
                     const match = /language-(\w+)/.exec(className || '');
@@ -141,8 +217,8 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
                   },
                   ul: ({ children }) => <ul style={styles.list}>{children}</ul>,
                   ol: ({ children }) => <ol style={styles.orderedList}>{children}</ol>,
-                  li: ({ children }) => <li style={styles.listItem}>{children}</li>,
-                  p: ({ children }) => <p style={styles.paragraph}>{children}</p>,
+                  li: ({ children }) => <li style={styles.listItem}>{enhanceEmojis(children)}</li>,
+                  p: ({ children }) => <p style={styles.paragraph}>{enhanceEmojis(children)}</p>,
                 }}
               >
                 {slideContent}
@@ -284,4 +360,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     color: '#666',
   },
+  // Issue #20: 絵文字強調スタイル
+  emojiLarge: {
+    fontSize: '1.5em',
+    verticalAlign: 'middle',
+    display: 'inline-block',
+    margin: '0 4px'
+  }
 };
