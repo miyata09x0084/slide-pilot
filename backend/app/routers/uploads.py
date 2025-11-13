@@ -2,12 +2,14 @@
 PDFアップロードルーター
 
 Issue #29: Supabase Storage移行対応
+Issue: Supabase Auth統合
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import uuid
 from app.dependencies import get_max_file_size
 from app.core.storage import upload_to_storage
+from app.auth.middleware import verify_token
 
 router = APIRouter()
 
@@ -15,15 +17,18 @@ router = APIRouter()
 @router.post("/upload-pdf")
 async def upload_pdf(
     file: UploadFile = File(...),
-    user_id: str = "anonymous",
+    user_id: str = Depends(verify_token),
     max_file_size: int = Depends(get_max_file_size)
 ):
     """
     PDFファイルをSupabase Storageにアップロードする
 
+    認証: 必須（JWT）
+
     Args:
         file: アップロードされたPDFファイル
-        user_id: ユーザー識別子（クエリパラメータ、デフォルト: "anonymous"）
+        user_id: JWT検証で取得したユーザーID（UUID）
+        max_file_size: アップロード上限サイズ
 
     Returns:
         {

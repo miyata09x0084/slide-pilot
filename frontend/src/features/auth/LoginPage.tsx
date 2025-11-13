@@ -1,13 +1,12 @@
 /**
  * LoginPage
- * Google OAuth ログイン画面
+ * Supabase Auth で Google OAuth ログイン画面
+ *
+ * Issue: Supabase Auth統合
  */
 
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import type { CredentialResponse } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
-import Login from './components/Login';
 import { useAuth } from './hooks/useAuth';
 
 export default function LoginPage() {
@@ -21,18 +20,51 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleLoginSuccess = (credentialResponse: CredentialResponse) => {
-    if (credentialResponse.credential) {
-      const decoded: any = jwtDecode(credentialResponse.credential);
-      const userInfo = {
-        name: decoded.name,
-        email: decoded.email,
-        picture: decoded.picture
-      };
-      login(userInfo);
-      navigate('/', { replace: true });
+  const handleLogin = async () => {
+    try {
+      await login(); // Supabase OAuth フロー開始
+    } catch (error) {
+      console.error('Login failed:', error);
     }
   };
 
-  return <Login onSuccess={handleLoginSuccess} />;
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      background: '#f5f5f5'
+    }}>
+      <div style={{
+        background: 'white',
+        padding: '40px',
+        borderRadius: '10px',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+        textAlign: 'center'
+      }}>
+        <h1 style={{ marginBottom: '10px', color: '#333' }}>
+          ラクヨミ アシスタントAI
+        </h1>
+        <p style={{ marginBottom: '30px', color: '#666' }}>
+          AIスライド生成ツール
+        </p>
+        <button
+          onClick={handleLogin}
+          style={{
+            padding: '12px 24px',
+            fontSize: '16px',
+            backgroundColor: '#4285f4',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          Sign in with Google
+        </button>
+      </div>
+    </div>
+  );
 }

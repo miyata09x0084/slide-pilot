@@ -20,7 +20,6 @@ export default function GenerationProgressPage() {
   const hasRedirected = useRef(false);
   const hasStarted = useRef(false);
   const [status, setStatus] = useState<ProcessingStatus>('uploading');
-  const [uploadedPath, setUploadedPath] = useState<string | null>(pdfPath || null);
 
   // PDF自動開始処理（アップロード完了時）
   useEffect(() => {
@@ -39,7 +38,6 @@ export default function GenerationProgressPage() {
             user_id: user?.email,
           });
           finalPath = uploadResult.path;
-          setUploadedPath(finalPath);
         }
 
         if (!finalPath) {

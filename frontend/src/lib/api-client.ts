@@ -1,10 +1,13 @@
 /**
  * API Client Configuration
  * Centralized Axios instance with interceptors for authentication and error handling
+ *
+ * Issue: Supabase Auth統合（JWT自動送信）
  */
 
 import axios from 'axios';
 import { env } from '@/config/env';
+import { supabase } from './supabase';
 
 // Create Axios instance
 export const api = axios.create({
@@ -15,21 +18,17 @@ export const api = axios.create({
   withCredentials: false,
 });
 
-// Request interceptor - Add authentication headers
+// Request interceptor - Add JWT authentication headers
 api.interceptors.request.use(
-  (config) => {
-    // Get user from localStorage
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        if (user.email) {
-          config.headers['X-User-Email'] = user.email;
-        }
-      } catch (err) {
-        console.warn('Failed to parse user data from localStorage:', err);
-      }
+  async (config) => {
+    // Supabase Session から JWT 取得
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // JWT が存在する場合は Authorization ヘッダーに追加
+    if (session?.access_token) {
+      config.headers['Authorization'] = `Bearer ${session.access_token}`;
     }
+
     return config;
   },
   (error) => {

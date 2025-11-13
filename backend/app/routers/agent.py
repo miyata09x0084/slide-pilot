@@ -3,14 +3,18 @@ LangGraphエージェントAPIプロキシルーター
 
 LangGraphサーバー (localhost:2024) へのリクエストをプロキシし、
 フロントエンドが単一エンドポイント (localhost:8001) で全機能にアクセスできるようにする。
+
+Issue: Supabase Auth統合
 """
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from fastapi.responses import StreamingResponse
 import httpx
 import asyncio
 import os
 from typing import Any, Dict
+
+from app.auth.middleware import optional_verify_token
 
 router = APIRouter()
 
@@ -146,10 +150,12 @@ async def search_assistants(request: Request):
 async def stream_run(
     thread_id: str,
     request: Request,
-    x_user_email: str = Header(None, alias="X-User-Email")
+    user_id: str = Depends(optional_verify_token)
 ):
     """
     LangGraphエージェントをストリーミング実行
+
+    認証: オプショナル（未認証時は "anonymous"）
 
     SSE (Server-Sent Events) をプロキシし、リアルタイムで実行状況を転送する。
     非同期ストリーミングによりバッファリング遅延なく転送される。
@@ -157,7 +163,7 @@ async def stream_run(
     Args:
         thread_id: LangGraphスレッドID
         request: リクエストボディ（assistant_id, input, stream_mode含む）
-        x_user_email: ユーザー識別子（Emailヘッダー、オプショナル）
+        user_id: JWT検証で取得したユーザーID（オプショナル、デフォルト: "anonymous"）
 
     Returns:
         StreamingResponse: SSEストリーム
@@ -166,14 +172,14 @@ async def stream_run(
         body = await request.json()
 
         # ──────────────────────────────────────────────────────────────
-        # user_id を input に注入（Issue: スライド履歴プレビュー + user_id修正）
+        # user_id を input に注入（Issue: Supabase Auth統合）
         # LangGraph MessagesState の拡張フィールドとして渡す
+        # JWT検証済みのuser_idを使用（改ざん不可）
         # ──────────────────────────────────────────────────────────────
-        if x_user_email:
-            if "input" not in body:
-                body["input"] = {}
-            body["input"]["user_id"] = x_user_email
-            print(f"[agent] Injected user_id={x_user_email} into input")
+        if "input" not in body:
+            body["input"] = {}
+        body["input"]["user_id"] = user_id
+        print(f"[agent] Injected user_id={user_id} into input (from JWT)")
 
         # 認証ヘッダー準備
         headers = {}
