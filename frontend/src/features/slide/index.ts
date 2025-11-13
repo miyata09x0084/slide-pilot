@@ -12,5 +12,5 @@ export { default as SlideDetailLayout } from './components/SlideDetailLayout';
 export { default as SuggestedQuestions } from './components/SuggestedQuestions';
 
 // React Router lazy loading用
-export { slideDetailLoader as lazySlideDetailLoader } from './loaders/slideDetailLoader';
+export { createSlideDetailLoader as lazySlideDetailLoader } from './loaders/slideDetailLoader';
 export { default as lazySlideDetailComponent } from './SlideDetailPage';

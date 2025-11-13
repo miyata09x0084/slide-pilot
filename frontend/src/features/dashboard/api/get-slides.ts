@@ -20,6 +20,14 @@ interface GetSlidesParams {
   limit?: number;
 }
 
+// クエリキーの定義（キャッシュ管理とキャッシュ無効化に使用）
+export const slidesKeys = {
+  all: ['slides'] as const,
+  lists: () => [...slidesKeys.all, 'list'] as const,
+  list: (userEmail: string, limit?: number) =>
+    [...slidesKeys.lists(), { userEmail, limit }] as const,
+};
+
 /**
  * Fetches slides from the API
  * User ID is automatically extracted from JWT by backend

@@ -3,8 +3,8 @@
  * Root layout for all authenticated routes
  */
 
-import { ProtectedRoute } from '@/features/auth';
+import { AuthGuard } from '@/features/auth';
 
 export function ProtectedLayout() {
-  return <ProtectedRoute />;
+  return <AuthGuard />;
 }

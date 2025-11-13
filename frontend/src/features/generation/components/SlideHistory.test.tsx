@@ -16,7 +16,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="test@example.com"
         onPreview={() => {}}
       />
     )
@@ -32,7 +31,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="test@example.com"
         onPreview={() => {}}
       />
     )
@@ -67,7 +65,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="test@example.com"
         onPreview={() => {}}
       />
     )
@@ -86,7 +83,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="test@example.com"
         onPreview={() => {}}
       />
     )
@@ -104,7 +100,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="user@example.com"
         onPreview={() => {}}
       />
     )
@@ -134,7 +129,6 @@ describe('SlideHistory', () => {
 
     render(
       <SlideHistory
-        userEmail="test@example.com"
         onPreview={mockOnPreview}
       />
     )

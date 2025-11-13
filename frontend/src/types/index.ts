@@ -37,6 +37,7 @@ export interface Slide {
   created_at: string;
   pdf_url?: string;
   thumbnail_url?: string;
+  topic?: string;
 }
 
 export interface SlideDetail {
