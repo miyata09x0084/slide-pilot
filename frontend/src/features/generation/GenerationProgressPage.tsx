@@ -32,10 +32,8 @@ export default function GenerationProgressPage() {
         let finalPath = pdfPath;
         if (pdfFile && !pdfPath) {
           setStatus('uploading');
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
           const uploadResult = await uploadPdf({
             file: pdfFile,
-            user_id: user?.email,
           });
           finalPath = uploadResult.path;
         }

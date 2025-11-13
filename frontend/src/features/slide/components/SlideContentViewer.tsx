@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
 import { ProgressBar } from './ProgressBar';
+import { api } from '@/lib/api-client';
 
 // Mermaid初期化
 mermaid.initialize({
@@ -123,13 +124,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
   useEffect(() => {
     const fetchSlide = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides/${slideId}/markdown`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch slide: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await api.get(`/slides/${slideId}/markdown`) as SlideContent;
         setSlide(data);
       } catch (err: any) {
         setError(err.message);

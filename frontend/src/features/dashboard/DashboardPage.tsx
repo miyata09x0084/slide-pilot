@@ -140,10 +140,10 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const { createThread, sendMessage } = useReactAgent();
 
-  // React Queryでスライド履歴を取得
+  // React Queryでスライド履歴を取得（JWTから自動的にuser_idを取得）
   const { data } = useSlides(
-    { user_id: user?.email || '', limit: 20 },
-    { enabled: !!user?.email }
+    { limit: 20 },
+    { enabled: !!user }
   );
   const slides = data?.slides || [];
 
@@ -188,10 +188,7 @@ export default function DashboardPage() {
         // バックグラウンドでアップロード処理（非同期）
         // エラー時のみユーザーに通知
         try {
-          await uploadPdf({
-            file,
-            user_id: user?.email,
-          });
+          await uploadPdf({ file });
           // アップロード成功（プログレス画面で状態更新される）
         } catch (err) {
           console.error("❌ アップロードエラー:", err);

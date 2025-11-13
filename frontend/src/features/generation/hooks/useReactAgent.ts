@@ -16,6 +16,7 @@ import {
 import { createThread } from '../api/create-thread';
 import { findAssistantByGraphId } from '../api/get-assistants';
 import { env } from '@/config/env';
+import { supabase } from '@/lib/supabase';
 
 // SSE用のAPI URL（fetchで直接呼び出す）
 const API_BASE_URL = `${env.API_URL}/agent`;
@@ -88,17 +89,16 @@ export function useReactAgent() {
       const allMessages = [...messages, userMessage];
 
       // ──────────────────────────────────────────────────────────────
-      // ユーザー情報取得（Issue #24: Supabase統合）
+      // JWT取得（Issue #24: Supabase統合）
       // ──────────────────────────────────────────────────────────────
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const userEmail = user.email || 'anonymous@example.com';
+      const { data: { session } } = await supabase.auth.getSession();
 
       // SSEストリーミング開始
       const response = await fetch(`${API_BASE_URL}/threads/${activeThreadId}/runs/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Email': userEmail  // ユーザー識別ヘッダー
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         },
         body: JSON.stringify({
           assistant_id: assistantId,
