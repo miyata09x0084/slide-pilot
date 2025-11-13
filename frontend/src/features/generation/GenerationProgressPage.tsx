@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useReactAgent } from './hooks/useReactAgent';
 import { uploadPdf } from '../dashboard/api/upload-pdf';
-import ThinkingIndicator from './components/ThinkingIndicator';
 
 // 処理ステータス
 type ProcessingStatus = 'uploading' | 'creating_thread' | 'generating' | 'completed' | 'error';
@@ -16,11 +15,10 @@ export default function GenerationProgressPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { pdfPath, pdfFile, autoStart } = (location.state as { pdfPath?: string; pdfFile?: File; autoStart?: boolean }) || {};
-  const { thinkingSteps, isThinking, slideData, error, createThread, sendMessage } = useReactAgent();
+  const { isThinking, slideData, error, createThread, sendMessage } = useReactAgent();
   const hasRedirected = useRef(false);
   const hasStarted = useRef(false);
   const [status, setStatus] = useState<ProcessingStatus>('uploading');
-  const [elapsedTime, setElapsedTime] = useState(0);
 
   // PDF自動開始処理（アップロード完了時）
   useEffect(() => {
@@ -162,16 +160,12 @@ export default function GenerationProgressPage() {
               fontSize: '14px',
               color: '#666'
             }}>
-              {status === 'uploading' && 'PDFファイルをアップロードしています'}
               {status === 'creating_thread' && 'スライド生成の準備をしています'}
-              {status === 'generating' && 'PDFを分析してスライドを生成中...（約1分）'}
+              {status === 'generating' && 'PDFを分析してスライドを生成中...（1〜2分）'}
               {status === 'completed' && 'まもなくスライドページに移動します'}
               {status === 'error' && (error || '不明なエラーが発生しました')}
             </p>
           </div>
-
-          {/* 思考過程インジケーター */}
-          <ThinkingIndicator steps={thinkingSteps} isActive={isThinking} />
 
           {/* 完了メッセージ */}
           {slideData.slide_id && !isThinking && (

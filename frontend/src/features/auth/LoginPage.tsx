@@ -68,7 +68,24 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          ラクヨミ アシスタントAI
+          ラクヨミ アシスタントAI{' '}
+          <span
+            style={{
+              display: 'inline-block',
+              marginLeft: '8px',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: '600',
+              color: '#6b7280',
+              background: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              letterSpacing: '0.5px',
+              verticalAlign: 'middle',
+            }}
+          >
+            α版
+          </span>
         </h1>
         <p style={{ marginBottom: '8px', color: '#666', fontWeight: '600' }}>
           あなた専用の学習パートナー

@@ -45,6 +45,18 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#1a1a1a",
     letterSpacing: "-0.5px",
   },
+  alphaBadge: {
+    display: "inline-block",
+    marginLeft: "10px",
+    padding: "2px 8px",
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#6b7280",
+    background: "#f3f4f6",
+    border: "1px solid #d1d5db",
+    borderRadius: "4px",
+    letterSpacing: "0.5px",
+  },
   userSection: {
     display: "flex",
     alignItems: "center",
@@ -253,7 +265,10 @@ export default function DashboardPage() {
       <div style={styles.header}>
         <div style={styles.logoSection}>
           <span style={styles.logoIcon}>📚</span>
-          <h1 style={styles.logo}>ラクヨミ アシスタントAI</h1>
+          <h1 style={styles.logo}>
+            ラクヨミ アシスタントAI
+            <span style={styles.alphaBadge}>α版</span>
+          </h1>
         </div>
 
         <div style={styles.userSection}>
