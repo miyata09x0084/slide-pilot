@@ -147,7 +147,7 @@ export default function QuickActionMenu({
         <div style={styles.header}>
           <h2 style={styles.headerTitle}>新規作成</h2>
           <div style={styles.headerSubtitle}>
-            作成方法を選択してください
+            PDFアップロードで資料を理解しやすく
           </div>
         </div>
 
@@ -169,7 +169,7 @@ export default function QuickActionMenu({
             <div style={styles.menuContent}>
               <div style={styles.menuTitle}>PDFをアップロード</div>
               <div style={styles.menuDescription}>
-                PDFファイルからスライドを作成
+                PDFを理解しやすいスライドに変換
               </div>
             </div>
           </button>

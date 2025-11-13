@@ -1,43 +1,89 @@
 /**
  * useAuth Hook
- * Google OAuth認証状態を管理
+ * Supabase Auth で Google OAuth 認証状態を管理
+ *
+ * Issue: Supabase Auth統合
  */
 
 import { useState, useEffect } from 'react';
 import type { UserInfo } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 export function useAuth() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ページロード時にlocalStorageから復元
+  // セッション復元（Supabase が自動管理）
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (err) {
-        console.error('Failed to parse user data:', err);
-        localStorage.removeItem('user');
+    // 初回セッション取得
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata.full_name || session.user.email || '',
+          email: session.user.email || '',
+          picture: session.user.user_metadata.avatar_url || '',
+        });
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    // セッション変更を監視（ログイン/ログアウト時に自動更新）
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setUser({
+            name: session.user.user_metadata.full_name || session.user.email || '',
+            email: session.user.email || '',
+            picture: session.user.user_metadata.avatar_url || '',
+          });
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (userInfo: UserInfo) => {
-    setUser(userInfo);
-    localStorage.setItem('user', JSON.stringify(userInfo));
+  const login = async () => {
+    // Supabase Auth で Google OAuth フロー開始（リダイレクト型）
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    if (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   };
 
-  const logout = () => {
+  const loginWithGoogle = async (googleCredential: string) => {
+    // Google JWT を Supabase に渡して検証
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: googleCredential,
+    });
+
+    if (error) {
+      console.error('Supabase Auth failed:', error);
+      throw error;
+    }
+
+    console.log('✅ Supabase Auth success:', data.user?.email);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('user');
   };
 
   return {
     user,
     loading,
-    login,
+    login, // リダイレクト型（フォールバック用）
+    loginWithGoogle, // Google JWT 検証型（メイン）
     logout,
     isAuthenticated: !!user,
   };

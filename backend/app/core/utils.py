@@ -368,7 +368,7 @@ layout: intro
 class: text-left
 ---
 
-## 📋 Agenda
+## 目次
 
 <v-clicks>
 
@@ -545,7 +545,7 @@ background: #ffffff
 layout: intro
 ---
 
-## Agenda
+## 目次
 - Microsoft AI 最新情報
 - OpenAI の動向
 - Google Gemini アップデート

@@ -1,6 +1,8 @@
 /**
  * AppProvider - Global application providers
  * Wraps app with GoogleOAuth, React Query, Recoil, Suspense, and ErrorBoundary
+ *
+ * Issue: Google OAuth UI復元（GoogleOAuthProvider + Supabase Auth ハイブリッド）
  */
 
 import { Suspense } from 'react';
