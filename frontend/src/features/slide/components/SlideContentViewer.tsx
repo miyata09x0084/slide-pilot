@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
 import { ProgressBar } from './ProgressBar';
-import { api } from '@/lib/api-client';
+import { useSlideDetail } from '../api/get-slide-detail';
 
 // Mermaid初期化
 mermaid.initialize({
@@ -105,36 +105,10 @@ interface SlideContentViewerProps {
   slideId: string;
 }
 
-interface SlideContent {
-  slide_id: string;
-  title: string;
-  markdown: string;
-  created_at: string;
-  pdf_url?: string;
-  template_type?: 'science' | 'story' | 'math' | 'default'; // Issue #20: テンプレート種別
-}
-
 export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
-  const [slide, setSlide] = useState<SlideContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // React Queryフックでスライド詳細を取得
+  const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
   const [currentSlide, setCurrentSlide] = useState(0); // Issue #20: 進捗バー用の現在位置
-
-  // スライドデータの取得
-  useEffect(() => {
-    const fetchSlide = async () => {
-      try {
-        const data = await api.get(`/slides/${slideId}/markdown`) as SlideContent;
-        setSlide(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSlide();
-  }, [slideId]);
 
   // Intersection Observer でスライド位置を追跡
   useEffect(() => {
@@ -175,7 +149,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
       <div style={styles.container}>
         <div style={styles.errorCard}>
           <h2 style={styles.errorTitle}>エラー</h2>
-          <p style={styles.errorText}>{error}</p>
+          <p style={styles.errorText}>{error.message || 'スライドの読み込みに失敗しました'}</p>
         </div>
       </div>
     );
@@ -186,14 +160,14 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
   }
 
   // Markdownを `---` で分割してスライドに変換
-  const contentWithoutFrontmatter = slide.markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
+  const contentWithoutFrontmatter = slide.markdown?.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '') || '';
   const slides = contentWithoutFrontmatter
     .split(/\n---\n/)
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
-  // テーマカラーを取得
-  const templateType = slide?.template_type || 'story';
+  // テーマカラーを取得（デフォルトは'story'）
+  const templateType = 'story'; // TODO: SlideDetailにtemplate_type追加後に有効化
   const themeColors = THEME_COLORS[templateType];
 
   return (

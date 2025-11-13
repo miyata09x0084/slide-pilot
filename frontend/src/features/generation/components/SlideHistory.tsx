@@ -1,54 +1,20 @@
 /**
  * SlideHistory - スライド履歴表示コンポーネント
  *
- * Supabaseから取得したユーザーのスライド一覧をカード形式で表示
+ * React Query フックでSupabaseから取得したユーザーのスライド一覧をカード形式で表示
  */
 
-import { useEffect, useState } from 'react';
-
-interface Slide {
-  id: string;
-  title: string;
-  topic: string;
-  created_at: string;
-  pdf_url?: string;
-}
+import { useSlides } from '../../dashboard/api/get-slides';
 
 interface SlideHistoryProps {
-  userEmail: string;
+  userEmail: string; // 今は使用しないが、将来的な拡張のために保持
   onPreview: (slideId: string) => void;
 }
 
-export function SlideHistory({ userEmail, onPreview }: SlideHistoryProps) {
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchSlides = async () => {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8001/api'}/slides?user_id=${encodeURIComponent(userEmail)}&limit=20`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch slides: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        setSlides(data.slides || []);
-      } catch (err: any) {
-        console.error('Failed to fetch slides:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (userEmail) {
-      fetchSlides();
-    }
-  }, [userEmail]);
+export function SlideHistory({ userEmail: _userEmail, onPreview }: SlideHistoryProps) {
+  // React Queryフックでスライド履歴を取得（JWTから自動的にuser_idを取得）
+  const { data, isLoading: loading, error } = useSlides({ limit: 20 });
+  const slides = data?.slides || [];
 
   if (loading) {
     return (
@@ -87,7 +53,7 @@ export function SlideHistory({ userEmail, onPreview }: SlideHistoryProps) {
         borderRadius: '8px',
         border: '1px solid #f5c6cb'
       }}>
-        ⚠️ エラー: {error}
+        ⚠️ エラー: {error.message || 'スライドの読み込みに失敗しました'}
       </div>
     );
   }
