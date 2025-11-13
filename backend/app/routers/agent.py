@@ -37,7 +37,7 @@ else:
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 # タイムアウト設定（LLM処理が長時間かかる可能性があるため長めに設定）
-TIMEOUT = httpx.Timeout(300.0, connect=10.0)
+TIMEOUT = httpx.Timeout(600.0, connect=10.0)  # 10分タイムアウト（スライド生成は長時間かかる）
 
 # リトライ設定（LangSmith Cloudでは不要だが、ローカル用に残す）
 MAX_RETRIES = 5

@@ -37,7 +37,7 @@ def generate_slides(
 
     Args:
         topic: スライドのトピック
-               - PDFファイルパス（例: "/path/to/file.pdf"）
+               - PDFファイル（Storage形式: "user_id/filename.pdf" または "anonymous/filename.pdf"）
                - YouTube URL（例: "https://youtube.com/watch?v=..."）
                - テキスト（例: "AI最新情報"）
         state: LangGraphから自動注入されるState（user_id含む）

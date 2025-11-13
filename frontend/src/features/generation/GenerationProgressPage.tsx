@@ -61,12 +61,18 @@ export default function GenerationProgressPage() {
 
   // スライド生成完了時に詳細ページへ自動遷移
   useEffect(() => {
-    if (slideData.slide_id && !hasRedirected.current && !isThinking) {
+    // slide_idまたはpathがあれば完了とみなす
+    if ((slideData.slide_id || slideData.path) && !hasRedirected.current && !isThinking) {
       hasRedirected.current = true;
 
-      // Phase 3: SlideDetailPageへ遷移
+      // slide_idがあればSlideDetailPageへ、なければダッシュボードへ
       setTimeout(() => {
-        navigate(`/slides/${slideData.slide_id}`, { replace: true });
+        if (slideData.slide_id) {
+          navigate(`/slides/${slideData.slide_id}`, { replace: true });
+        } else {
+          // 古いワークフローの場合はダッシュボードに戻る
+          navigate('/', { replace: true });
+        }
       }, 2000);
     }
   }, [slideData, isThinking, navigate]);

@@ -1,10 +1,13 @@
 // ReActエージェントとの通信を管理するカスタムフック
 // SSEストリーミングでメッセージ送受信と思考過程を取得
 // Recoilでグローバル状態管理（ページ間で状態共有）
+// React Queryでキャッシュ無効化（スライド生成完了時）
 
 import { useCallback, useState } from 'react';
 import { useRecoilState } from 'recoil';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
+import { slidesKeys } from '@/features/dashboard/api/get-slides';
 import {
   messagesAtom,
   thinkingStepsAtom,
@@ -29,6 +32,9 @@ export function useReactAgent() {
   const [error, setError] = useRecoilState(errorAtom);
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
   const [cachedAssistantId, setCachedAssistantId] = useState<string | null>(null);
+
+  // React Queryのクライアント（キャッシュ無効化用）
+  const queryClient = useQueryClient();
 
   // スライド生成中フラグ（ローカル変数で管理）
   // @ts-ignore - Used in closure but TypeScript doesn't detect it
@@ -195,6 +201,14 @@ export function useReactAgent() {
                             type: 'observation',
                             content: 'スライド生成完了'
                           }]);
+
+                          // スライド一覧のキャッシュを無効化（新しいスライドを反映）
+                          const user = JSON.parse(localStorage.getItem('user') || '{}');
+                          if (user.email) {
+                            queryClient.invalidateQueries({
+                              queryKey: slidesKeys.list(user.email, 20),
+                            });
+                          }
                         }
                       } catch (e) {
                         console.warn('Failed to parse slide data:', e);

@@ -202,3 +202,6 @@ docs/bugs/
 docs/internal/
 
 frontend/.firebase/
+
+# Deployment procedure documentation (contains sensitive info)
+docs/deployment/FIREBASE_HOSTING_DEPLOYMENT.md

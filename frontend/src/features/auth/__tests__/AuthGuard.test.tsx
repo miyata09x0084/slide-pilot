@@ -1,18 +1,18 @@
 /**
- * ProtectedRouteコンポーネントのテスト
+ * AuthGuardコンポーネントのテスト
  * Phase 2で移行した認証ガードコンポーネントの動作確認
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import ProtectedRoute from '../components/ProtectedRoute';
+import AuthGuard from '../components/AuthGuard';
 import * as useAuthModule from '../hooks/useAuth';
 
 // useAuthをモック
 vi.mock('../hooks/useAuth');
 
-describe('ProtectedRoute component', () => {
+describe('AuthGuard component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -30,7 +30,7 @@ describe('ProtectedRoute component', () => {
     render(
       <MemoryRouter initialEntries={['/protected']}>
         <Routes>
-          <Route element={<ProtectedRoute />}>
+          <Route element={<AuthGuard />}>
             <Route path="/protected" element={<div>Protected Content</div>} />
           </Route>
         </Routes>
@@ -53,7 +53,7 @@ describe('ProtectedRoute component', () => {
     render(
       <MemoryRouter initialEntries={['/protected']}>
         <Routes>
-          <Route element={<ProtectedRoute />}>
+          <Route element={<AuthGuard />}>
             <Route path="/protected" element={<div>Protected Content</div>} />
           </Route>
           <Route path="/login" element={<div>Login Page</div>} />
@@ -82,7 +82,7 @@ describe('ProtectedRoute component', () => {
     render(
       <MemoryRouter initialEntries={['/protected']}>
         <Routes>
-          <Route element={<ProtectedRoute />}>
+          <Route element={<AuthGuard />}>
             <Route path="/protected" element={<div>Protected Content</div>} />
           </Route>
           <Route path="/login" element={<div>Login Page</div>} />
