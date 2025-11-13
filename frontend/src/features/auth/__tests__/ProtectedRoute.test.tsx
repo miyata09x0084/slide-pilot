@@ -23,6 +23,7 @@ describe('ProtectedRoute component', () => {
       user: null,
       loading: true,
       login: vi.fn(),
+      loginWithGoogle: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -45,6 +46,7 @@ describe('ProtectedRoute component', () => {
       user: null,
       loading: false,
       login: vi.fn(),
+      loginWithGoogle: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -73,6 +75,7 @@ describe('ProtectedRoute component', () => {
       },
       loading: false,
       login: vi.fn(),
+      loginWithGoogle: vi.fn(),
       logout: vi.fn(),
     });
 

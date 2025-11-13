@@ -46,7 +46,7 @@ export function useAuth() {
   }, []);
 
   const login = async () => {
-    // Supabase Auth で Google OAuth フロー開始
+    // Supabase Auth で Google OAuth フロー開始（リダイレクト型）
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -59,6 +59,21 @@ export function useAuth() {
     }
   };
 
+  const loginWithGoogle = async (googleCredential: string) => {
+    // Google JWT を Supabase に渡して検証
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: googleCredential,
+    });
+
+    if (error) {
+      console.error('Supabase Auth failed:', error);
+      throw error;
+    }
+
+    console.log('✅ Supabase Auth success:', data.user?.email);
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -67,7 +82,8 @@ export function useAuth() {
   return {
     user,
     loading,
-    login,
+    login, // リダイレクト型（フォールバック用）
+    loginWithGoogle, // Google JWT 検証型（メイン）
     logout,
     isAuthenticated: !!user,
   };

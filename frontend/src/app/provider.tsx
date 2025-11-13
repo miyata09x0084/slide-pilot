@@ -1,12 +1,13 @@
 /**
  * AppProvider - Global application providers
- * Wraps app with React Query, Recoil, Suspense, and ErrorBoundary
+ * Wraps app with GoogleOAuth, React Query, Recoil, Suspense, and ErrorBoundary
  *
- * Issue: Supabase Auth統合（GoogleOAuthProvider削除）
+ * Issue: Google OAuth UI復元（GoogleOAuthProvider + Supabase Auth ハイブリッド）
  */
 
 import { Suspense } from 'react';
 import type { ReactNode } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { RecoilRoot } from 'recoil';
@@ -22,12 +23,14 @@ interface AppProviderProps {
 export function AppProvider({ children }: AppProviderProps) {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <RecoilRoot>
-          <Suspense fallback={<Spinner />}>{children}</Suspense>
-        </RecoilRoot>
-        {env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
-      </QueryClientProvider>
+      <GoogleOAuthProvider clientId={env.GOOGLE_CLIENT_ID}>
+        <QueryClientProvider client={queryClient}>
+          <RecoilRoot>
+            <Suspense fallback={<Spinner />}>{children}</Suspense>
+          </RecoilRoot>
+          {env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+        </QueryClientProvider>
+      </GoogleOAuthProvider>
     </ErrorBoundary>
   );
 }
