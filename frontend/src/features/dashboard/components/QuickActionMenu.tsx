@@ -9,7 +9,6 @@ import { useRef, useCallback, memo } from 'react';
 interface QuickActionMenuProps {
   onClose: () => void;
   onSelectUpload: () => void;
-  onSelectTemplate: (templateId: string) => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -95,33 +94,40 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: '#6b7280',
   },
+  menuItemDisabled: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px',
+    borderRadius: '8px',
+    cursor: 'not-allowed',
+    transition: 'all 0.2s',
+    border: 'none',
+    background: '#f9fafb',
+    width: '100%',
+    textAlign: 'left',
+    opacity: 0.6,
+  },
 };
 
-const templates = [
+const comingSoonItems = [
   {
-    id: 'ai-news',
-    icon: '🤖',
-    title: 'AI最新ニュース',
-    description: '2025年のトレンドをまとめます',
+    id: 'webpage',
+    icon: '🌐',
+    title: 'WebページURL',
+    description: '🔒 準備中',
   },
   {
-    id: 'ml-basics',
-    icon: '📊',
-    title: '機械学習入門',
-    description: '基礎から学べるスライド',
-  },
-  {
-    id: 'textbook',
-    icon: '📚',
-    title: '教科書要約',
-    description: '章立てから作成します',
+    id: 'video',
+    icon: '🎬',
+    title: '動画URL',
+    description: '🔒 準備中',
   },
 ];
 
 const QuickActionMenu = memo(function QuickActionMenu({
   onClose,
   onSelectUpload,
-  onSelectTemplate,
 }: QuickActionMenuProps) {
   // @ts-ignore - Reserved for future use
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,11 +142,6 @@ const QuickActionMenu = memo(function QuickActionMenu({
     onClose();
     onSelectUpload();
   }, [onClose, onSelectUpload]);
-
-  const handleTemplateClick = useCallback((templateId: string) => {
-    onClose();
-    onSelectTemplate(templateId);
-  }, [onClose, onSelectTemplate]);
 
   return (
     <div style={styles.overlay} onClick={handleOverlayClick}>
@@ -175,29 +176,20 @@ const QuickActionMenu = memo(function QuickActionMenu({
             </div>
           </button>
 
-          {/* テンプレート */}
-          {templates.map((template) => (
-            <button
-              key={template.id}
-              style={styles.menuItem}
-              onClick={() => handleTemplateClick(template.id)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f9fafb';
-                e.currentTarget.style.transform = 'translateX(4px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'white';
-                e.currentTarget.style.transform = 'translateX(0)';
-              }}
+          {/* 準備中の項目 */}
+          {comingSoonItems.map((item) => (
+            <div
+              key={item.id}
+              style={styles.menuItemDisabled}
             >
-              <div style={styles.menuIcon}>{template.icon}</div>
+              <div style={styles.menuIcon}>{item.icon}</div>
               <div style={styles.menuContent}>
-                <div style={styles.menuTitle}>{template.title}</div>
+                <div style={styles.menuTitle}>{item.title}</div>
                 <div style={styles.menuDescription}>
-                  {template.description}
+                  {item.description}
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>
