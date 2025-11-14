@@ -3,7 +3,7 @@
  * 認証が必要なルートを保護するコンポーネント
  */
 
-import { Navigate, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export default function AuthGuard() {
@@ -15,6 +15,12 @@ export default function AuthGuard() {
     timestamp: new Date().toISOString()
   });
 
+  // 🚨 デバッグ用：認証チェックを一時的に無効化
+  console.warn('[AuthGuard] ⚠️ DEBUG MODE: Authentication check DISABLED - allowing all access');
+  return <Outlet />;
+
+  // 以下は一時的にコメントアウト（デバッグ後に復元）
+  /*
   // 認証状態の読み込み中はローディング表示
   if (loading) {
     console.log('[AuthGuard] Showing loading spinner');
@@ -57,4 +63,5 @@ export default function AuthGuard() {
   // 認証済みの場合は子ルートを表示
   console.log('[AuthGuard] Authenticated, rendering protected content');
   return <Outlet />;
+  */
 }
