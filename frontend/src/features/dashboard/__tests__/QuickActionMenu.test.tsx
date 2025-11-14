@@ -1,6 +1,6 @@
 /**
  * QuickActionMenu コンポーネントのテスト
- * 新規作成時のクイックアクションメニュー
+ * 新規作成時のクイックアクションメニュー（更新版: 準備中項目対応）
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -12,53 +12,47 @@ describe('QuickActionMenu', () => {
     it('メニューが表示される', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
       expect(screen.getByText('新規作成')).toBeInTheDocument();
-      expect(screen.getByText('作成方法を選択してください')).toBeInTheDocument();
+      expect(screen.getByText('PDFアップロードで資料を理解しやすく')).toBeInTheDocument();
     });
 
     it('PDFアップロードボタンが表示される', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
       expect(screen.getByText('PDFをアップロード')).toBeInTheDocument();
-      expect(screen.getByText('PDFファイルからスライドを作成')).toBeInTheDocument();
+      expect(screen.getByText('PDFを理解しやすいスライドに変換')).toBeInTheDocument();
     });
 
-    it('テンプレートボタンが3つ表示される', () => {
+    it('準備中項目が2つ表示される', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
-      expect(screen.getByText('AI最新ニュース')).toBeInTheDocument();
-      expect(screen.getByText('機械学習入門')).toBeInTheDocument();
-      expect(screen.getByText('教科書要約')).toBeInTheDocument();
+      expect(screen.getByText('WebページURL')).toBeInTheDocument();
+      expect(screen.getByText('動画URL')).toBeInTheDocument();
+      expect(screen.getAllByText('🔒 準備中')).toHaveLength(2);
     });
   });
 
@@ -66,13 +60,11 @@ describe('QuickActionMenu', () => {
     it('PDFアップロードボタンクリックで onSelectUpload と onClose が呼ばれる', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
@@ -81,70 +73,34 @@ describe('QuickActionMenu', () => {
 
       expect(onClose).toHaveBeenCalledTimes(1);
       expect(onSelectUpload).toHaveBeenCalledTimes(1);
-      expect(onSelectTemplate).not.toHaveBeenCalled();
     });
   });
 
-  describe('インタラクション - テンプレート選択', () => {
-    it('AI最新ニュース選択で onSelectTemplate("ai-news") が呼ばれる', () => {
+  describe('インタラクション - 準備中項目', () => {
+    it('準備中項目はdiv要素で、クリックできない', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
-      const aiNewsButton = screen.getByText('AI最新ニュース').closest('button')!;
-      fireEvent.click(aiNewsButton);
+      // WebページURLとVideo URLはdiv要素（ボタンではない）
+      const webpageItem = screen.getByText('WebページURL').closest('div')!;
+      const videoItem = screen.getByText('動画URL').closest('div')!;
 
-      expect(onClose).toHaveBeenCalledTimes(1);
-      expect(onSelectTemplate).toHaveBeenCalledWith('ai-news');
+      expect(webpageItem.tagName).toBe('DIV');
+      expect(videoItem.tagName).toBe('DIV');
+
+      // クリックしても何も起こらない
+      fireEvent.click(webpageItem);
+      fireEvent.click(videoItem);
+
       expect(onSelectUpload).not.toHaveBeenCalled();
-    });
-
-    it('機械学習入門選択で onSelectTemplate("ml-basics") が呼ばれる', () => {
-      const onClose = vi.fn();
-      const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
-
-      render(
-        <QuickActionMenu
-          onClose={onClose}
-          onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
-        />
-      );
-
-      const mlButton = screen.getByText('機械学習入門').closest('button')!;
-      fireEvent.click(mlButton);
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-      expect(onSelectTemplate).toHaveBeenCalledWith('ml-basics');
-    });
-
-    it('教科書要約選択で onSelectTemplate("textbook") が呼ばれる', () => {
-      const onClose = vi.fn();
-      const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
-
-      render(
-        <QuickActionMenu
-          onClose={onClose}
-          onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
-        />
-      );
-
-      const textbookButton = screen.getByText('教科書要約').closest('button')!;
-      fireEvent.click(textbookButton);
-
-      expect(onClose).toHaveBeenCalledTimes(1);
-      expect(onSelectTemplate).toHaveBeenCalledWith('textbook');
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 
@@ -152,13 +108,11 @@ describe('QuickActionMenu', () => {
     it('オーバーレイクリックで onClose が呼ばれる', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       const { container } = render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
@@ -172,13 +126,11 @@ describe('QuickActionMenu', () => {
     it('メニュー内をクリックしても onClose は呼ばれない', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
@@ -194,13 +146,11 @@ describe('QuickActionMenu', () => {
     it('PDFボタンにマウスホバーでスタイルが変更される', () => {
       const onClose = vi.fn();
       const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
 
       render(
         <QuickActionMenu
           onClose={onClose}
           onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
         />
       );
 
@@ -211,28 +161,6 @@ describe('QuickActionMenu', () => {
 
       fireEvent.mouseLeave(uploadButton);
       expect(uploadButton.style.background).toBe('rgb(239, 246, 255)'); // #eff6ff
-    });
-
-    it('テンプレートボタンにマウスホバーでスタイルが変更される', () => {
-      const onClose = vi.fn();
-      const onSelectUpload = vi.fn();
-      const onSelectTemplate = vi.fn();
-
-      render(
-        <QuickActionMenu
-          onClose={onClose}
-          onSelectUpload={onSelectUpload}
-          onSelectTemplate={onSelectTemplate}
-        />
-      );
-
-      const aiNewsButton = screen.getByText('AI最新ニュース').closest('button')!;
-
-      fireEvent.mouseEnter(aiNewsButton);
-      expect(aiNewsButton.style.background).toBe('rgb(249, 250, 251)'); // #f9fafb
-
-      fireEvent.mouseLeave(aiNewsButton);
-      expect(aiNewsButton.style.background).toBe('white');
     });
   });
 });
