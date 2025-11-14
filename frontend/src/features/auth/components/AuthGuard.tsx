@@ -9,8 +9,15 @@ import { useAuth } from '../hooks/useAuth';
 export default function AuthGuard() {
   const { isAuthenticated, loading } = useAuth();
 
+  console.log('[AuthGuard] Render:', {
+    loading,
+    isAuthenticated,
+    timestamp: new Date().toISOString()
+  });
+
   // 認証状態の読み込み中はローディング表示
   if (loading) {
+    console.log('[AuthGuard] Showing loading spinner');
     return (
       <div style={{
         minHeight: '100vh',
@@ -43,9 +50,11 @@ export default function AuthGuard() {
 
   // 未認証の場合はログインページにリダイレクト
   if (!isAuthenticated) {
+    console.log('[AuthGuard] Not authenticated, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   // 認証済みの場合は子ルートを表示
+  console.log('[AuthGuard] Authenticated, rendering protected content');
   return <Outlet />;
 }
