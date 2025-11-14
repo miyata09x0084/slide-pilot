@@ -4,10 +4,13 @@
  */
 
 import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useCallback } from 'react';
 import SlideDetailLayout from './components/SlideDetailLayout';
 import ChatPanel from './components/ChatPanel';
 import { SlideContentViewer } from './components/SlideContentViewer';
 import { useSlideDetail } from './api/get-slide-detail';
+import FeedbackModal from './components/FeedbackModal';
+import { submitFeedback } from './api/submit-feedback';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -63,6 +66,17 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.2s',
     display: 'inline-block',
   },
+  feedbackButton: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    background: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'background 0.2s',
+  },
   slideViewerWrapper: {
     height: '100%',
   },
@@ -71,9 +85,25 @@ const styles: Record<string, React.CSSProperties> = {
 export default function SlideDetailPage() {
   const { slideId } = useParams<{ slideId: string }>();
   const navigate = useNavigate();
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   // React Queryでスライド詳細を取得
   const { data: slide, isLoading, error } = useSlideDetail(slideId || '');
+
+  const handleFeedbackSubmit = useCallback(
+    async (rating: number, comment: string) => {
+      if (!slideId) return;
+
+      await submitFeedback({
+        slide_id: slideId,
+        rating,
+        comment,
+      });
+
+      alert('フィードバックをありがとうございます！');
+    },
+    [slideId]
+  );
 
   if (isLoading) {
     return <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
@@ -99,21 +129,17 @@ export default function SlideDetailPage() {
           <h1 style={styles.title}>{slide.title}</h1>
         </div>
 
-        {/* PDF表示ボタン（一旦非表示） */}
-        {/* <div style={styles.actions}>
-          {slide.pdf_url && (
-            <a
-              href={slide.pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseOver={(e) => (e.currentTarget.style.background = '#218838')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '#28a745')}
-              style={styles.actionButton}
-            >
-              📄 PDF を開く
-            </a>
-          )}
-        </div> */}
+        {/* アクションボタン */}
+        <div style={styles.actions}>
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
+            onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
+            style={styles.feedbackButton}
+          >
+            💬 フィードバック
+          </button>
+        </div>
       </div>
 
       {/* 2ペインレイアウト */}
@@ -125,6 +151,15 @@ export default function SlideDetailPage() {
         }
         chatPane={<ChatPanel slideId={slide.id} />}
       />
+
+      {/* フィードバックモーダル */}
+      {showFeedbackModal && (
+        <FeedbackModal
+          slideId={slide.id}
+          onClose={() => setShowFeedbackModal(false)}
+          onSubmit={handleFeedbackSubmit}
+        />
+      )}
     </div>
   );
 }

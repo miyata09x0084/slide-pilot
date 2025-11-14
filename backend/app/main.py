@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # 設定とルーターのインポート
 from app.config import settings
-from app.routers import health, uploads, slides, agent, auth
+from app.routers import health, uploads, slides, agent, auth, feedback
 
 # FastAPIアプリケーション作成
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(uploads.router, prefix="/api", tags=["uploads"])
 app.include_router(slides.router, prefix="/api", tags=["slides"])
 app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 
 
 @app.get("/")

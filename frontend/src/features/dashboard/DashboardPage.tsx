@@ -150,7 +150,7 @@ const responsiveStyles = `
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { createThread, sendMessage, resetChat } = useReactAgent();
+  const { resetChat } = useReactAgent();
 
   // React Queryでスライド履歴を取得（JWTから自動的にuser_idを取得）
   const { data } = useSlides(
@@ -214,31 +214,6 @@ export default function DashboardPage() {
       }
     };
     input.click();
-  };
-
-  // テンプレートクリック
-  const handleTemplateClick = async (templateId: string) => {
-    // 過去の状態をクリア（Issue: 新規作成時にキャッシュが残る問題を修正）
-    resetChat();
-
-    const templates: Record<string, string> = {
-      "ai-news":
-        "AI最新ニュースについて、2025年のトレンドをまとめたスライドを作成してください",
-      "ml-basics":
-        "機械学習の基礎について、初心者向けのスライドを作成してください",
-      textbook: "教科書の章立てから復習用スライドを作成してください",
-    };
-
-    const prompt = templates[templateId];
-    if (!prompt) return;
-
-    try {
-      const tid = await createThread();
-      navigate(`/generate/${tid}`, { state: { template: templateId } });
-      await sendMessage(prompt, tid);
-    } catch (err) {
-      console.error("❌ テンプレート処理エラー:", err);
-    }
   };
 
   // スライドクリック
@@ -359,7 +334,6 @@ export default function DashboardPage() {
         <QuickActionMenu
           onClose={() => setShowQuickMenu(false)}
           onSelectUpload={handleSelectUpload}
-          onSelectTemplate={handleTemplateClick}
         />
       )}
 
