@@ -6,21 +6,13 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import type { CredentialResponse } from '@react-oauth/google';
 import { useAuth } from './hooks/useAuth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle, isAuthenticated } = useAuth();
-
-  // すでにログイン済みの場合はダッシュボードへリダイレクト
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
+  const { loginWithGoogle } = useAuth();
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     if (!credentialResponse.credential) {
@@ -31,7 +23,10 @@ export default function LoginPage() {
     try {
       // Google JWT を Supabase に渡してセッション作成
       await loginWithGoogle(credentialResponse.credential);
-      // onAuthStateChange → useEffect が自動的に / へ遷移するため、ここでのnavigate不要
+      // Supabaseセッション確立を待つため短い遅延を入れる
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // ログイン成功後、ダッシュボードへ遷移
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Login failed:', error);
     }
