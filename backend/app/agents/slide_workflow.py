@@ -554,6 +554,9 @@ class: text-center
       # Step 4: 見出し（## ）前に `---` を機械的に挿入
       content_with_separators = _insert_separators(raw_content)
 
+      # Step 4.5: 会話形式に改行を挿入（LLM出力の揺らぎに対応）
+      content_with_separators = _format_conversation(content_with_separators)
+
       # Step 5: 連続した --- を圧縮（安全装置）
       content_with_separators = _double_separators(content_with_separators)
 
