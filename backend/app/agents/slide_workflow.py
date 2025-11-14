@@ -26,19 +26,23 @@ from app.core.llm import llm
 from app.core.supabase import save_slide_to_supabase
 from app.core.storage import upload_to_storage
 from app.core.utils import (
-    # ユーティリティ関数
-    _log, _strip_bullets, _slugify_en, _find_json,
-    _ensure_marp_header, _insert_separators, _double_separators,
-    _clean_title, _strip_whole_code_fence, _remove_presenter_lines,
-    # 日時関数
-    JST, now_jst, today_iso, month_ja, month_en, get_today_jst,
-    # Slidev生成関数
-    _get_all_vendors_info, _create_llm_summarized_bullets,
+    _log,
+    _strip_bullets,
+    _slugify_en,
+    _find_json,
+    _insert_separators,
+    _double_separators,
+    _strip_whole_code_fence,
+    _format_conversation,
+    JST,
+    now_jst,
+    month_ja,
+    _get_all_vendors_info,
+    _create_llm_summarized_bullets,
     _generate_multi_vendor_slides_integrated,
-    # Tavily検索関数
-    tavily_search, tavily_collect_context, context_to_bullets,
-    # テストツール
-    generate_slidev_test,
+    tavily_search,
+    tavily_collect_context,
+    context_to_bullets,
 )
 from app.prompts.evaluation_prompts import get_evaluation_prompt
 from app.prompts.slide_prompts import (

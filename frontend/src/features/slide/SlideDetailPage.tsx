@@ -99,7 +99,8 @@ export default function SlideDetailPage() {
           <h1 style={styles.title}>{slide.title}</h1>
         </div>
 
-        <div style={styles.actions}>
+        {/* PDF表示ボタン（一旦非表示） */}
+        {/* <div style={styles.actions}>
           {slide.pdf_url && (
             <a
               href={slide.pdf_url}
@@ -112,7 +113,7 @@ export default function SlideDetailPage() {
               📄 PDF を開く
             </a>
           )}
-        </div>
+        </div> */}
       </div>
 
       {/* 2ペインレイアウト */}
