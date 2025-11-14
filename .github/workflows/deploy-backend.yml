@@ -1,0 +1,100 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+
+      - name: Build and push container image
+        working-directory: backend
+        run: |
+          PROJECT_ID="slide-pilot-474305"
+          IMAGE_NAME="asia-northeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/slidepilot-api"
+          IMAGE_TAG="${{ github.sha }}"
+
+          docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" -t "${IMAGE_NAME}:latest" .
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${IMAGE_NAME}:latest"
+
+      - name: Install yq for schema parsing
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Deploy to Cloud Run (using schema-based deployment)
+        run: |
+          PROJECT_ID="slide-pilot-474305"
+          SERVICE_NAME="slidepilot-api"
+          REGION="asia-northeast1"
+          SCHEMA_FILE="backend/.env.schema.yml"
+          IMAGE_NAME="asia-northeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}"
+
+          # Generate --set-secrets flag from schema
+          SECRETS=$(yq eval '.secrets[] | .name' "$SCHEMA_FILE" | while read -r name; do
+            secret_id=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            echo "${name}=${secret_id}:latest"
+          done | paste -sd ",")
+
+          # Generate --set-env-vars flag from schema
+          ENV_VARS=$(yq eval '.env_vars[] | .name + "=" + .value' "$SCHEMA_FILE" | paste -sd ",")
+
+          # Deploy to Cloud Run
+          gcloud run deploy "$SERVICE_NAME" \
+            --image="${IMAGE_NAME}:${{ github.sha }}" \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=300 \
+            --max-instances=100 \
+            --min-instances=0 \
+            --set-secrets="$SECRETS" \
+            --set-env-vars="$ENV_VARS"
+
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=$(gcloud run services describe slidepilot-api \
+            --region=asia-northeast1 \
+            --format='value(status.url)')
+
+          echo "✅ Service deployed to: ${SERVICE_URL}"
+
+          # Health check
+          echo "🔍 Health check: ${SERVICE_URL}/api/health"
+          curl -f "${SERVICE_URL}/api/health" || exit 1
+
+          echo "🔍 Agent check: ${SERVICE_URL}/api/agent/ok"
+          curl -f "${SERVICE_URL}/api/agent/ok" || exit 1
+
+          echo "✅ All health checks passed!"

@@ -1,0 +1,82 @@
+name: Deploy Frontend to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  deploy:
+    name: Build and Deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install jq for schema parsing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Create production environment file from schema
+        working-directory: frontend
+        run: |
+          # Read schema and generate .env.production
+          cat > .env.production << EOF
+          # Auto-generated from .env.schema.json
+          # Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          # Backend API URL
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+
+          # Google OAuth Client ID
+          VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+
+          # Supabase Configuration
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          EOF
+
+          echo "✅ Generated .env.production:"
+          cat .env.production
+
+      - name: Build production bundle
+        working-directory: frontend
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: live
+          projectId: slide-pilot-474305
+          entryPoint: './frontend'
+
+      - name: Verify deployment
+        run: |
+          echo "✅ Frontend deployed to: https://slide-pilot-474305.web.app"
+          echo "🔍 Verifying deployment..."
+
+          # Wait for CDN propagation
+          sleep 10
+
+          # Health check
+          curl -f https://slide-pilot-474305.web.app/ || exit 1
+
+          echo "✅ Deployment verification successful!"
