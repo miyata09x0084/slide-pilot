@@ -31,7 +31,7 @@ export default function LoginPage() {
     try {
       // Google JWT を Supabase に渡してセッション作成
       await loginWithGoogle(credentialResponse.credential);
-      navigate('/', { replace: true });
+      // onAuthStateChange → useEffect が自動的に / へ遷移するため、ここでのnavigate不要
     } catch (error) {
       console.error('Login failed:', error);
     }
