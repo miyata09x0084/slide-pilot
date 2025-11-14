@@ -41,15 +41,23 @@ api.interceptors.response.use(
   (response) => {
     return response.data;
   },
-  (error) => {
+  async (error) => {
     // Handle specific error codes
     if (error.response) {
       const { status } = error.response;
 
-      // 401 Unauthorized - Redirect to login
+      // 401 Unauthorized - ログアウト処理（強制リダイレクトしない）
       if (status === 401) {
+        console.error('[API Client] 401 Unauthorized - Signing out from Supabase');
+
+        // Supabaseからログアウト（これによりonAuthStateChangeが発火）
+        await supabase.auth.signOut();
+
+        // ローカルストレージのクリーンアップ
         localStorage.removeItem('user');
-        window.location.href = '/login';
+
+        // window.location.href = '/login' は削除
+        // onAuthStateChange → useAuth → AuthGuard が自動的に /login へリダイレクト
       }
 
       // Log other errors
