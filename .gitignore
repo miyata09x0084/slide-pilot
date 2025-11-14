@@ -193,6 +193,9 @@ backend/data/slides/*.pdf
 backend/data/slides/*.png
 backend/data/slides/*.html
 
+# Feedback data (JSON files)
+backend/data/feedback/
+
 # Gmail API credentials (Issue #6)
 backend/credentials.json
 backend/token.json
