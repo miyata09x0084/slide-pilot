@@ -15,20 +15,26 @@ export default function LoginPage() {
   const { loginWithGoogle } = useAuth();
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    console.log('[LoginPage] Google OAuth success callback fired');
+
     if (!credentialResponse.credential) {
-      console.error('No credential received from Google');
+      console.error('[LoginPage] No credential received from Google');
       return;
     }
 
     try {
-      // Google JWT を Supabase に渡してセッション作成
+      console.log('[LoginPage] Calling loginWithGoogle...');
       await loginWithGoogle(credentialResponse.credential);
-      // Supabaseセッション確立を待つため短い遅延を入れる
+      console.log('[LoginPage] loginWithGoogle completed successfully');
+
+      console.log('[LoginPage] Waiting 100ms for session establishment...');
       await new Promise(resolve => setTimeout(resolve, 100));
-      // ログイン成功後、ダッシュボードへ遷移
+
+      console.log('[LoginPage] Navigating to / ...');
       navigate('/', { replace: true });
+      console.log('[LoginPage] navigate() called');
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('[LoginPage] Login failed:', error);
     }
   };
 

@@ -15,34 +15,58 @@ export function useAuth() {
 
   // セッション復元（Supabase が自動管理）
   useEffect(() => {
+    console.log('[useAuth] Initializing useEffect...');
+
     // 初回セッション取得
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[useAuth] Initial getSession result:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        timestamp: new Date().toISOString()
+      });
+
       if (session?.user) {
         setUser({
           name: session.user.user_metadata.full_name || session.user.email || '',
           email: session.user.email || '',
           picture: session.user.user_metadata.avatar_url || '',
         });
+        console.log('[useAuth] User set from initial session');
       }
       setLoading(false);
+      console.log('[useAuth] Loading set to false, isAuthenticated:', !!session);
     });
 
     // セッション変更を監視（ログイン/ログアウト時に自動更新）
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        console.log('[useAuth] onAuthStateChange fired:', {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id,
+          email: session?.user?.email,
+          timestamp: new Date().toISOString()
+        });
+
         if (session?.user) {
           setUser({
             name: session.user.user_metadata.full_name || session.user.email || '',
             email: session.user.email || '',
             picture: session.user.user_metadata.avatar_url || '',
           });
+          console.log('[useAuth] User set from onAuthStateChange, isAuthenticated: true');
         } else {
           setUser(null);
+          console.log('[useAuth] User cleared from onAuthStateChange, isAuthenticated: false');
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('[useAuth] Cleanup: unsubscribing from onAuthStateChange');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async () => {
@@ -60,6 +84,8 @@ export function useAuth() {
   };
 
   const loginWithGoogle = async (googleCredential: string) => {
+    console.log('[useAuth] loginWithGoogle called');
+
     // Google JWT を Supabase に渡して検証
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
@@ -67,11 +93,15 @@ export function useAuth() {
     });
 
     if (error) {
-      console.error('Supabase Auth failed:', error);
+      console.error('[useAuth] Supabase Auth failed:', error);
       throw error;
     }
 
-    console.log('✅ Supabase Auth success:', data.user?.email);
+    console.log('[useAuth] Supabase Auth success:', {
+      userId: data.user?.id,
+      email: data.user?.email,
+      hasSession: !!data.session
+    });
   };
 
   const logout = async () => {
