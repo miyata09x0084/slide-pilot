@@ -99,7 +99,9 @@ export default function LoginPage() {
         </p>
 
         {/* Google 公式 OAuth UI */}
-        <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
+        </div>
       </div>
     </div>
   );
