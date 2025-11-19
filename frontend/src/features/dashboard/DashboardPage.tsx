@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
 import { useSlides } from "./api/get-slides";
+import { useSamples } from "./api/get-samples";
 import { uploadPdf } from "./api/upload-pdf";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
@@ -113,6 +114,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     color: "#9ca3af",
   },
+  sectionDivider: {
+    gridColumn: "1 / -1",
+    marginTop: "20px",
+    marginBottom: "10px",
+  },
+  sectionTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#374151",
+    margin: 0,
+  },
 };
 
 // レスポンシブ対応のCSS
@@ -158,6 +170,10 @@ export default function DashboardPage() {
     { enabled: !!user }
   );
   const slides = data?.slides || [];
+
+  // サンプルスライドを取得
+  const { data: samplesData } = useSamples({ enabled: !!user });
+  const samples = samplesData?.samples || [];
 
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
@@ -327,6 +343,27 @@ export default function DashboardPage() {
             )}
           </>
         )}
+
+        {/* サンプルセクション区切り */}
+        {samples.length > 0 && (
+          <div style={styles.sectionDivider}>
+            <h2 style={styles.sectionTitle}>📖 サンプルスライド</h2>
+          </div>
+        )}
+
+        {/* サンプルスライドカード */}
+        {samples.map((sample) => (
+          <UnifiedCard
+            key={sample.id}
+            icon="📚"
+            title={sample.title}
+            subtitle="サンプル"
+            onClickWithArg={handleSlideClick}
+            clickArg={sample.id}
+            variant="sample"
+            className="card-sample"
+          />
+        ))}
       </div>
 
       {/* クイックアクションメニュー */}
