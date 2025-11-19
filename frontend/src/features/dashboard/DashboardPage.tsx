@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import { useAuth } from "../auth";
 import { useReactAgent } from "../generation";
 import { useSlides } from "./api/get-slides";
+import { useSamples } from "./api/get-samples";
 import { uploadPdf } from "./api/upload-pdf";
 import UnifiedCard from "./components/UnifiedCard";
 import QuickActionMenu from "./components/QuickActionMenu";
@@ -93,6 +94,15 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "1440px",
     margin: "0 auto",
   },
+  gridContainerNoTopPadding: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gridAutoRows: "minmax(200px, auto)",
+    gap: "20px",
+    padding: "0 32px 32px 32px",
+    maxWidth: "1440px",
+    margin: "0 auto",
+  },
   emptyState: {
     gridColumn: "1 / -1",
     textAlign: "center",
@@ -112,6 +122,42 @@ const styles: Record<string, React.CSSProperties> = {
   emptySubtext: {
     fontSize: "14px",
     color: "#9ca3af",
+  },
+  sectionTitleContainer: {
+    maxWidth: "1440px",
+    margin: "0 auto",
+    padding: "8px 32px",
+  },
+  sectionTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#374151",
+    margin: 0,
+  },
+  heroBanner: {
+    gridColumn: "1 / -1",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    borderRadius: "16px",
+    padding: "32px",
+    textAlign: "center",
+    color: "white",
+    marginBottom: "12px",
+  },
+  heroBannerIcon: {
+    fontSize: "48px",
+    marginBottom: "12px",
+  },
+  heroBannerTitle: {
+    fontSize: "24px",
+    fontWeight: "700",
+    margin: "0 0 8px 0",
+    color: "white",
+  },
+  heroBannerSubtitle: {
+    fontSize: "15px",
+    fontWeight: "400",
+    margin: 0,
+    color: "rgba(255, 255, 255, 0.9)",
   },
 };
 
@@ -158,6 +204,10 @@ export default function DashboardPage() {
     { enabled: !!user }
   );
   const slides = data?.slides || [];
+
+  // サンプルスライドを取得
+  const { data: samplesData } = useSamples({ enabled: !!user });
+  const samples = samplesData?.samples || [];
 
   const [showAll, setShowAll] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
@@ -266,8 +316,40 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* カードグリッド */}
-      <div className="dashboard-grid" style={styles.gridContainer}>
+      {/* サンプルセクション */}
+      {samples.length > 0 && (
+        <div className="dashboard-grid" style={styles.gridContainer}>
+          <div style={styles.heroBanner}>
+            <div style={styles.heroBannerIcon}>📚</div>
+            <h2 style={styles.heroBannerTitle}>サンプルスライドで機能を体験</h2>
+            <p style={styles.heroBannerSubtitle}>
+              まずはサンプルで、AIが生成するスライドの品質を確認してみましょう
+            </p>
+          </div>
+
+          {/* サンプルスライドカード */}
+          {samples.map((sample) => (
+            <UnifiedCard
+              key={sample.id}
+              icon="📚"
+              title={sample.title}
+              subtitle={sample.description || "サンプル"}
+              onClickWithArg={handleSlideClick}
+              clickArg={sample.id}
+              variant="sample"
+              className="card-sample"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* あなたのスライドセクションタイトル */}
+      <div style={styles.sectionTitleContainer}>
+        <h2 style={styles.sectionTitle}>📂 あなたのスライド</h2>
+      </div>
+
+      {/* ユーザースライドグリッド */}
+      <div className="dashboard-grid" style={styles.gridContainerNoTopPadding}>
         {/* 新規作成 */}
         <UnifiedCard
           icon="📄"

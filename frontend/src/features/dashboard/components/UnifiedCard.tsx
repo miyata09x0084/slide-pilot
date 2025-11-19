@@ -13,7 +13,7 @@ interface UnifiedCardProps {
   onClick?: () => void;
   onClickWithArg?: (arg: string) => void;
   clickArg?: string;
-  variant?: 'primary' | 'default' | 'history' | 'more';
+  variant?: 'primary' | 'default' | 'history' | 'more' | 'sample';
   className?: string;
 }
 
@@ -82,12 +82,35 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
     boxSizing: 'border-box',
   },
+  cardSample: {
+    height: '100%',
+    minHeight: '200px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: '2px solid #667eea',
+    borderRadius: '12px',
+    padding: '28px 24px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxSizing: 'border-box',
+    color: 'white',
+  },
   icon: {
     fontSize: '36px',
     marginBottom: '8px',
   },
   iconPrimary: {
     fontSize: '64px',
+    marginBottom: '12px',
+    fontWeight: '300',
+    lineHeight: '1',
+  },
+  iconSample: {
+    fontSize: '48px',
     marginBottom: '12px',
     fontWeight: '300',
     lineHeight: '1',
@@ -111,6 +134,13 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: '1.3',
     wordBreak: 'break-word',
   },
+  titleSample: {
+    fontSize: '15px',
+    fontWeight: '700',
+    color: 'white',
+    lineHeight: '1.3',
+    wordBreak: 'break-word',
+  },
   subtitle: {
     fontSize: '12px',
     color: '#6b7280',
@@ -119,6 +149,11 @@ const styles: Record<string, React.CSSProperties> = {
   subtitlePrimary: {
     fontSize: '12px',
     color: '#6b7280',
+    lineHeight: '1.4',
+  },
+  subtitleSample: {
+    fontSize: '12px',
+    color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: '1.4',
   },
 };
@@ -136,6 +171,7 @@ const UnifiedCard = memo(function UnifiedCard({
   const isPrimary = variant === 'primary';
   const isHistory = variant === 'history';
   const isMore = variant === 'more';
+  const isSample = variant === 'sample';
 
   const cardStyle = isPrimary
     ? styles.cardPrimary
@@ -143,10 +179,12 @@ const UnifiedCard = memo(function UnifiedCard({
     ? styles.cardHistory
     : isMore
     ? styles.cardMore
+    : isSample
+    ? styles.cardSample
     : styles.card;
-  const iconStyle = isPrimary ? styles.iconPrimary : styles.icon;
-  const titleStyle = isPrimary ? styles.titlePrimary : styles.title;
-  const subtitleStyle = isPrimary ? styles.subtitlePrimary : styles.subtitle;
+  const iconStyle = isPrimary ? styles.iconPrimary : isSample ? styles.iconSample : styles.icon;
+  const titleStyle = isPrimary ? styles.titlePrimary : isSample ? styles.titleSample : styles.title;
+  const subtitleStyle = isPrimary ? styles.subtitlePrimary : isSample ? styles.subtitleSample : styles.subtitle;
 
   // クリックハンドラー: onClickWithArgが指定されている場合はそちらを優先
   const handleClick = () => {
@@ -159,13 +197,16 @@ const UnifiedCard = memo(function UnifiedCard({
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderColor = '#3b82f6';
-    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.12)';
+    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
     if (isPrimary) {
       e.currentTarget.style.background = '#dbeafe';
     } else if (isHistory) {
       e.currentTarget.style.background = '#f3f4f6';
     } else if (isMore) {
       e.currentTarget.style.background = '#f9fafb';
+    } else if (isSample) {
+      e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+      e.currentTarget.style.transform = 'translateY(-4px)';
     } else {
       e.currentTarget.style.background = '#f9fafb';
     }
@@ -181,6 +222,10 @@ const UnifiedCard = memo(function UnifiedCard({
     } else if (isMore) {
       e.currentTarget.style.borderColor = '#d1d5db';
       e.currentTarget.style.background = '#ffffff';
+    } else if (isSample) {
+      e.currentTarget.style.borderColor = '#667eea';
+      e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      e.currentTarget.style.transform = 'translateY(0)';
     } else {
       e.currentTarget.style.borderColor = '#e5e7eb';
       e.currentTarget.style.background = '#ffffff';

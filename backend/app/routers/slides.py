@@ -54,6 +54,7 @@ async def get_slide_markdown(
 
     認証: 必須（JWT）
     RLS: Supabaseが自動的にuser_idでフィルタ
+    例外: サンプルスライド（user_id = 00000000-...）は全員アクセス可能
 
     Args:
         slide_id: スライドID（UUID）
@@ -72,8 +73,12 @@ async def get_slide_markdown(
     if not slide:
         raise HTTPException(status_code=404, detail="スライドが見つかりません")
 
-    # RLS + 念のためユーザーID照合
-    if slide.get("user_id") != user_id:
+    # サンプルスライド（user_id = 00000000-...）は全員アクセス可能
+    SAMPLE_USER_ID = "00000000-0000-0000-0000-000000000000"
+    is_sample = slide.get("user_id") == SAMPLE_USER_ID
+
+    # RLS + 念のためユーザーID照合（サンプルスライドは除外）
+    if not is_sample and slide.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="アクセス権限がありません")
 
     return {
