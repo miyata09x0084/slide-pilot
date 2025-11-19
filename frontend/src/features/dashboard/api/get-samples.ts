@@ -12,6 +12,8 @@ export interface Sample {
   topic: string;
   created_at: string;
   pdf_url?: string;
+  description?: string; // サンプルの説明文
+  readTime?: string;    // 読了時間の目安
 }
 
 interface SamplesResponse {
@@ -20,8 +22,8 @@ interface SamplesResponse {
 
 // 固定サンプルスライドID（Supabaseに登録済み）
 const SAMPLE_SLIDE_IDS = [
-  "11111111-1111-1111-1111-111111111111",  // 多言語AIで文書解析
-  "22222222-2222-2222-2222-222222222222",  // 2Dと3Dで学ぶ空間理解
+  "11111111-1111-1111-1111-111111111111",  // 速いAIの秘密
+  "22222222-2222-2222-2222-222222222222",  // AIアートの秘密
 ];
 
 /**
@@ -42,15 +44,19 @@ export const useSamples = (options?: { enabled?: boolean }) => {
         samples: [
           {
             id: SAMPLE_SLIDE_IDS[0],
-            title: "多言語AIで文書解析",
-            topic: "多言語AIで文書解析",
+            title: "速いAIの秘密",
+            topic: "速いAIの秘密",
             created_at: "2025-01-15T00:00:00Z",
+            description: "Kimi Linearの仕組みを対話形式で理解",
+            readTime: "3分",
           },
           {
             id: SAMPLE_SLIDE_IDS[1],
-            title: "2Dと3Dで学ぶ空間理解",
-            topic: "2Dと3Dで学ぶ空間理解",
+            title: "AIアートの秘密",
+            topic: "AIアートの秘密",
             created_at: "2025-01-15T00:00:00Z",
+            description: "ComfyUI-Copilotの使い方を初心者向けに解説",
+            readTime: "3分",
           },
         ],
       };

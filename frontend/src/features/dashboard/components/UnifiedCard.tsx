@@ -109,6 +109,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: '300',
     lineHeight: '1',
   },
+  iconSample: {
+    fontSize: '48px',
+    marginBottom: '12px',
+    fontWeight: '300',
+    lineHeight: '1',
+  },
   content: {
     display: 'flex',
     flexDirection: 'column',
@@ -176,7 +182,7 @@ const UnifiedCard = memo(function UnifiedCard({
     : isSample
     ? styles.cardSample
     : styles.card;
-  const iconStyle = isPrimary ? styles.iconPrimary : styles.icon;
+  const iconStyle = isPrimary ? styles.iconPrimary : isSample ? styles.iconSample : styles.icon;
   const titleStyle = isPrimary ? styles.titlePrimary : isSample ? styles.titleSample : styles.title;
   const subtitleStyle = isPrimary ? styles.subtitlePrimary : isSample ? styles.subtitleSample : styles.subtitle;
 
@@ -191,7 +197,7 @@ const UnifiedCard = memo(function UnifiedCard({
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     e.currentTarget.style.borderColor = '#3b82f6';
-    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.12)';
+    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
     if (isPrimary) {
       e.currentTarget.style.background = '#dbeafe';
     } else if (isHistory) {
@@ -200,6 +206,7 @@ const UnifiedCard = memo(function UnifiedCard({
       e.currentTarget.style.background = '#f9fafb';
     } else if (isSample) {
       e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)';
+      e.currentTarget.style.transform = 'translateY(-4px)';
     } else {
       e.currentTarget.style.background = '#f9fafb';
     }
@@ -218,6 +225,7 @@ const UnifiedCard = memo(function UnifiedCard({
     } else if (isSample) {
       e.currentTarget.style.borderColor = '#667eea';
       e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      e.currentTarget.style.transform = 'translateY(0)';
     } else {
       e.currentTarget.style.borderColor = '#e5e7eb';
       e.currentTarget.style.background = '#ffffff';
