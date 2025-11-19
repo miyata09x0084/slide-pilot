@@ -208,3 +208,7 @@ frontend/.firebase/
 
 # Deployment procedure documentation (contains sensitive info)
 docs/deployment/FIREBASE_HOSTING_DEPLOYMENT.md
+
+# Debug and admin scripts for sample slide management
+backend/scripts/fetch_recent_slides.py
+backend/scripts/get_slide_detail.py
