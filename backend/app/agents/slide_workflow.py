@@ -1111,6 +1111,24 @@ def render_video(state: State) -> Dict:
         }
 
 # -------------------
+# 条件分岐: 動画生成
+# -------------------
+def route_after_save(state: State) -> str:
+    """保存後の分岐: 動画生成フラグで判定"""
+    from app.core.config import VIDEO_ENABLED
+
+    # エラーがある場合はスキップ
+    if state.get("error"):
+        return END
+
+    # フラグがONの場合は動画生成へ
+    if VIDEO_ENABLED:
+        return "generate_narration"
+
+    # フラグがOFFの場合は終了（PDF生成のみ）
+    return END
+
+# -------------------
 # グラフ構築
 # -------------------
 graph_builder = StateGraph(State)
@@ -1121,6 +1139,8 @@ graph_builder.add_node("write_slides_slidev", write_slides_slidev)
 graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
+graph_builder.add_node("generate_narration", generate_narration)
+graph_builder.add_node("render_video", render_video)
 
 # エッジ定義（Slidevフロー with 評価ループ）
 graph_builder.add_edge(START, "collect_info")
@@ -1136,7 +1156,16 @@ graph_builder.add_conditional_edges(
   {"retry": "generate_key_points", "ok": "save_and_render_slidev"}
 )
 
-graph_builder.add_edge("save_and_render_slidev", END)
+# 動画生成フロー（条件分岐）
+graph_builder.add_conditional_edges(
+    "save_and_render_slidev",
+    route_after_save,
+    {"generate_narration": "generate_narration", END: END}
+)
+
+# 動画生成エッジ
+graph_builder.add_edge("generate_narration", "render_video")
+graph_builder.add_edge("render_video", END)
 
 graph = graph_builder.compile()
 
