@@ -121,6 +121,14 @@ class State(TypedDict, total=False):
   pdf_url: str                                  # Supabase公開URL（オプショナル）
 
   # ══════════════════════════════════════════════════════════
+  # 動画生成 (Node G-H) - Video Narration Feature
+  # ══════════════════════════════════════════════════════════
+  narration_scripts: List[str]                  # ナレーション台本
+  audio_files: List[str]                        # 音声ファイルパス
+  video_url: str                                # Supabase動画URL
+  _temp_narration_dir: str                      # 一時ディレクトリ（内部用）
+
+  # ══════════════════════════════════════════════════════════
   # システム
   # ══════════════════════════════════════════════════════════
   error: str                                    # エラーメッセージ
@@ -829,6 +837,110 @@ def save_and_render_slidev(state: State) -> Dict:
     result["log"] = _log(state, f"[supabase] save failed (non-critical): {str(e)[:100]}")
 
   return result
+
+# -------------------
+# Node G: ナレーション生成（OpenAI TTS）
+# -------------------
+@traceable(run_name="g_generate_narration")
+def generate_narration(state: State) -> Dict:
+    """各スライドのナレーション音声を生成（OpenAI TTS）"""
+    from openai import OpenAI
+    from app.prompts.narration_prompts import get_narration_prompt
+
+    if state.get("error"):
+        return {}
+
+    slide_md = state.get("slide_md", "")
+    title = state.get("title", "AIスライド")
+
+    # Slidevのスライド区切り（---）で分割
+    slides = slide_md.split("\n---\n")
+
+    # frontmatter（最初のYAML部分）をスキップ
+    slide_contents = []
+    for slide in slides[1:]:  # slides[0]はfrontmatter
+        # 空白・コメント行を除去
+        content = "\n".join([
+            line for line in slide.split("\n")
+            if line.strip() and not line.strip().startswith("<!--")
+        ])
+        if content.strip():
+            slide_contents.append(content)
+
+    if not slide_contents:
+        return {
+            "error": "No slide content found for narration",
+            "log": _log(state, "[narration] ERROR: no valid slides")
+        }
+
+    # OpenAI TTSクライアント初期化
+    client = OpenAI()  # OPENAI_API_KEYから自動認証
+
+    # 設定値取得
+    tts_model = getattr(settings, 'TTS_MODEL', 'tts-1-hd')
+    tts_voice = getattr(settings, 'TTS_VOICE', 'shimmer')
+    tts_speed = float(getattr(settings, 'TTS_SPEED', '1.0'))
+
+    # 一時ディレクトリ作成
+    temp_dir = Path(tempfile.mkdtemp())
+
+    audio_files = []
+    narrations = []
+
+    try:
+        for i, slide_content in enumerate(slide_contents):
+            # LLMでナレーション台本生成
+            prompt = get_narration_prompt(slide_content=slide_content)
+
+            try:
+                msg = llm.invoke(prompt)
+                narration_text = msg.content.strip()
+
+                # 前後の引用符を除去
+                narration_text = narration_text.strip('"').strip("'")
+
+                narrations.append(narration_text)
+            except Exception as e:
+                # LLMエラー時はスライド内容をそのまま使用
+                narrations.append(f"{i+1}枚目のスライドです。")
+                print(f"[narration] LLM error for slide {i}: {str(e)[:100]}")
+
+            # OpenAI TTSで音声生成
+            try:
+                response = client.audio.speech.create(
+                    model=tts_model,
+                    voice=tts_voice,
+                    input=narrations[-1],
+                    speed=tts_speed
+                )
+
+                # 音声ファイル保存
+                audio_path = temp_dir / f"narration_{i:03d}.mp3"
+                with open(audio_path, 'wb') as f:
+                    f.write(response.content)
+                audio_files.append(str(audio_path))
+
+            except Exception as e:
+                return {
+                    "error": f"OpenAI TTS error: {str(e)}",
+                    "log": _log(state, f"[narration] TTS API failed at slide {i}: {str(e)[:100]}")
+                }
+
+        return {
+            "narration_scripts": narrations,
+            "audio_files": audio_files,
+            "_temp_narration_dir": str(temp_dir),  # 後続ノードで使用
+            "log": _log(state, f"[narration] generated {len(audio_files)} audio files (model={tts_model}, voice={tts_voice})")
+        }
+
+    except Exception as e:
+        # クリーンアップ
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return {
+            "error": f"narration_error: {str(e)}",
+            "log": _log(state, f"[narration] EXCEPTION {str(e)[:100]}")
+        }
 
 # -------------------
 # グラフ構築
