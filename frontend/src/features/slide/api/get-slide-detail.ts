@@ -13,6 +13,7 @@ interface GetSlideDetailResponse {
   title: string;
   created_at: string;
   pdf_url?: string;
+  video_url?: string;
   markdown?: string;
 }
 
@@ -29,6 +30,7 @@ export const getSlideDetail = async (slideId: string): Promise<SlideDetail> => {
     topic: data.title, // Use title as topic fallback
     created_at: data.created_at,
     pdf_url: data.pdf_url,
+    video_url: data.video_url,
     markdown: data.markdown,
   };
 };

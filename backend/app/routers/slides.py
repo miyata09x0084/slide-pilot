@@ -86,7 +86,8 @@ async def get_slide_markdown(
         "title": slide["title"],
         "markdown": slide["slide_md"],
         "created_at": slide["created_at"],
-        "pdf_url": slide.get("pdf_url")
+        "pdf_url": slide.get("pdf_url"),
+        "video_url": slide.get("video_url")  # Video Narration Feature
     }
 
 

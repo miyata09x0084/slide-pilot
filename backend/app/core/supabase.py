@@ -133,3 +133,35 @@ def get_slides_by_user(user_id: str, limit: int = 20) -> List[Dict]:
     except Exception as e:
         print(f"[supabase] Failed to get slides for {user_id}: {e}")
         return []
+
+
+def update_slide_video_url(slide_id: str, video_url: str) -> Dict:
+    """スライドのvideo_urlを更新（Video Narration Feature）
+
+    Args:
+        slide_id: スライドID（UUID）
+        video_url: 動画の公開URL（Supabase Storage）
+
+    Returns:
+        成功時: {"success": True}
+        失敗時: {"error": str}
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+
+    try:
+        response = (
+            client.table("slides")
+            .update({"video_url": video_url})
+            .eq("id", slide_id)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            return {"success": True}
+        else:
+            return {"error": "Failed to update video_url"}
+
+    except Exception as e:
+        return {"error": f"Supabase update failed: {str(e)}"}
