@@ -36,6 +36,7 @@ export interface Slide {
   title: string;
   created_at: string;
   pdf_url?: string;
+  video_url?: string;
   thumbnail_url?: string;
   topic?: string;
 }
@@ -46,6 +47,7 @@ export interface SlideDetail {
   topic: string;
   created_at: string;
   pdf_url?: string;
+  video_url?: string;
   markdown?: string;
 }
 

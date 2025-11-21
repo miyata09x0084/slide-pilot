@@ -105,10 +105,13 @@ interface SlideContentViewerProps {
   slideId: string;
 }
 
+type ViewMode = 'markdown' | 'pdf' | 'video';
+
 export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
   // React Queryフックでスライド詳細を取得
   const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
   const [currentSlide, setCurrentSlide] = useState(0); // Issue #20: 進捗バー用の現在位置
+  const [viewMode, setViewMode] = useState<ViewMode>('markdown'); // Phase 5: 表示モード切り替え
 
   // Intersection Observer でスライド位置を追跡
   useEffect(() => {
@@ -172,15 +175,110 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
 
   return (
     <div style={styles.container}>
-      {/* 進捗バー */}
-      <ProgressBar
-        current={currentSlide + 1}
-        total={slides.length}
-        themeColor={themeColors.primary}
-      />
+      {/* 表示モード切り替えボタン（Phase 5: 動画プレビュー機能） */}
+      {(slide.pdf_url || slide.video_url) && (
+        <div style={styles.viewModeButtons}>
+          <button
+            onClick={() => setViewMode('markdown')}
+            style={{
+              ...styles.viewModeButton,
+              ...(viewMode === 'markdown' ? styles.viewModeButtonActive : {}),
+            }}
+          >
+            📝 Markdown表示
+          </button>
+          {slide.pdf_url && (
+            <button
+              onClick={() => setViewMode('pdf')}
+              style={{
+                ...styles.viewModeButton,
+                ...(viewMode === 'pdf' ? styles.viewModeButtonActive : {}),
+              }}
+            >
+              📄 PDF表示
+            </button>
+          )}
+          {slide.video_url && (
+            <button
+              onClick={() => setViewMode('video')}
+              style={{
+                ...styles.viewModeButton,
+                ...(viewMode === 'video' ? styles.viewModeButtonActive : {}),
+              }}
+            >
+              🎬 動画表示
+            </button>
+          )}
 
-      {/* スライドコンテンツ */}
-      <div style={styles.slidesContainer}>
+          {/* ダウンロードボタン */}
+          <div style={styles.downloadButtons}>
+            {slide.pdf_url && (
+              <a
+                href={slide.pdf_url}
+                download
+                style={styles.downloadButtonPdf}
+              >
+                📥 PDFダウンロード
+              </a>
+            )}
+            {slide.video_url && (
+              <a
+                href={slide.video_url}
+                download
+                style={styles.downloadButtonVideo}
+              >
+                🎬 動画ダウンロード
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PDF表示 */}
+      {viewMode === 'pdf' && slide.pdf_url && (
+        <div style={styles.pdfContainer}>
+          <iframe
+            src={slide.pdf_url}
+            style={styles.pdfIframe}
+            title="PDF Viewer"
+          />
+        </div>
+      )}
+
+      {/* 動画表示（Phase 5: 動画プレビュー機能） */}
+      {viewMode === 'video' && slide.video_url && (
+        <div style={styles.videoContainer}>
+          <video
+            src={slide.video_url}
+            controls
+            style={styles.videoPlayer}
+            preload="metadata"
+          >
+            お使いのブラウザは動画タグをサポートしていません。
+            <a href={slide.video_url} download>動画をダウンロード</a>
+          </video>
+        </div>
+      )}
+
+      {/* 動画が存在しない場合のメッセージ */}
+      {viewMode === 'video' && !slide.video_url && (
+        <div style={styles.noVideoMessage}>
+          <p style={styles.noVideoText}>このスライドには動画版がありません</p>
+        </div>
+      )}
+
+      {/* Markdown表示（既存のスライド表示） */}
+      {viewMode === 'markdown' && (
+        <>
+          {/* 進捗バー */}
+          <ProgressBar
+            current={currentSlide + 1}
+            total={slides.length}
+            themeColor={themeColors.primary}
+          />
+
+          {/* スライドコンテンツ */}
+          <div style={styles.slidesContainer}>
         {slides.map((slideContent, index) => (
           <div
             key={index}
@@ -227,7 +325,9 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
             <div style={styles.pageNumber}>{index + 1} / {slides.length}</div>
           </div>
         ))}
-      </div>
+          </div>
+        </>
+      )}
 
       {/* フッター */}
       <div style={styles.footer}>
@@ -366,5 +466,96 @@ const styles: Record<string, React.CSSProperties> = {
     verticalAlign: 'middle',
     display: 'inline-block',
     margin: '0 4px'
-  }
+  },
+  // Phase 5: 動画プレビュー機能
+  viewModeButtons: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginBottom: '16px',
+    padding: '12px',
+    background: '#f8f9fa',
+    borderRadius: '8px',
+    alignItems: 'center',
+  },
+  viewModeButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    background: '#e5e7eb',
+    color: '#333',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: 'normal',
+    transition: 'all 0.2s',
+  },
+  viewModeButtonActive: {
+    background: '#3b82f6',
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  downloadButtons: {
+    display: 'flex',
+    gap: '8px',
+    marginLeft: 'auto',
+  },
+  downloadButtonPdf: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    background: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'inline-block',
+  },
+  downloadButtonVideo: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    background: '#8b5cf6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'inline-block',
+  },
+  pdfContainer: {
+    width: '100%',
+    height: '80vh',
+    marginBottom: '16px',
+  },
+  pdfIframe: {
+    width: '100%',
+    height: '100%',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+  },
+  videoContainer: {
+    width: '100%',
+    maxWidth: '1200px',
+    margin: '0 auto 16px auto',
+    background: '#000',
+    borderRadius: '8px',
+    overflow: 'hidden',
+  },
+  videoPlayer: {
+    width: '100%',
+    display: 'block',
+  },
+  noVideoMessage: {
+    padding: '40px',
+    textAlign: 'center',
+    background: '#f9fafb',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+    marginBottom: '16px',
+  },
+  noVideoText: {
+    fontSize: '16px',
+    color: '#6b7280',
+  },
 };
