@@ -15,24 +15,15 @@ export default function LoginPage() {
   const { loginWithGoogle } = useAuth();
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    console.log('[LoginPage] Google OAuth success callback fired');
-
     if (!credentialResponse.credential) {
       console.error('[LoginPage] No credential received from Google');
       return;
     }
 
     try {
-      console.log('[LoginPage] Calling loginWithGoogle...');
       await loginWithGoogle(credentialResponse.credential);
-      console.log('[LoginPage] loginWithGoogle completed successfully');
-
-      console.log('[LoginPage] Waiting 100ms for session establishment...');
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      console.log('[LoginPage] Navigating to / ...');
       navigate('/', { replace: true });
-      console.log('[LoginPage] navigate() called');
     } catch (error) {
       console.error('[LoginPage] Login failed:', error);
     }
