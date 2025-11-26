@@ -22,6 +22,7 @@ interface SamplesResponse {
 
 // 固定サンプルスライドID（Supabaseに登録済み・動画付き）
 const SAMPLE_SLIDE_IDS = [
+  "862ae7f8-793f-4a39-9c7c-a003659b213c",  // 疑似科学を見抜く力（最新）
   "743cb44b-8546-47f9-bd91-2caebb423dab",  // 映画制作の未来
   "91997e40-ff18-45fc-b106-e5d568fd5725",  // 未来予測AI
 ];
@@ -44,6 +45,14 @@ export const useSamples = (options?: { enabled?: boolean }) => {
         samples: [
           {
             id: SAMPLE_SLIDE_IDS[0],
+            title: "疑似科学を見抜く力",
+            topic: "疑似科学を見抜く力",
+            created_at: "2025-11-26T06:54:35Z",
+            description: "科学的に見せかけた誤情報を見抜くスキルを解説",
+            readTime: "3分",
+          },
+          {
+            id: SAMPLE_SLIDE_IDS[1],
             title: "映画制作の未来",
             topic: "映画制作の未来",
             created_at: "2025-11-26T02:18:22Z",
@@ -51,7 +60,7 @@ export const useSamples = (options?: { enabled?: boolean }) => {
             readTime: "3分",
           },
           {
-            id: SAMPLE_SLIDE_IDS[1],
+            id: SAMPLE_SLIDE_IDS[2],
             title: "未来予測AI",
             topic: "未来予測AI",
             created_at: "2025-11-26T00:00:00Z",
