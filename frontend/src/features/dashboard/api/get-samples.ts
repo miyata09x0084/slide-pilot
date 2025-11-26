@@ -22,7 +22,7 @@ interface SamplesResponse {
 
 // 固定サンプルスライドID（Supabaseに登録済み・動画付き）
 const SAMPLE_SLIDE_IDS = [
-  "4f16150c-4576-4495-b7cd-6293caff9b3f",  // 新時代のAI技術
+  "743cb44b-8546-47f9-bd91-2caebb423dab",  // 映画制作の未来
   "91997e40-ff18-45fc-b106-e5d568fd5725",  // 未来予測AI
 ];
 
@@ -44,10 +44,10 @@ export const useSamples = (options?: { enabled?: boolean }) => {
         samples: [
           {
             id: SAMPLE_SLIDE_IDS[0],
-            title: "新時代のAI技術",
-            topic: "新時代のAI技術",
-            created_at: "2025-11-26T00:00:00Z",
-            description: "Kimi Linearの革新的な技術を対話形式で理解",
+            title: "映画制作の未来",
+            topic: "映画制作の未来",
+            created_at: "2025-11-26T02:18:22Z",
+            description: "AIが変える映画制作の世界を対話形式で理解",
             readTime: "3分",
           },
           {

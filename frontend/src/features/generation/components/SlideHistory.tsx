@@ -1,7 +1,7 @@
 /**
- * SlideHistory - スライド履歴表示コンポーネント
+ * SlideHistory - 動画履歴表示コンポーネント
  *
- * React Query フックでSupabaseから取得したユーザーのスライド一覧をカード形式で表示
+ * React Query フックでSupabaseから取得したユーザーの動画一覧をカード形式で表示
  */
 
 import { useSlides } from "../../dashboard/api/get-slides";
@@ -11,7 +11,7 @@ interface SlideHistoryProps {
 }
 
 export function SlideHistory({ onPreview }: SlideHistoryProps) {
-  // React Queryフックでスライド履歴を取得（JWTから自動的にuser_idを取得）
+  // React Queryフックで動画履歴を取得（JWTから自動的にuser_idを取得）
   const { data, isLoading: loading, error } = useSlides({ limit: 20 });
   const slides = data?.slides || [];
 
@@ -58,7 +58,7 @@ export function SlideHistory({ onPreview }: SlideHistoryProps) {
           border: "1px solid #f5c6cb",
         }}
       >
-        ⚠️ エラー: {error.message || "スライドの読み込みに失敗しました"}
+        ⚠️ エラー: {error.message || "動画の読み込みに失敗しました"}
       </div>
     );
   }
@@ -76,9 +76,9 @@ export function SlideHistory({ onPreview }: SlideHistoryProps) {
         }}
       >
         <div style={{ fontSize: "48px", marginBottom: "16px" }}>📄</div>
-        <p style={{ fontSize: "16px", margin: 0 }}>まだスライドがありません</p>
+        <p style={{ fontSize: "16px", margin: 0 }}>まだ動画がありません</p>
         <p style={{ fontSize: "14px", marginTop: "8px", color: "#bbb" }}>
-          PDFをアップロードしてスライドを作成してみましょう
+          PDFをアップロードして動画を作成してみましょう
         </p>
       </div>
     );

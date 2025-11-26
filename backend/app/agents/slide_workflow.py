@@ -965,8 +965,14 @@ def _parse_slide_to_json(slide_content: str, index: int) -> Dict[str, Any]:
 
 @traceable(run_name="g_generate_narration")
 def generate_narration(state: State) -> Dict:
-    """各スライドのナレーション音声を生成（OpenAI TTS）+ slides_json生成"""
+    """各スライドのナレーション音声を生成（OpenAI TTS）+ slides_json生成
+
+    並列処理:
+    - LLMナレーション生成: llm.batch() で最大5並列
+    - TTS音声生成: ThreadPoolExecutor で最大5並列
+    """
     from openai import OpenAI
+    from concurrent.futures import ThreadPoolExecutor
     from app.prompts.narration_prompts import get_narration_prompt
 
     if state.get("error"):
@@ -1011,54 +1017,71 @@ def generate_narration(state: State) -> Dict:
     # 一時ディレクトリ作成
     temp_dir = Path(tempfile.mkdtemp())
 
-    audio_files = []
-    narrations = []
-
     try:
-        for i, slide_content in enumerate(slide_contents):
-            # LLMでナレーション台本生成
-            prompt = get_narration_prompt(slide_content=slide_content)
+        # ========== Step 1: LLMナレーション生成（並列処理） ==========
+        batch_prompts = [
+            get_narration_prompt(slide_content=content)
+            for content in slide_contents
+        ]
 
+        # 並列LLM実行（最大5並列）
+        responses = llm.batch(batch_prompts, config={"max_concurrency": 5})
+
+        # 結果を整形
+        narrations = []
+        for i, msg in enumerate(responses):
             try:
-                msg = llm.invoke(prompt)
-                narration_text = msg.content.strip()
-
-                # 前後の引用符を除去
-                narration_text = narration_text.strip('"').strip("'")
-
+                narration_text = msg.content.strip().strip('"').strip("'")
                 narrations.append(narration_text)
             except Exception as e:
-                # LLMエラー時はスライド内容をそのまま使用
+                # LLMエラー時はフォールバック
                 narrations.append(f"{i+1}枚目のスライドです。")
-                print(f"[narration] LLM error for slide {i}: {str(e)[:100]}")
+                print(f"[narration] LLM parse error for slide {i}: {str(e)[:100]}")
 
-            # OpenAI TTSで音声生成
-            try:
-                response = client.audio.speech.create(
-                    model=tts_model,
-                    voice=tts_voice,
-                    input=narrations[-1],
-                    speed=tts_speed
-                )
+        # ========== Step 2: TTS音声生成（並列処理） ==========
+        def generate_audio(args):
+            """単一スライドの音声生成（スレッドプール用）"""
+            idx, narration_text = args
+            response = client.audio.speech.create(
+                model=tts_model,
+                voice=tts_voice,
+                input=narration_text,
+                speed=tts_speed
+            )
+            audio_path = temp_dir / f"narration_{idx:03d}.mp3"
+            with open(audio_path, 'wb') as f:
+                f.write(response.content)
+            return idx, str(audio_path)
 
-                # 音声ファイル保存
-                audio_path = temp_dir / f"narration_{i:03d}.mp3"
-                with open(audio_path, 'wb') as f:
-                    f.write(response.content)
-                audio_files.append(str(audio_path))
+        # 並列TTS実行（最大5並列）
+        audio_results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [
+                executor.submit(generate_audio, (i, narration))
+                for i, narration in enumerate(narrations)
+            ]
+            for future in futures:
+                try:
+                    result = future.result()
+                    audio_results.append(result)
+                except Exception as e:
+                    # TTS失敗時は即座にエラー返却
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return {
+                        "error": f"OpenAI TTS error: {str(e)}",
+                        "log": _log(state, f"[narration] TTS API failed: {str(e)[:100]}")
+                    }
 
-            except Exception as e:
-                return {
-                    "error": f"OpenAI TTS error: {str(e)}",
-                    "log": _log(state, f"[narration] TTS API failed at slide {i}: {str(e)[:100]}")
-                }
+        # 順序を維持してソート（インデックス順）
+        audio_results.sort(key=lambda x: x[0])
+        audio_files = [path for _, path in audio_results]
 
         return {
             "narration_scripts": narrations,
             "audio_files": audio_files,
             "slides_json": slides_json,  # HTML生成用の構造化データ
             "_temp_narration_dir": str(temp_dir),  # 後続ノードで使用
-            "log": _log(state, f"[narration] generated {len(audio_files)} audio files, {len(slides_json)} slides_json (model={tts_model}, voice={tts_voice})")
+            "log": _log(state, f"[narration] generated {len(audio_files)} audio files, {len(slides_json)} slides_json (model={tts_model}, voice={tts_voice}, parallel=5)")
         }
 
     except Exception as e:

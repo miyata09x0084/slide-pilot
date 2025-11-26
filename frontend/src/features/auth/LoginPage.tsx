@@ -30,7 +30,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleError = () => {
-    console.error('❌ [Google OAuth] Login Failed');
+    console.error('[Google OAuth] Login Failed');
     console.error('  Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
     console.error('  Current Origin:', window.location.origin);
     console.error('  Expected Origin: http://localhost:5173');
@@ -82,11 +82,8 @@ export default function LoginPage() {
         <p style={{ marginBottom: '8px', color: '#666', fontWeight: '600' }}>
           Multimodal Content Experiment
         </p>
-        <p style={{ marginBottom: '6px', color: '#888', fontSize: '14px' }}>
-          PDF → Video 変換パイプライン
-        </p>
-        <p style={{ marginBottom: '30px', color: '#999', fontSize: '12px' }}>
-          🧪 実験的マルチモーダル変換
+        <p style={{ marginBottom: '30px', color: '#888', fontSize: '14px' }}>
+          難しいPDFを、わかりやすい動画に
         </p>
 
         {/* Google 公式 OAuth UI */}
