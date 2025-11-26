@@ -41,7 +41,7 @@ app.include_router(samples.router, prefix="/api", tags=["samples"])
 async def root():
     """ルートエンドポイント"""
     return {
-        "message": "Rakuyomi Assistant AI API",
+        "message": "Multimode Lab API",
         "docs": "/docs",
         "health": "/api/health"
     }
@@ -49,6 +49,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"🚀 Starting {settings.API_TITLE} on http://{settings.HOST}:{settings.PORT}")
+    print(f"🧪 Starting {settings.API_TITLE} on http://{settings.HOST}:{settings.PORT}")
     print(f"📚 API docs available at http://{settings.HOST}:{settings.PORT}/docs")
     uvicorn.run(app, host=settings.HOST, port=settings.PORT)

@@ -1,7 +1,7 @@
 // ReActエージェントとの通信を管理するカスタムフック
 // SSEストリーミングでメッセージ送受信と思考過程を取得
 // Recoilでグローバル状態管理（ページ間で状態共有）
-// React Queryでキャッシュ無効化（スライド生成完了時）
+// React Queryでキャッシュ無効化（動画生成完了時）
 
 import { useCallback, useState } from 'react';
 import { useRecoilState } from 'recoil';
@@ -36,9 +36,9 @@ export function useReactAgent() {
   // React Queryのクライアント（キャッシュ無効化用）
   const queryClient = useQueryClient();
 
-  // スライド生成中フラグ（ローカル変数で管理）
+  // 動画生成中フラグ（ローカル変数で管理）
   // @ts-ignore - Used in closure but TypeScript doesn't detect it
-  let _isGeneratingSlides = false;
+  let _isGeneratingVideo = false;
 
   // スレッド作成
   const createThreadHandler = useCallback(async () => {
@@ -83,7 +83,7 @@ export function useReactAgent() {
     setIsThinking(true);
     setThinkingSteps([]);
     setError(null);
-    _isGeneratingSlides = false; // スライド生成フラグをリセット
+    _isGeneratingVideo = false; // 動画生成フラグをリセット
 
     try {
       // assistant_id取得（キャッシュを優先）
@@ -154,17 +154,17 @@ export function useReactAgent() {
                       msg.tool_calls.forEach((call: any) => {
                         // generate_slidesツールの場合は1回だけ表示
                         if (call.name === 'generate_slides') {
-                          _isGeneratingSlides = true;
+                          _isGeneratingVideo = true;
                           setThinkingSteps(prev => {
                             // 既に表示済みなら追加しない
                             const alreadyExists = prev.some(step =>
-                              step.content.includes('スライド生成中')
+                              step.content.includes('動画生成中')
                             );
                             if (alreadyExists) return prev;
 
                             return [...prev, {
                               type: 'action',
-                              content: 'スライド生成中（AI情報の収集・分析・評価）...'
+                              content: '動画生成中（AI情報の収集・分析・評価）...'
                             }];
                           });
                         } else {
@@ -178,9 +178,9 @@ export function useReactAgent() {
                   } else if (msg.type === 'tool') {
                     // ツール実行結果の処理
 
-                    // スライド生成ツールの結果からファイルパスを抽出
+                    // 動画生成ツールの結果からファイルパスを抽出
                     if ((msg.name === 'generate_slides' || msg.name === 'generate_slidev_test' || msg.name === 'generate_slidev_mvp1') && msg.content) {
-                      _isGeneratingSlides = false; // スライド生成完了
+                      _isGeneratingVideo = false; // 動画生成完了
 
                       try {
                         // ツール結果をパース（JSON文字列の場合）
@@ -191,7 +191,7 @@ export function useReactAgent() {
                         if (result.slide_path || result.path) {
                           setSlideData({
                             path: result.slide_path || result.path,
-                            title: result.title || 'スライド',
+                            title: result.title || '動画',
                             slide_id: result.slide_id,     // Supabase ID（Issue #24）
                             pdf_url: result.pdf_url        // Supabase公開URL（Issue #24）
                           });
@@ -199,10 +199,10 @@ export function useReactAgent() {
                           // 完了メッセージを追加
                           setThinkingSteps(prev => [...prev, {
                             type: 'observation',
-                            content: 'スライド生成完了'
+                            content: '動画生成完了'
                           }]);
 
-                          // スライド一覧のキャッシュを無効化（新しいスライドを反映）
+                          // 動画一覧のキャッシュを無効化（新しい動画を反映）
                           const user = JSON.parse(localStorage.getItem('user') || '{}');
                           if (user.email) {
                             queryClient.invalidateQueries({

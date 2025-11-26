@@ -148,9 +148,6 @@ const QuickActionMenu = memo(function QuickActionMenu({
       <div style={styles.menu}>
         <div style={styles.header}>
           <h2 style={styles.headerTitle}>新規作成</h2>
-          <div style={styles.headerSubtitle}>
-            PDFアップロードで資料を理解しやすく
-          </div>
         </div>
 
         <div style={styles.menuList}>
@@ -171,7 +168,7 @@ const QuickActionMenu = memo(function QuickActionMenu({
             <div style={styles.menuContent}>
               <div style={styles.menuTitle}>PDFをアップロード</div>
               <div style={styles.menuDescription}>
-                PDFを理解しやすいスライドに変換
+                PDFを理解しやすい動画に変換
               </div>
             </div>
           </button>

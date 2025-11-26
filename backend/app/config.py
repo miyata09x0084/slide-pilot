@@ -21,9 +21,9 @@ class Settings:
     """アプリケーション設定クラス"""
 
     # API設定
-    API_TITLE: str = "Rakuyomi Assistant AI API"
+    API_TITLE: str = "Multimode Lab API"
     API_VERSION: str = "1.0.0"
-    API_DESCRIPTION: str = "Your personal learning assistant - digest difficult content easily with multimodal AI"
+    API_DESCRIPTION: str = "Experimental multimodal content converter - PDF to Slide to Video"
 
     # サーバー設定
     HOST: str = "0.0.0.0"

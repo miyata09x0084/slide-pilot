@@ -29,3 +29,11 @@ TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
 SLIDE_FORMAT = os.getenv("SLIDE_FORMAT", "").lower().strip()
 MARP_THEME = os.getenv("MARP_THEME", "default") # default/gaia/gaia-dark/gaia-light
 MARP_PAGINATE = os.getenv("MARP_PAGINATE", "true") # true/false
+
+# =====================================
+# 動画生成設定（Video Narration Feature）
+# =====================================
+VIDEO_ENABLED = os.getenv("VIDEO_ENABLED", "false").lower() == "true"
+TTS_MODEL = os.getenv("TTS_MODEL", "tts-1-hd")  # tts-1 / tts-1-hd
+TTS_VOICE = os.getenv("TTS_VOICE", "shimmer")   # alloy/echo/fable/onyx/nova/shimmer
+TTS_SPEED = os.getenv("TTS_SPEED", "1.0")       # 0.25-4.0

@@ -121,6 +121,15 @@ class State(TypedDict, total=False):
   pdf_url: str                                  # Supabase公開URL（オプショナル）
 
   # ══════════════════════════════════════════════════════════
+  # 動画生成 (Node G-H) - Video Narration Feature
+  # ══════════════════════════════════════════════════════════
+  slides_json: List[Dict[str, Any]]             # スライドデータ（HTML生成用）
+  narration_scripts: List[str]                  # ナレーション台本
+  audio_files: List[str]                        # 音声ファイルパス
+  video_url: str                                # Supabase動画URL
+  _temp_narration_dir: str                      # 一時ディレクトリ（内部用）
+
+  # ══════════════════════════════════════════════════════════
   # システム
   # ══════════════════════════════════════════════════════════
   error: str                                    # エラーメッセージ
@@ -831,6 +840,493 @@ def save_and_render_slidev(state: State) -> Dict:
   return result
 
 # -------------------
+# Node G: ナレーション生成（OpenAI TTS）
+# -------------------
+def _parse_slide_to_json(slide_content: str, index: int) -> Dict[str, Any]:
+    """
+    スライドマークダウンを構造化JSONに変換
+
+    Args:
+        slide_content: スライドのマークダウン内容
+        index: スライド番号（0始まり）
+
+    Returns:
+        スライドの構造化データ
+    """
+    import re
+
+    lines = [l for l in slide_content.strip().split("\n") if l.strip()]
+    if not lines:
+        return {"type": "content", "heading": f"スライド {index + 1}", "bullets": []}
+
+    # タイトルスライド判定（# で始まり、箇条書きがない）
+    if lines[0].startswith("# ") and not any(l.strip().startswith("-") for l in lines):
+        title = lines[0].lstrip("# ").strip()
+        subtitle = ""
+        for l in lines[1:]:
+            if l.strip() and not l.startswith("#"):
+                subtitle = l.strip()
+                break
+        return {"type": "title", "title": title, "subtitle": subtitle}
+
+    content_str = "\n".join(lines)
+
+    # mermaid図判定（```mermaid が含まれる）
+    if "```mermaid" in content_str:
+        heading = ""
+        mermaid_code = ""
+
+        # mermaidコードを抽出
+        mermaid_match = re.search(r'```mermaid\n(.*?)\n```', content_str, re.DOTALL)
+        if mermaid_match:
+            mermaid_code = mermaid_match.group(1).strip()
+
+        # 見出しを抽出
+        for l in lines:
+            if l.startswith("## "):
+                heading = l.lstrip("## ").strip()
+                break
+            elif l.startswith("# "):
+                heading = l.lstrip("# ").strip()
+                break
+
+        if mermaid_code:
+            return {
+                "type": "mermaid",
+                "heading": heading or "図解",
+                "mermaid_code": mermaid_code
+            }
+
+    # 会話形式判定（👨‍🏫 または 先生: が含まれる）
+    if "👨‍🏫" in content_str or "先生:" in content_str or "🧑‍🎓" in content_str:
+        heading = ""
+        teacher = ""
+        student = ""
+
+        for l in lines:
+            if l.startswith("## "):
+                heading = l.lstrip("## ").strip()
+            elif "👨‍🏫" in l or "先生:" in l:
+                teacher = re.sub(r"^[-*]\s*", "", l)
+                teacher = re.sub(r"(👨‍🏫|先生:?)\s*", "", teacher).strip()
+            elif "🧑‍🎓" in l or "生徒:" in l:
+                student = re.sub(r"^[-*]\s*", "", l)
+                student = re.sub(r"(🧑‍🎓|生徒:?)\s*", "", student).strip()
+
+        if teacher or student:
+            return {
+                "type": "conversation",
+                "heading": heading or "会話",
+                "teacher": teacher,
+                "student": student
+            }
+
+    # まとめスライド判定
+    if any(keyword in content_str for keyword in ["まとめ", "ポイント", "要点", "Summary"]):
+        heading = ""
+        points = []
+        for l in lines:
+            if l.startswith("## "):
+                heading = l.lstrip("## ").strip()
+            elif l.strip().startswith("-") or l.strip().startswith("*"):
+                point = re.sub(r"^[-*]\s*", "", l.strip())
+                if point:
+                    points.append(point)
+
+        if points:
+            return {
+                "type": "summary",
+                "heading": heading or "まとめ",
+                "points": points
+            }
+
+    # デフォルト: コンテンツスライド（見出し + 箇条書き）
+    heading = ""
+    bullets = []
+    for l in lines:
+        if l.startswith("## "):
+            heading = l.lstrip("## ").strip()
+        elif l.startswith("# "):
+            heading = l.lstrip("# ").strip()
+        elif l.strip().startswith("-") or l.strip().startswith("*"):
+            bullet = re.sub(r"^[-*]\s*", "", l.strip())
+            if bullet:
+                bullets.append(bullet)
+        elif l.strip() and not heading:
+            # 見出しがまだない場合、最初の非空行を見出しに
+            heading = l.strip()
+
+    return {
+        "type": "content",
+        "heading": heading or f"スライド {index + 1}",
+        "bullets": bullets
+    }
+
+
+@traceable(run_name="g_generate_narration")
+def generate_narration(state: State) -> Dict:
+    """各スライドのナレーション音声を生成（OpenAI TTS）+ slides_json生成
+
+    並列処理:
+    - LLMナレーション生成: llm.batch() で最大5並列
+    - TTS音声生成: ThreadPoolExecutor で最大5並列
+    """
+    from openai import OpenAI
+    from concurrent.futures import ThreadPoolExecutor
+    from app.prompts.narration_prompts import get_narration_prompt
+
+    if state.get("error"):
+        return {}
+
+    slide_md = state.get("slide_md", "")
+    title = state.get("title", "AIスライド")
+
+    # Slidevのスライド区切り（---）で分割
+    slides = slide_md.split("\n---\n")
+
+    # frontmatter（最初のYAML部分）をスキップ
+    slide_contents = []
+    slides_json = []
+
+    for idx, slide in enumerate(slides[1:]):  # slides[0]はfrontmatter
+        # 空白・コメント行を除去
+        content = "\n".join([
+            line for line in slide.split("\n")
+            if line.strip() and not line.strip().startswith("<!--")
+        ])
+        if content.strip():
+            slide_contents.append(content)
+            # スライドをJSON形式に変換
+            slide_data = _parse_slide_to_json(content, idx)
+            slides_json.append(slide_data)
+
+    if not slide_contents:
+        return {
+            "error": "No slide content found for narration",
+            "log": _log(state, "[narration] ERROR: no valid slides")
+        }
+
+    # OpenAI TTSクライアント初期化
+    client = OpenAI()  # OPENAI_API_KEYから自動認証
+
+    # 設定値取得
+    tts_model = getattr(settings, 'TTS_MODEL', 'tts-1-hd')
+    tts_voice = getattr(settings, 'TTS_VOICE', 'shimmer')
+    tts_speed = float(getattr(settings, 'TTS_SPEED', '1.0'))
+
+    # 一時ディレクトリ作成
+    temp_dir = Path(tempfile.mkdtemp())
+
+    try:
+        # ========== Step 1: LLMナレーション生成（並列処理） ==========
+        batch_prompts = [
+            get_narration_prompt(slide_content=content)
+            for content in slide_contents
+        ]
+
+        # 並列LLM実行（最大5並列）
+        responses = llm.batch(batch_prompts, config={"max_concurrency": 5})
+
+        # 結果を整形
+        narrations = []
+        for i, msg in enumerate(responses):
+            try:
+                narration_text = msg.content.strip().strip('"').strip("'")
+                narrations.append(narration_text)
+            except Exception as e:
+                # LLMエラー時はフォールバック
+                narrations.append(f"{i+1}枚目のスライドです。")
+                print(f"[narration] LLM parse error for slide {i}: {str(e)[:100]}")
+
+        # ========== Step 2: TTS音声生成（並列処理） ==========
+        def generate_audio(args):
+            """単一スライドの音声生成（スレッドプール用）"""
+            idx, narration_text = args
+            response = client.audio.speech.create(
+                model=tts_model,
+                voice=tts_voice,
+                input=narration_text,
+                speed=tts_speed
+            )
+            audio_path = temp_dir / f"narration_{idx:03d}.mp3"
+            with open(audio_path, 'wb') as f:
+                f.write(response.content)
+            return idx, str(audio_path)
+
+        # 並列TTS実行（最大5並列）
+        audio_results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [
+                executor.submit(generate_audio, (i, narration))
+                for i, narration in enumerate(narrations)
+            ]
+            for future in futures:
+                try:
+                    result = future.result()
+                    audio_results.append(result)
+                except Exception as e:
+                    # TTS失敗時は即座にエラー返却
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return {
+                        "error": f"OpenAI TTS error: {str(e)}",
+                        "log": _log(state, f"[narration] TTS API failed: {str(e)[:100]}")
+                    }
+
+        # 順序を維持してソート（インデックス順）
+        audio_results.sort(key=lambda x: x[0])
+        audio_files = [path for _, path in audio_results]
+
+        return {
+            "narration_scripts": narrations,
+            "audio_files": audio_files,
+            "slides_json": slides_json,  # HTML生成用の構造化データ
+            "_temp_narration_dir": str(temp_dir),  # 後続ノードで使用
+            "log": _log(state, f"[narration] generated {len(audio_files)} audio files, {len(slides_json)} slides_json (model={tts_model}, voice={tts_voice}, parallel=5)")
+        }
+
+    except Exception as e:
+        # クリーンアップ
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return {
+            "error": f"narration_error: {str(e)}",
+            "log": _log(state, f"[narration] EXCEPTION {str(e)[:100]}")
+        }
+
+# -------------------
+# Node H: 動画レンダリング（MoviePy + SlideRenderer）
+# -------------------
+def _render_video_blocking(
+    slides_json: List[Dict[str, Any]],
+    audio_files: List[str],
+    title: str,
+    user_id: str,
+    slide_id: str,
+    log_entries: List[str]
+) -> Dict:
+    """
+    動画レンダリングのブロッキング処理（別スレッドで実行される）
+
+    LangGraph ASGIサーバーのイベントループをブロックしないよう、
+    この関数は asyncio.to_thread() 経由で呼び出される。
+    """
+    print("[DEBUG] _render_video_blocking: START")
+    print(f"[DEBUG] slides_json count: {len(slides_json)}")
+    print(f"[DEBUG] audio_files count: {len(audio_files)}")
+
+    print("[DEBUG] Importing moviepy...")
+    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+    print("[DEBUG] moviepy imported OK")
+
+    print("[DEBUG] Importing SlideRenderer...")
+    from app.core.slide_renderer import SlideRenderer
+    print("[DEBUG] SlideRenderer imported OK")
+
+    print("[DEBUG] Importing get_slug_prompt...")
+    from app.prompts.slide_prompts import get_slug_prompt
+    print("[DEBUG] get_slug_prompt imported OK")
+
+    print("[DEBUG] Importing upload_to_storage...")
+    from app.core.storage import upload_to_storage
+    print("[DEBUG] upload_to_storage imported OK")
+
+    print("[DEBUG] Importing update_slide_video_url...")
+    from app.core.supabase import update_slide_video_url
+    print("[DEBUG] update_slide_video_url imported OK")
+
+    # 一時ディレクトリ作成
+    print("[DEBUG] Creating temp directory...")
+    temp_dir = Path(tempfile.mkdtemp())
+    print(f"[DEBUG] temp_dir created: {temp_dir}")
+
+    try:
+        # 1. スライドファイル名の英語表記を生成
+        slug_prompt = get_slug_prompt(title=title)
+
+        try:
+            emsg = llm.invoke(slug_prompt)
+            file_stem = _slugify_en(emsg.content.strip()) or _slugify_en(title)
+        except Exception:
+            file_stem = _slugify_en(title) or "ai-slide"
+
+        # 2. SlideRenderer で PNG 画像生成（HTML/CSS + Playwright）
+        png_dir = temp_dir / "slides_png"
+
+        print(f"[video] Rendering slides with SlideRenderer:")
+        print(f"  slides_json count: {len(slides_json)}")
+        print(f"  Output dir: {png_dir}")
+
+        renderer = SlideRenderer()
+        png_files = renderer.render_all(slides_json, png_dir)
+
+        print(f"[video] SlideRenderer result:")
+        print(f"  PNG files generated: {len(png_files)}")
+
+        if not png_files:
+            return {
+                "error": "No PNG files generated by SlideRenderer",
+                "log": log_entries + ["[video] ERROR: SlideRenderer produced no images"]
+            }
+
+        # 音声ファイル数とPNGファイル数が一致しない場合の警告
+        audio_files_local = list(audio_files)  # ミュータブルコピー
+        if len(png_files) != len(audio_files_local):
+            print(f"[video] WARNING: PNG count ({len(png_files)}) != audio count ({len(audio_files_local)})")
+            min_count = min(len(png_files), len(audio_files_local))
+            png_files = png_files[:min_count]
+            audio_files_local = audio_files_local[:min_count]
+
+        # 3. MoviePyで画像+音声を合成
+        clips = []
+
+        for i, (png_path, audio_path) in enumerate(zip(png_files, audio_files_local)):
+            try:
+                img_clip = ImageClip(str(png_path))
+                audio_clip = AudioFileClip(audio_path)
+                video_clip = img_clip.with_duration(audio_clip.duration).with_audio(audio_clip)
+                clips.append(video_clip)
+            except Exception as e:
+                print(f"[video] WARNING: Failed to process slide {i}: {str(e)[:100]}")
+                continue
+
+        if not clips:
+            return {
+                "error": "No video clips created",
+                "log": log_entries + ["[video] ERROR: all clips failed"]
+            }
+
+        # 4. 全スライドを結合
+        final_video = concatenate_videoclips(clips, method="compose")
+        video_path = temp_dir / f"{file_stem}_video.mp4"
+
+        final_video.write_videofile(
+            str(video_path),
+            fps=2,
+            codec="libx264",
+            audio_codec="aac",
+            bitrate="2000k",
+            preset="ultrafast"
+        )
+
+        # 5. Supabase Storageにアップロード
+        video_url = None
+        try:
+            storage_path = f"{user_id}/{file_stem}_video.mp4"
+            video_url = upload_to_storage(
+                bucket="slide-files",
+                file_path=storage_path,
+                file_data=video_path.read_bytes(),
+                content_type="video/mp4"
+            )
+            log_msg = f"[video] rendered {len(clips)} slides → MP4 ({video_path.stat().st_size / 1024 / 1024:.1f}MB, {final_video.duration:.1f}sec)"
+            log_msg += f" | uploaded to {video_url}"
+        except Exception as e:
+            log_msg = f"[video] rendered locally but upload failed: {str(e)[:100]}"
+            video_url = str(video_path)
+
+        # 6. Supabase DBにvideo_urlを保存
+        if video_url and slide_id:
+            try:
+                update_result = update_slide_video_url(slide_id, video_url)
+                if "success" in update_result:
+                    log_msg += f" | DB updated (slide_id={slide_id})"
+                elif "error" in update_result:
+                    log_msg += f" | DB update failed: {update_result['error'][:50]}"
+            except Exception as e:
+                log_msg += f" | DB update exception: {str(e)[:50]}"
+
+        # 7. クリーンアップ
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        return {
+            "video_url": video_url,
+            "log": log_entries + [log_msg]
+        }
+
+    except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return {
+            "error": f"video_render_error: {str(e)}",
+            "log": log_entries + [f"[video] EXCEPTION {str(e)[:100]}"]
+        }
+
+
+@traceable(run_name="h_render_video")
+def render_video(state: State) -> Dict:
+    """PNG画像 + 音声 → MP4動画生成（HTML/CSS + Playwrightベース）
+
+    NOTE: ブロッキング処理を含むため、langgraph devは --allow-blocking で起動すること。
+    本番環境では BG_JOB_ISOLATED_LOOPS=true を設定する。
+    """
+    print("[DEBUG] render_video: START")
+
+    if state.get("error"):
+        print("[DEBUG] render_video: error in state, returning early")
+        return {}
+
+    audio_files = state.get("audio_files", [])
+    slides_json = state.get("slides_json", [])
+    temp_narration_dir = state.get("_temp_narration_dir")
+    title = state.get("title", "AIスライド")
+    user_id = state.get("user_id", "anonymous")
+    slide_id = state.get("slide_id", "")
+    log_entries = state.get("log", [])
+
+    print(f"[DEBUG] render_video: audio_files={len(audio_files)}, slides_json={len(slides_json)}")
+
+    if not audio_files:
+        print("[DEBUG] render_video: no audio files")
+        return {
+            "error": "No audio files for video rendering",
+            "log": _log(state, "[video] ERROR: no audio files")
+        }
+
+    if not slides_json:
+        print("[DEBUG] render_video: no slides_json")
+        return {
+            "error": "No slides_json for video rendering",
+            "log": _log(state, "[video] ERROR: no slides_json data")
+        }
+
+    # ブロッキング処理を直接呼び出し
+    print("[DEBUG] render_video: calling _render_video_blocking...")
+    result = _render_video_blocking(
+        slides_json,
+        audio_files,
+        title,
+        user_id,
+        slide_id,
+        log_entries
+    )
+    print(f"[DEBUG] render_video: completed, result keys: {result.keys() if result else 'None'}")
+
+    # ナレーション用一時ディレクトリのクリーンアップ
+    if temp_narration_dir:
+        shutil.rmtree(temp_narration_dir, ignore_errors=True)
+
+    print("[DEBUG] render_video: END")
+    return result
+
+
+# -------------------
+# 条件分岐: 動画生成
+# -------------------
+def route_after_save(state: State) -> str:
+    """保存後の分岐: 動画生成フラグで判定"""
+    from app.core.config import VIDEO_ENABLED
+
+    # エラーがある場合はスキップ
+    if state.get("error"):
+        return END
+
+    # フラグがONの場合は動画生成へ
+    if VIDEO_ENABLED:
+        return "generate_narration"
+
+    # フラグがOFFの場合は終了（PDF生成のみ）
+    return END
+
+# -------------------
 # グラフ構築
 # -------------------
 graph_builder = StateGraph(State)
@@ -841,6 +1337,8 @@ graph_builder.add_node("write_slides_slidev", write_slides_slidev)
 graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
+graph_builder.add_node("generate_narration", generate_narration)
+graph_builder.add_node("render_video", render_video)
 
 # エッジ定義（Slidevフロー with 評価ループ）
 graph_builder.add_edge(START, "collect_info")
@@ -856,7 +1354,16 @@ graph_builder.add_conditional_edges(
   {"retry": "generate_key_points", "ok": "save_and_render_slidev"}
 )
 
-graph_builder.add_edge("save_and_render_slidev", END)
+# 動画生成フロー（条件分岐）
+graph_builder.add_conditional_edges(
+    "save_and_render_slidev",
+    route_after_save,
+    {"generate_narration": "generate_narration", END: END}
+)
+
+# 動画生成エッジ
+graph_builder.add_edge("generate_narration", "render_video")
+graph_builder.add_edge("render_video", END)
 
 graph = graph_builder.compile()
 

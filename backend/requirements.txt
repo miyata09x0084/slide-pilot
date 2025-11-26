@@ -41,3 +41,8 @@ pytest>=8.0.0
 pytest-asyncio>=1.3.0
 pytest-mock>=3.14.0
 pytest-cov>=7.0.0
+
+# ---動画生成（Video Narration Feature）---
+moviepy>=1.0.3         # 動画生成（画像+音声合成）
+pillow>=10.0.0         # 画像処理
+playwright>=1.49.0     # HTML→PNG変換（スライド画像生成）

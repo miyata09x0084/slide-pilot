@@ -90,6 +90,7 @@ def generate_slides(
         slide_path = result.get("slide_path", "")
         slide_id = result.get("slide_id")  # Supabase slide ID (Issue #24)
         pdf_url = result.get("pdf_url")    # Supabase公開URL (Issue #24)
+        video_url = result.get("video_url")  # Supabase動画URL (Video Narration Feature)
         # score = result.get("score", 0.0)
         # passed = result.get("passed", False)
 
@@ -99,13 +100,15 @@ def generate_slides(
 
         # JSON形式で返す（フロントエンドがパース可能）
         # Issue #24: slide_idとpdf_urlを追加してブラウザプレビューを有効化
+        # Video Narration Feature: video_urlを追加して動画プレビューを有効化
         return json.dumps({
             "status": "success",
             "message": "✅ スライド生成完了",
             "title": title,
             "slide_path": api_url,
             "slide_id": slide_id,
-            "pdf_url": pdf_url
+            "pdf_url": pdf_url,
+            "video_url": video_url
         }, ensure_ascii=False)
 
     except Exception as e:

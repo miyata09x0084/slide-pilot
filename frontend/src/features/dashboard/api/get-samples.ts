@@ -20,10 +20,10 @@ interface SamplesResponse {
   samples: Sample[];
 }
 
-// 固定サンプルスライドID（Supabaseに登録済み）
+// 固定サンプルスライドID（Supabaseに登録済み・動画付き）
 const SAMPLE_SLIDE_IDS = [
-  "11111111-1111-1111-1111-111111111111",  // 速いAIの秘密
-  "22222222-2222-2222-2222-222222222222",  // AIアートの秘密
+  "743cb44b-8546-47f9-bd91-2caebb423dab",  // 映画制作の未来
+  "91997e40-ff18-45fc-b106-e5d568fd5725",  // 未来予測AI
 ];
 
 /**
@@ -44,18 +44,18 @@ export const useSamples = (options?: { enabled?: boolean }) => {
         samples: [
           {
             id: SAMPLE_SLIDE_IDS[0],
-            title: "速いAIの秘密",
-            topic: "速いAIの秘密",
-            created_at: "2025-01-15T00:00:00Z",
-            description: "Kimi Linearの仕組みを対話形式で理解",
+            title: "映画制作の未来",
+            topic: "映画制作の未来",
+            created_at: "2025-11-26T02:18:22Z",
+            description: "AIが変える映画制作の世界を対話形式で理解",
             readTime: "3分",
           },
           {
             id: SAMPLE_SLIDE_IDS[1],
-            title: "AIアートの秘密",
-            topic: "AIアートの秘密",
-            created_at: "2025-01-15T00:00:00Z",
-            description: "ComfyUI-Copilotの使い方を初心者向けに解説",
+            title: "未来予測AI",
+            topic: "未来予測AI",
+            created_at: "2025-11-26T00:00:00Z",
+            description: "TimeGPTで未来を予測する仕組みを解説",
             readTime: "3分",
           },
         ],

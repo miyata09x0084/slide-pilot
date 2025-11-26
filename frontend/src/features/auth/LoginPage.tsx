@@ -15,31 +15,22 @@ export default function LoginPage() {
   const { loginWithGoogle } = useAuth();
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    console.log('[LoginPage] Google OAuth success callback fired');
-
     if (!credentialResponse.credential) {
       console.error('[LoginPage] No credential received from Google');
       return;
     }
 
     try {
-      console.log('[LoginPage] Calling loginWithGoogle...');
       await loginWithGoogle(credentialResponse.credential);
-      console.log('[LoginPage] loginWithGoogle completed successfully');
-
-      console.log('[LoginPage] Waiting 100ms for session establishment...');
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      console.log('[LoginPage] Navigating to / ...');
       navigate('/', { replace: true });
-      console.log('[LoginPage] navigate() called');
     } catch (error) {
       console.error('[LoginPage] Login failed:', error);
     }
   };
 
   const handleGoogleError = () => {
-    console.error('❌ [Google OAuth] Login Failed');
+    console.error('[Google OAuth] Login Failed');
     console.error('  Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
     console.error('  Current Origin:', window.location.origin);
     console.error('  Expected Origin: http://localhost:5173');
@@ -69,7 +60,7 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          ラクヨミ アシスタントAI{' '}
+          Multimode Lab{' '}
           <span
             style={{
               display: 'inline-block',
@@ -89,13 +80,10 @@ export default function LoginPage() {
           </span>
         </h1>
         <p style={{ marginBottom: '8px', color: '#666', fontWeight: '600' }}>
-          あなた専用の学習パートナー
+          Multimodal Content Experiment
         </p>
-        <p style={{ marginBottom: '6px', color: '#888', fontSize: '14px' }}>
-          PDFをアップロードして、難しい資料を楽に読む
-        </p>
-        <p style={{ marginBottom: '30px', color: '#999', fontSize: '12px' }}>
-          📄 対応形式: PDF
+        <p style={{ marginBottom: '30px', color: '#888', fontSize: '14px' }}>
+          難しいPDFを、わかりやすい動画に
         </p>
 
         {/* Google 公式 OAuth UI */}
