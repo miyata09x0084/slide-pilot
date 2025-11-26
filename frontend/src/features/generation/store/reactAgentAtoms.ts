@@ -36,7 +36,7 @@ export const errorAtom = atom<string | null>({
   default: null,
 });
 
-// スライドデータ（生成完了後の情報）
+// 動画データ（生成完了後の情報）
 export const slideDataAtom = atom<SlideData>({
   key: 'reactAgent/slideData',
   default: {},

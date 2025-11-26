@@ -10,7 +10,7 @@ interface SlideContentViewerProps {
 }
 
 export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
-  // React Queryフックでスライド詳細を取得
+  // React Queryフックで動画詳細を取得
   const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
 
   if (loading) {
@@ -26,7 +26,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
       <div style={styles.container}>
         <div style={styles.errorCard}>
           <h2 style={styles.errorTitle}>エラー</h2>
-          <p style={styles.errorText}>{error.message || 'スライドの読み込みに失敗しました'}</p>
+          <p style={styles.errorText}>{error.message || '動画の読み込みに失敗しました'}</p>
         </div>
       </div>
     );
@@ -71,7 +71,7 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
           <div style={styles.noVideoIcon}>🎬</div>
           <h3 style={styles.noVideoTitle}>動画を生成中...</h3>
           <p style={styles.noVideoText}>
-            このスライドの動画はまだ生成されていません。<br />
+            動画はまだ生成されていません。<br />
             しばらくお待ちください。
           </p>
         </div>

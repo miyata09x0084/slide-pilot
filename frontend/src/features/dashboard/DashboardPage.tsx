@@ -289,7 +289,6 @@ export default function DashboardPage() {
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={styles.logoSection}>
-          <span style={styles.logoIcon}>🧪</span>
           <h1 style={styles.logo}>
             Multimode Lab
             <span style={styles.alphaBadge}>α版</span>
@@ -320,18 +319,18 @@ export default function DashboardPage() {
       {samples.length > 0 && (
         <div className="dashboard-grid" style={styles.gridContainer}>
           <div style={styles.heroBanner}>
-            <div style={styles.heroBannerIcon}>📚</div>
-            <h2 style={styles.heroBannerTitle}>サンプルスライドで機能を体験</h2>
+            <div style={styles.heroBannerIcon}>🎬</div>
+            <h2 style={styles.heroBannerTitle}>サンプル動画で機能を体験</h2>
             <p style={styles.heroBannerSubtitle}>
-              まずはサンプルで、AIが生成するスライドの品質を確認してみましょう
+              まずはサンプルで、AIが生成する動画の品質を確認してみましょう
             </p>
           </div>
 
-          {/* サンプルスライドカード */}
+          {/* サンプル動画カード */}
           {samples.map((sample) => (
             <UnifiedCard
               key={sample.id}
-              icon="📚"
+              icon="🎬"
               title={sample.title}
               subtitle={sample.description || "サンプル"}
               onClickWithArg={handleSlideClick}
@@ -343,18 +342,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* あなたのスライドセクションタイトル */}
+      {/* あなたの動画セクションタイトル */}
       <div style={styles.sectionTitleContainer}>
-        <h2 style={styles.sectionTitle}>📂 あなたのスライド</h2>
+        <h2 style={styles.sectionTitle}>📂 あなたの動画</h2>
       </div>
 
-      {/* ユーザースライドグリッド */}
+      {/* ユーザー動画グリッド */}
       <div className="dashboard-grid" style={styles.gridContainerNoTopPadding}>
         {/* 新規作成 */}
         <UnifiedCard
           icon="📄"
           title="新規作成"
-          subtitle="PDFを理解する"
+          subtitle="PDFから動画を生成"
           onClick={handleNewSlide}
           variant="primary"
           className="card-default"
@@ -363,10 +362,10 @@ export default function DashboardPage() {
         {/* 空状態 */}
         {displayedSlides.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📄</div>
-            <div style={styles.emptyText}>まだスライドがありません</div>
+            <div style={styles.emptyIcon}>🎬</div>
+            <div style={styles.emptyText}>まだ動画がありません</div>
             <div style={styles.emptySubtext}>
-              新規作成からスライドを作成してみましょう
+              新規作成から動画を作成してみましょう
             </div>
           </div>
         ) : (
@@ -385,7 +384,7 @@ export default function DashboardPage() {
               return (
                 <UnifiedCard
                   key={slide.id}
-                  icon="📊"
+                  icon="🎬"
                   title={slide.title}
                   subtitle={formattedDate}
                   onClickWithArg={handleSlideClick}

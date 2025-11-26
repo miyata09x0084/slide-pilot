@@ -1,6 +1,6 @@
 /**
  * GenerationProgressPage
- * スライド生成進行状況をリアルタイム表示
+ * 動画生成進行状況をリアルタイム表示
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -45,10 +45,10 @@ export default function GenerationProgressPage() {
         setStatus('creating_thread');
         const tid = await createThread();
 
-        // Phase 3: スライド生成開始
+        // Phase 3: 動画生成開始
         setStatus('generating');
         await sendMessage(
-          `このPDFから中学生向けのわかりやすいスライドを作成してください: ${finalPath}`,
+          `このPDFから中学生向けのわかりやすい動画を作成してください: ${finalPath}`,
           tid
         );
       } catch (err) {
@@ -59,7 +59,7 @@ export default function GenerationProgressPage() {
     // 依存配列からthreadIdを削除（古い値での再実行を防ぐ）
   }, [autoStart, pdfPath, pdfFile, createThread, sendMessage]);
 
-  // スライド生成完了時に詳細ページへ自動遷移
+  // 動画生成完了時に詳細ページへ自動遷移
   useEffect(() => {
     // slide_idまたはpathがあれば完了とみなす
     if ((slideData.slide_id || slideData.path) && !hasRedirected.current && !isThinking) {
@@ -110,7 +110,7 @@ export default function GenerationProgressPage() {
           ← Dashboard
         </button>
         <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
-          スライド生成中...
+          動画生成中...
         </h1>
         <div style={{ width: '100px' }} /> {/* Spacer for centering */}
       </div>
@@ -156,7 +156,7 @@ export default function GenerationProgressPage() {
             }}>
               {status === 'uploading' && 'PDFアップロード中...'}
               {status === 'creating_thread' && '準備中...'}
-              {status === 'generating' && 'スライドを生成しています'}
+              {status === 'generating' && '動画を生成しています'}
               {status === 'completed' && '完了しました'}
               {status === 'error' && 'エラーが発生しました'}
             </h2>
@@ -166,9 +166,9 @@ export default function GenerationProgressPage() {
               fontSize: '14px',
               color: '#666'
             }}>
-              {status === 'creating_thread' && 'スライド生成の準備をしています'}
-              {status === 'generating' && 'PDFを分析してスライドを生成中...（1〜2分）'}
-              {status === 'completed' && 'まもなくスライドページに移動します'}
+              {status === 'creating_thread' && '動画生成の準備をしています'}
+              {status === 'generating' && 'PDFを分析して動画を生成中...（2〜3分）'}
+              {status === 'completed' && 'まもなく動画ページに移動します'}
               {status === 'error' && (error || '不明なエラーが発生しました')}
             </p>
           </div>
@@ -189,7 +189,7 @@ export default function GenerationProgressPage() {
                 color: '#155724',
                 marginBottom: '8px'
               }}>
-                ✅ スライド生成完了
+                ✅ 動画生成完了
               </div>
               {slideData.title && (
                 <div style={{
@@ -204,7 +204,7 @@ export default function GenerationProgressPage() {
                 color: '#155724',
                 marginTop: '8px'
               }}>
-                まもなくスライド詳細ページに移動します...
+                まもなく動画ページに移動します...
               </div>
             </div>
           )}
