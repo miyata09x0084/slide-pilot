@@ -69,13 +69,14 @@ jobs:
           ENV_VARS=$(yq eval '.env_vars[] | .name + "=" + .value' "$SCHEMA_FILE" | paste -sd ",")
 
           # Deploy to Cloud Run
+          # NOTE: memory=2Gi, cpu=2 for video rendering (Playwright + MoviePy)
           gcloud run deploy "$SERVICE_NAME" \
             --image="${IMAGE_NAME}:${{ github.sha }}" \
             --region="$REGION" \
             --platform=managed \
             --allow-unauthenticated \
-            --memory=512Mi \
-            --cpu=1 \
+            --memory=2Gi \
+            --cpu=2 \
             --timeout=300 \
             --max-instances=100 \
             --min-instances=0 \
