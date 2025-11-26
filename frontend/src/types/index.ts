@@ -56,6 +56,7 @@ export interface SlideData {
   title?: string;
   slide_id?: string;
   pdf_url?: string;
+  video_url?: string;
 }
 
 // ============================================================================

@@ -193,7 +193,8 @@ export function useReactAgent() {
                             path: result.slide_path || result.path,
                             title: result.title || '動画',
                             slide_id: result.slide_id,     // Supabase ID（Issue #24）
-                            pdf_url: result.pdf_url        // Supabase公開URL（Issue #24）
+                            pdf_url: result.pdf_url,       // Supabase公開URL（Issue #24）
+                            video_url: result.video_url    // 動画URL
                           });
 
                           // 完了メッセージを追加

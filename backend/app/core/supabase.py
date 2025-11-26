@@ -122,7 +122,7 @@ def get_slides_by_user(user_id: str, limit: int = 20) -> List[Dict]:
     try:
         response = (
             client.table("slides")
-            .select("id, title, topic, created_at, pdf_url")
+            .select("id, title, topic, created_at, pdf_url, video_url")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(limit)
