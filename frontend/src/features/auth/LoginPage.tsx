@@ -60,7 +60,7 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          ラクヨミ アシスタントAI{' '}
+          🧪 Multimode Lab{' '}
           <span
             style={{
               display: 'inline-block',
@@ -80,13 +80,13 @@ export default function LoginPage() {
           </span>
         </h1>
         <p style={{ marginBottom: '8px', color: '#666', fontWeight: '600' }}>
-          あなた専用の学習パートナー
+          Multimodal Content Experiment
         </p>
         <p style={{ marginBottom: '6px', color: '#888', fontSize: '14px' }}>
-          PDFをアップロードして、難しい資料を楽に読む
+          PDF → Slide → Video 変換パイプライン
         </p>
         <p style={{ marginBottom: '30px', color: '#999', fontSize: '12px' }}>
-          📄 対応形式: PDF
+          🧪 実験的マルチモーダル変換
         </p>
 
         {/* Google 公式 OAuth UI */}

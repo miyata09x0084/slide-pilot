@@ -1,1 +1,1 @@
-"""SlidePilot Backend Package"""
+"""Multimode Lab Backend Package"""

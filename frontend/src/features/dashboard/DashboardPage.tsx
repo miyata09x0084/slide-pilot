@@ -289,9 +289,9 @@ export default function DashboardPage() {
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={styles.logoSection}>
-          <span style={styles.logoIcon}>📚</span>
+          <span style={styles.logoIcon}>🧪</span>
           <h1 style={styles.logo}>
-            ラクヨミ アシスタントAI
+            Multimode Lab
             <span style={styles.alphaBadge}>α版</span>
           </h1>
         </div>
