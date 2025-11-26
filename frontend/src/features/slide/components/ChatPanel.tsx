@@ -76,7 +76,6 @@ export default function ChatPanel({ slideId: _slideId }: ChatPanelProps) {
       {/* ヘッダー */}
       <div style={styles.header}>
         <h3 style={styles.title}>
-          <span>💬</span>
           <span>スライドについて質問</span>
         </h3>
         <p style={styles.subtitle}>
@@ -88,7 +87,6 @@ export default function ChatPanel({ slideId: _slideId }: ChatPanelProps) {
       <div style={styles.messagesContainer}>
         {messages.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🤖</div>
             <div style={styles.emptyText}>
               スライドの内容について何でも質問してください。
               <br />
@@ -104,7 +102,7 @@ export default function ChatPanel({ slideId: _slideId }: ChatPanelProps) {
 
       {/* Phase 4 実装予定の通知 */}
       <div style={styles.notice}>
-        💬 RAGチャット機能は Phase 4 で実装予定です
+        RAGチャット機能は Phase 4 で実装予定です
       </div>
     </div>
   );

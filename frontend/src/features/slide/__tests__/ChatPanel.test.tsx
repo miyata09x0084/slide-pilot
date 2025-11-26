@@ -12,7 +12,6 @@ describe('ChatPanel', () => {
     it('ヘッダーが表示される', () => {
       render(<ChatPanel slideId="test-slide-123" />);
 
-      expect(screen.getByText('💬')).toBeInTheDocument();
       expect(screen.getByText('スライドについて質問')).toBeInTheDocument();
       expect(screen.getByText('RAGでPDF内容を参照して回答します')).toBeInTheDocument();
     });
@@ -20,7 +19,6 @@ describe('ChatPanel', () => {
     it('メッセージが空の場合、空状態が表示される', () => {
       render(<ChatPanel slideId="test-slide-123" />);
 
-      expect(screen.getByText('🤖')).toBeInTheDocument();
       expect(
         screen.getByText((content) => content.includes('スライドの内容について何でも質問してください'))
       ).toBeInTheDocument();

@@ -31,7 +31,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             fontSize: '18px',
             flexShrink: 0
           }}>
-            🤖
+            AI
           </div>
         )}
 
