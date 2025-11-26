@@ -59,7 +59,7 @@ export function InlineFeedback({
           }}
           title="良かった"
         >
-          <FontAwesomeIcon icon={faThumbsUp} style={styles.thumbIcon} />
+          <FontAwesomeIcon icon={faThumbsUp} color="#888" fontSize="16px" />
         </button>
         <button
           onClick={handleThumbsDown}
@@ -71,7 +71,7 @@ export function InlineFeedback({
           }}
           title="改善が必要"
         >
-          <FontAwesomeIcon icon={faThumbsDown} style={styles.thumbIcon} />
+          <FontAwesomeIcon icon={faThumbsDown} color="#888" fontSize="16px" />
         </button>
         <button
           onClick={onOpenDetail}
@@ -107,10 +107,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-  },
-  thumbIcon: {
-    color: '#888',
-    fontSize: '16px',
   },
   thumbButton: {
     width: '40px',
