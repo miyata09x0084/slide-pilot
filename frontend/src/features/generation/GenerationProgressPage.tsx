@@ -109,10 +109,6 @@ export default function GenerationProgressPage() {
         >
           ← Dashboard
         </button>
-        <h1 style={{ margin: 0, fontSize: '20px', color: '#333' }}>
-          動画生成中...
-        </h1>
-        <div style={{ width: '100px' }} /> {/* Spacer for centering */}
       </div>
 
       {/* 進行状況表示 */}
