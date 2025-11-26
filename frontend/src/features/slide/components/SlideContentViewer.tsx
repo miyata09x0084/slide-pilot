@@ -4,12 +4,15 @@
  */
 
 import { useSlideDetail } from '../api/get-slide-detail';
+import { InlineFeedback } from './InlineFeedback';
 
 interface SlideContentViewerProps {
   slideId: string;
+  onQuickFeedback: (rating: number) => Promise<void>;
+  onOpenFeedbackModal: () => void;
 }
 
-export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
+export function SlideContentViewer({ slideId, onQuickFeedback, onOpenFeedbackModal }: SlideContentViewerProps) {
   // React Queryフックで動画詳細を取得
   const { data: slide, isLoading: loading, error } = useSlideDetail(slideId);
 
@@ -64,6 +67,13 @@ export function SlideContentViewer({ slideId }: SlideContentViewerProps) {
               🎬 動画をダウンロード
             </a>
           </div>
+
+          {/* インラインフィードバック */}
+          <InlineFeedback
+            slideId={slideId}
+            onQuickFeedback={onQuickFeedback}
+            onOpenDetail={onOpenFeedbackModal}
+          />
         </div>
       ) : (
         /* 動画が存在しない場合のメッセージ */
