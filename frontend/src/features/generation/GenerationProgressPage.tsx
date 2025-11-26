@@ -45,10 +45,10 @@ export default function GenerationProgressPage() {
         setStatus('creating_thread');
         const tid = await createThread();
 
-        // Phase 3: 動画生成開始
+        // Phase 3: スライド生成開始（LangGraphは動画ではなくスライドツールのみ対応）
         setStatus('generating');
         await sendMessage(
-          `このPDFから中学生向けのわかりやすい動画を作成してください: ${finalPath}`,
+          `このPDFから中学生向けのわかりやすいスライドを作成してください: ${finalPath}`,
           tid
         );
       } catch (err) {

@@ -132,14 +132,14 @@ export default function SlideDetailPage() {
         {/* アクションボタン */}
         <div style={styles.actions}>
           <button
-            onClick={() => setShowFeedbackModal(true)}
-            onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
-            onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
-            style={styles.feedbackButton}
-          >
-            💬 フィードバック
-          </button>
-        </div>
+          onClick={() => setShowFeedbackModal(true)}
+          onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
+          onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
+          style={styles.feedbackButton}
+        >
+          フィードバック
+        </button>
+      </div>
       </div>
 
       {/* 2ペインレイアウト */}
