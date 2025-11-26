@@ -59,8 +59,9 @@ async def upload_pdf(
     if file_size == 0:
         raise HTTPException(status_code=400, detail="ファイルが空です")
 
-    # 一意なファイル名を生成
-    unique_name = f"{uuid.uuid4()}_{file.filename}"
+    # 一意なファイル名を生成（Supabase StorageはASCII文字のみサポート）
+    # 元のファイル名はレスポンスのfilenameで返す
+    unique_name = f"{uuid.uuid4()}.pdf"
 
     # Supabase Storageにアップロード
     storage_path = f"{user_id}/{unique_name}"
