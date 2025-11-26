@@ -60,7 +60,7 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          🧪 Multimode Lab{' '}
+          Multimode Lab{' '}
           <span
             style={{
               display: 'inline-block',
@@ -83,7 +83,7 @@ export default function LoginPage() {
           Multimodal Content Experiment
         </p>
         <p style={{ marginBottom: '6px', color: '#888', fontSize: '14px' }}>
-          PDF → Slide → Video 変換パイプライン
+          PDF → Video 変換パイプライン
         </p>
         <p style={{ marginBottom: '30px', color: '#999', fontSize: '12px' }}>
           🧪 実験的マルチモーダル変換
