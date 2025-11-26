@@ -167,7 +167,7 @@ export default function GenerationProgressPage() {
               color: '#666'
             }}>
               {status === 'creating_thread' && '動画生成の準備をしています'}
-              {status === 'generating' && 'PDFを分析して動画を生成中...（2〜3分）'}
+              {status === 'generating' && 'PDFを分析して動画を生成中...（4〜6分）'}
               {status === 'completed' && 'まもなく動画ページに移動します'}
               {status === 'error' && (error || '不明なエラーが発生しました')}
             </p>
