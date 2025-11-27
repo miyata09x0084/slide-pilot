@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-サンプルスライドをSupabaseに投入するスクリプト
+既存スライドをサンプルスライドに設定するスクリプト
+
+指定したスライドIDのuser_idをサンプル用ID (00000000-...) に更新し、
+全ユーザーがアクセス可能にする。
 
 Usage:
     cd backend
     python scripts/seed_sample_slides.py
 """
 
-import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-import uuid
-from datetime import datetime
 
 # プロジェクトルートを sys.path に追加
 backend_dir = Path(__file__).parent.parent
@@ -32,105 +32,61 @@ if not supabase:
 SAMPLE_USER_ID = "00000000-0000-0000-0000-000000000000"
 
 # サンプルスライドの定義
-SAMPLE_SLIDES = [
-    {
-        "id": "11111111-1111-1111-1111-111111111111",  # 固定UUID
-        "title": "多言語AIで文書解析",
-        "md_file": "multilingual-ai-document-analysis_slidev.md",
-        "pdf_file": "multilingual-ai-document-analysis_slidev.pdf",
-    },
-    {
-        "id": "22222222-2222-2222-2222-222222222222",  # 固定UUID
-        "title": "2Dと3Dで学ぶ空間理解",
-        "md_file": "learning-spatial-understanding-2d-3d_slidev.md",
-        "pdf_file": "learning-spatial-understanding-2d-3d_slidev.pdf",
-    },
+# 注意: このスクリプトは既存スライドのuser_idを更新するモードに変更
+# 新規作成ではなく、既にSupabaseに存在するスライドをサンプル化する
+SAMPLE_SLIDE_IDS = [
+    "862ae7f8-793f-4a39-9c7c-a003659b213c",  # 疑似科学を見抜く力
+    "743cb44b-8546-47f9-bd91-2caebb423dab",  # 映画制作の未来
+    "91997e40-ff18-45fc-b106-e5d568fd5725",  # 未来予測AI
 ]
 
 
-def upload_pdf_to_storage(local_path: str, storage_path: str):
-    """PDFファイルをSupabase Storageにアップロード"""
-    with open(local_path, "rb") as f:
-        pdf_data = f.read()
-
-    try:
-        # 既存ファイルを削除（エラー無視）
-        supabase.storage().from_("slide-files").remove([storage_path])
-    except Exception as e:
-        print(f"  ⚠️  Delete failed (ok): {e}")
-
-    # アップロード
-    result = supabase.storage().from_("slide-files").upload(
-        storage_path, pdf_data, {"content-type": "application/pdf"}
+def update_slide_to_sample(slide_id: str):
+    """既存スライドのuser_idをサンプル用IDに更新"""
+    result = (
+        supabase.table("slides")
+        .update({"user_id": SAMPLE_USER_ID})
+        .eq("id", slide_id)
+        .execute()
     )
-    print(f"  ✅ PDF uploaded: {storage_path}")
-    return result
-
-
-def insert_slide_to_db(slide_id: str, title: str, slide_md: str, pdf_url: str):
-    """スライドメタデータをSupabaseテーブルに挿入"""
-    data = {
-        "id": slide_id,
-        "user_id": SAMPLE_USER_ID,
-        "title": title,
-        "topic": title,  # topicはtitleと同じ値を設定
-        "slide_md": slide_md,
-        "pdf_url": pdf_url,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-
-    # 既存レコードを削除（エラー無視）
-    try:
-        supabase.table("slides").delete().eq("id", slide_id).execute()
-    except Exception:
-        pass
-
-    # 挿入
-    result = supabase.table("slides").insert(data).execute()
-    print(f"  ✅ Slide inserted: {title} (id: {slide_id})")
     return result
 
 
 def main():
-    print("🚀 サンプルスライド投入スクリプト開始\n")
+    print("🚀 サンプルスライド設定スクリプト開始\n")
+    print(f"サンプルユーザーID: {SAMPLE_USER_ID}\n")
 
-    samples_dir = backend_dir / "data" / "samples"
+    updated = []
+    failed = []
 
-    for sample in SAMPLE_SLIDES:
-        print(f"📄 Processing: {sample['title']}")
+    for slide_id in SAMPLE_SLIDE_IDS:
+        print(f"📄 Processing: {slide_id}")
 
-        # 1. Markdownファイル読み込み
-        md_path = samples_dir / sample["md_file"]
-        if not md_path.exists():
-            print(f"  ❌ Error: {md_path} not found")
+        # スライドが存在するか確認
+        result = supabase.table("slides").select("id, title").eq("id", slide_id).execute()
+
+        if not result.data:
+            print(f"  ❌ Error: スライドが見つかりません")
+            failed.append(slide_id)
             continue
 
-        with open(md_path, "r", encoding="utf-8") as f:
-            slide_md = f.read()
-        print(f"  ✅ Markdown loaded: {len(slide_md)} chars")
+        title = result.data[0]["title"]
 
-        # 2. PDFファイルをStorageにアップロード
-        pdf_path = samples_dir / sample["pdf_file"]
-        if not pdf_path.exists():
-            print(f"  ❌ Error: {pdf_path} not found")
-            continue
-
-        storage_path = f"{SAMPLE_USER_ID}/{sample['pdf_file']}"
-        upload_pdf_to_storage(str(pdf_path), storage_path)
-
-        # 公開URLを取得
-        pdf_url = supabase.storage().from_("slide-files").get_public_url(storage_path)
-        print(f"  ✅ Public URL: {pdf_url}")
-
-        # 3. slidesテーブルに挿入
-        insert_slide_to_db(sample["id"], sample["title"], slide_md, pdf_url)
-
+        # user_idを更新
+        update_slide_to_sample(slide_id)
+        print(f"  ✅ Updated: {title}")
+        updated.append({"id": slide_id, "title": title})
         print()
 
-    print("✅ サンプルスライド投入完了！\n")
-    print("📋 投入されたスライド:")
-    for sample in SAMPLE_SLIDES:
-        print(f"  - {sample['title']} (UUID: {sample['id']})")
+    print("=" * 50)
+    print(f"✅ 更新完了: {len(updated)}件")
+    for item in updated:
+        print(f"  - {item['title']} ({item['id']})")
+
+    if failed:
+        print(f"\n❌ 失敗: {len(failed)}件")
+        for slide_id in failed:
+            print(f"  - {slide_id}")
 
 
 if __name__ == "__main__":
