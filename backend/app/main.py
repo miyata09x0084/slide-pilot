@@ -40,7 +40,7 @@ app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 async def root():
     """ルートエンドポイント"""
     return {
-        "message": "Multimode Lab API",
+        "message": "Multimodal Lab API",
         "docs": "/docs",
         "health": "/api/health"
     }

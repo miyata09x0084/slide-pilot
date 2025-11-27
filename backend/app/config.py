@@ -21,7 +21,7 @@ class Settings:
     """アプリケーション設定クラス"""
 
     # API設定
-    API_TITLE: str = "Multimode Lab API"
+    API_TITLE: str = "Multimodal Lab API"
     API_VERSION: str = "1.0.0"
     API_DESCRIPTION: str = "Experimental multimodal content converter - PDF to Slide to Video"
 

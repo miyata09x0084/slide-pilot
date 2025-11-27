@@ -1,1 +1,1 @@
-"""Multimode Lab Backend Package"""
+"""Multimodal Lab Backend Package"""

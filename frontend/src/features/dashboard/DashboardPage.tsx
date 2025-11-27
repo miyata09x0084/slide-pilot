@@ -290,7 +290,7 @@ export default function DashboardPage() {
       <div style={styles.header}>
         <div style={styles.logoSection}>
           <h1 style={styles.logo}>
-            Multimode Lab
+            Multimodal Lab
             <span style={styles.alphaBadge}>α版</span>
           </h1>
         </div>

@@ -60,7 +60,7 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ marginBottom: '10px', color: '#333' }}>
-          Multimode Lab{' '}
+          Multimodal Lab{' '}
           <span
             style={{
               display: 'inline-block',
