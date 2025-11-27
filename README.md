@@ -1,72 +1,108 @@
-# Multimode Lab – PDFから動画を自動生成する実験プロダクト
+#  Slide-Pilot  
+*A multimodal LLM-powered tool that converts PDFs into presentation slides and narrated videos.*
 
-難しいPDFを、わかりやすい動画に。LangGraphで構築したエージェントが、PDF解析からスライド生成、ナレーション音声、動画化までを自動で行います。
+---
 
-## できること
-- PDFを数分で要約し、スライド＋ナレーション動画を生成
-- LLMによる台本生成とOpenAI TTSを最大5並列で実行し高速化
-- 生成した動画をブラウザでプレビューし、そのままダウンロード
+##  Overview / 概要
 
-## 使い方
-1. Googleでログイン
-2. PDFをアップロード
-3. 数分待つ
-4. 生成された動画をプレビュー/ダウンロード
+EN:
+In recent years, the cost of multimodal generation has steadily decreased, and as it continues to decline, generating text, audio, and video is becoming increasingly practical and accessible. This trend suggests new opportunities for automating content production workflows.
+Slide-Pilot explores this direction by prototyping a system that transforms a static PDF into narrated slides and a rendered video — positioning the project as an experiment toward future multimodal content automation.
 
-## ワークフロー（5ステップ）
-```
-解析 → 要約/目次 → スライドレンダリング → ナレーション/TTS → 動画書き出し
-```
+JP（補足）：
+近年、マルチモーダル生成のコストは着実に低下しており、今後さらに下がることで、テキストだけでなく音声や動画生成もより現実的な選択肢になっていくと考えられます。
+こうした変化は、コンテンツ生成パイプラインの自動化に新たな可能性をもたらしつつあります。
+Slide-Pilotは、PDFをスライドとナレーション付き動画へ変換するシステムを試作することで、将来的なマルチモーダル生成の活用可能性を探る実験的プロジェクトです。
 
-## ユースケースとメリット
-- 社内共有: 長い資料のポイントを動画で短時間キャッチアップ
-- 顧客説明: サービス説明資料を動画化し、閲覧ハードルを下げる
-- 教育用途: 学習者向けに、難解PDFを平易な動画に変換
-- メリット: 速い（数分）、安い（自動生成）、分かりやすい（音声＋スライド）
+---
 
-## アーキテクチャ
-- **Frontend**: React 19 + TypeScript, Google OAuth
-- **Backend**: FastAPI（port 8001）+ LangGraph（port 2024）
-- **AI/生成**: GPT-4 (LLM)、OpenAI TTS、Slidevベースのスライドレンダリング（独自レンダラー）
-- **データ/その他**: Supabase（Auth/Storage）、Tavily検索
+##  Demo  
+> *(Add when available: GIF, Screenshot, Loom, or Demo URL)*  
+Example placeholders:  
 
-## セットアップ
-- 前提: Python 3.11+, Node.js 18+, 必要なAPI Key（後日整備）
+- `demo.gif`  
+- https://loom.com/example  
 
-```bash
-# 1. LangGraph（AI Engine）- リポジトリルートで実行
+---
+
+##  Key Features
+
+-  PDF text extraction & structure parsing  
+-  LLM-based summarization and slide content generation  
+-  LangGraph-based workflow orchestration  
+-  Automatic narration using text-to-speech  
+-  Video generation combining slides + narration  
+-  Modular architecture for experimenting with different LLM providers  
+-  Browser UI for previewing and exporting output  
+
+---
+
+##  Architecture
+
+### **Frontend**
+- Next.js + React  
+- TypeScript  
+- UI preview for slides & generated video  
+
+### **Backend**
+- Python + FastAPI  
+- LangGraph for workflow orchestration  
+- LLM API integration (OpenAI, etc.)  
+- Supabase for file handling (optional future direction)
+
+### **Additional Components**
+- Optional parallel processing for TTS & rendering  
+- Video composition layer  
+
+---
+
+##  Tech Stack
+
+| Category | Technologies |
+|---------|-------------|
+| Frontend | Next.js / React / TypeScript |
+| Backend | Python / FastAPI / LangGraph |
+| AI / LLM | OpenAI API (multimodal) |
+| Processing | FFmpeg (planned), async workflows |
+| Tools | Docker / Supabase (optional) |
+
+---
+
+##  My Role & Contributions
+
+- Designed full system architecture  
+- Implemented backend workflow using FastAPI + LangGraph  
+- Integrated LLM API for summarization and content generation  
+- Developed UI for preview and interaction  
+- Experimented with parallel processing for faster rendering  
+- Created automation scripts and prototypes using Python  
+
+---
+
+##  What I Learned
+
+- Practical approaches to LLM API integration (not model training)  
+- Workflow orchestration using LangGraph  
+- Multimodal UI/UX challenges (text → slides → video)  
+- Improved backend structure, naming, and async patterns  
+- Balancing prototype velocity vs. maintainable architecture  
+
+---
+
+##  Usage / Quick Start
+
+> Note: Environment variables are required for LLM API access (setup instructions in progress).
+
+```sh
+git clone https://github.com/miyata09x0084/slide-pilot
+cd slide-pilot
+
+# 1. LangGraph (AI Engine) - Run in the repository root
 python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
 
-# 2. FastAPI（Gateway）
+# 2. FastAPI (Gateway)
 cd backend/app && python3 main.py
 
 # 3. Frontend
 cd frontend && npm install && npm run dev
 ```
-
-→ http://localhost:5173
-
-## 進行中/制約
-- 実験段階。モデル/速度/コストは今後調整予定
-- 一部機能は内部用の設定やキーが必要です
-
-## 背景（簡略版）
-マルチモーダル生成コストが急速に低下しており、動画/音声も個別最適化が現実的になりつつあります。Multimode Labはその将来を見越し、PDFから動画への自動変換パイプラインを検証する実験です。より詳細な実装メモや設計は [CLAUDE.md](./CLAUDE.md) を参照してください。
-
-## プロジェクト構造
-```
-slide-pilot/
-├── backend/app/
-│   ├── routers/      # API endpoints
-│   ├── agents/       # LangGraphワークフロー
-│   ├── tools/        # Gmail, PDF, Slides
-│   └── prompts/      # プロンプト管理
-├── frontend/src/
-└── langgraph.json
-```
-
-## License
-MIT License
-
-## Contributing
-Issue、PR歓迎。技術詳細: [CLAUDE.md](./CLAUDE.md)
