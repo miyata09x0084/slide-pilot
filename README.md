@@ -18,7 +18,7 @@ Multimode Labtは、PDFをスライドとナレーション付き動画へ変換
 
 ##  Demo  
 
-- [https://loom.com/example  
+- [Multimode Lab
 ](https://slide-pilot-474305.web.app/)
 ---
 
