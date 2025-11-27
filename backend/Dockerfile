@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# Multimode Lab Backend - LangGraph Cloud版 Dockerfile
+# Multimodal Lab Backend - LangGraph Cloud版 Dockerfile
 #
 # 変更内容（2025-11-03）:
 # - LangGraph devサーバーを削除（LangSmith Cloudを使用）
