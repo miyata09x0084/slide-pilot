@@ -1,4 +1,4 @@
-#  Multimode Lab 
+#  Multimodal Lab
 *A multimodal LLM-powered tool that converts PDFs into presentation slides and narrated videos.*
 
 ---
@@ -7,18 +7,18 @@
 
 EN:
 In recent years, the cost of multimodal generation has steadily decreased, and as it continues to decline, generating text, audio, and video is becoming increasingly practical and accessible. This trend suggests new opportunities for automating content production workflows.
-Multimode Lab explores this direction by prototyping a system that transforms a static PDF into narrated slides and a rendered video — positioning the project as an experiment toward future multimodal content automation.
+Multimodal Lab explores this direction by prototyping a system that transforms a static PDF into narrated slides and a rendered video — positioning the project as an experiment toward future multimodal content automation.
 
 JP（補足）：
 近年、マルチモーダル生成のコストは着実に低下しており、今後さらに下がることで、テキストだけでなく音声や動画生成もより現実的な選択肢になっていくと考えられます。
 こうした変化は、コンテンツ生成パイプラインの自動化に新たな可能性をもたらしつつあります。
-Multimode Labtは、PDFをスライドとナレーション付き動画へ変換するシステムを試作することで、将来的なマルチモーダル生成の活用可能性を探る実験的プロジェクトです。
+Multimodal Labは、PDFをスライドとナレーション付き動画へ変換するシステムを試作することで、将来的なマルチモーダル生成の活用可能性を探る実験的プロジェクトです。
 
 ---
 
 ##  Demo  
 
-- [Multimode Lab
+- [Multimodal Lab
 ](https://slide-pilot-474305.web.app/)
 ---
 
