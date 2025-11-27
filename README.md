@@ -17,12 +17,9 @@ Multimode Labtは、PDFをスライドとナレーション付き動画へ変換
 ---
 
 ##  Demo  
-> *(Add when available: GIF, Screenshot, Loom, or Demo URL)*  
-Example placeholders:  
 
-- `demo.gif`  
-- https://loom.com/example  
-
+- [https://loom.com/example  
+](https://slide-pilot-474305.web.app/)
 ---
 
 ##  Key Features
