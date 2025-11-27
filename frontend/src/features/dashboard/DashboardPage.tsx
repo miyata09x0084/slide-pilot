@@ -332,7 +332,6 @@ export default function DashboardPage() {
               key={sample.id}
               icon="🎬"
               title={sample.title}
-              subtitle={sample.topic || "サンプル"}
               onClickWithArg={handleSlideClick}
               clickArg={sample.id}
               variant="sample"
