@@ -15,6 +15,38 @@ from app.auth.middleware import verify_token
 
 router = APIRouter()
 
+# サンプルスライド用の固定ユーザーID
+SAMPLE_USER_ID = "00000000-0000-0000-0000-000000000000"
+
+
+# ──────────────────────────────────────────────────────────────
+# サンプルスライド（認証不要）
+# ──────────────────────────────────────────────────────────────
+
+@router.get("/samples")
+async def get_samples() -> Dict[str, Any]:
+    """サンプルスライド一覧を取得（認証不要）
+
+    user_id = 00000000-0000-0000-0000-000000000000 のスライドを動的に取得
+    RLSポリシーで全員アクセス可能に設定済み
+
+    Returns:
+        {"samples": [...]}
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"samples": []}
+
+    response = (
+        client.table("slides")
+        .select("id, title, topic, created_at, pdf_url, video_url")
+        .eq("user_id", SAMPLE_USER_ID)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return {"samples": response.data}
+
 
 # ──────────────────────────────────────────────────────────────
 # Supabase統合エンドポイント（Issue #24）
@@ -74,7 +106,6 @@ async def get_slide_markdown(
         raise HTTPException(status_code=404, detail="スライドが見つかりません")
 
     # サンプルスライド（user_id = 00000000-...）は全員アクセス可能
-    SAMPLE_USER_ID = "00000000-0000-0000-0000-000000000000"
     is_sample = slide.get("user_id") == SAMPLE_USER_ID
 
     # RLS + 念のためユーザーID照合（サンプルスライドは除外）
