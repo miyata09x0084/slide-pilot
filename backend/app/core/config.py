@@ -25,10 +25,8 @@ os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 # Tavily
 TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
 
-# Marp 出力（PDF/PNG/HTML）。空なら .md に出力
-SLIDE_FORMAT = os.getenv("SLIDE_FORMAT", "").lower().strip()
-MARP_THEME = os.getenv("MARP_THEME", "default") # default/gaia/gaia-dark/gaia-light
-MARP_PAGINATE = os.getenv("MARP_PAGINATE", "true") # true/false
+# PDF生成廃止: Slidev CLI のブロッキング処理を回避するため、MD保存のみに変更
+# 動画生成はFastAPI経由で実行（render.py）
 
 # =====================================
 # 動画生成設定（Video Narration Feature）
