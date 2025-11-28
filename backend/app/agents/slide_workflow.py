@@ -1135,19 +1135,13 @@ def render_video(state: State) -> Dict:
 # 条件分岐: 動画生成
 # -------------------
 def route_after_save(state: State) -> str:
-    """保存後の分岐: 動画生成フラグで判定"""
-    from app.core.config import VIDEO_ENABLED
-
+    """保存後の分岐: 常に動画生成へ"""
     # エラーがある場合はスキップ
     if state.get("error"):
         return END
 
-    # フラグがONの場合は動画生成へ
-    if VIDEO_ENABLED:
-        return "generate_narration"
-
-    # フラグがOFFの場合は終了（PDF生成のみ）
-    return END
+    # 常に動画生成へ
+    return "generate_narration"
 
 # -------------------
 # グラフ構築
