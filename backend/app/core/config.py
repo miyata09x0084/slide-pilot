@@ -31,7 +31,7 @@ TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
 # =====================================
 # 動画生成設定（Video Narration Feature）
 # =====================================
-VIDEO_ENABLED = os.getenv("VIDEO_ENABLED", "false").lower() == "true"
+# 動画生成は常に有効（VIDEO_ENABLED廃止）
 TTS_MODEL = os.getenv("TTS_MODEL", "tts-1-hd")  # tts-1 / tts-1-hd
 TTS_VOICE = os.getenv("TTS_VOICE", "shimmer")   # alloy/echo/fable/onyx/nova/shimmer
 TTS_SPEED = os.getenv("TTS_SPEED", "1.0")       # 0.25-4.0
