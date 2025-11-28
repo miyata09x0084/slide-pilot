@@ -829,6 +829,30 @@ def save_and_render_slidev(state: State) -> Dict:
       result["pdf_url"] = pdf_url
       result["md_url"] = md_url
       result["log"] = _log(state, f"[supabase] saved slide_id={supabase_result['slide_id']}")
+
+      # ──────────────────────────────────────────────────────────────────────────
+      # Cloud Tasks で動画生成ジョブを投入（VIDEO_ENABLED=true の場合のみ）
+      # LangGraph Cloud ではブロッキング処理が実行できないため、
+      # Cloud Run Job にオフロードする
+      # ──────────────────────────────────────────────────────────────────────────
+      from app.core.config import VIDEO_ENABLED
+      if VIDEO_ENABLED:
+        try:
+          from app.core.cloud_tasks import create_video_generation_task
+          task_name = create_video_generation_task(
+            slide_id=supabase_result["slide_id"],
+            user_id=user_id,
+            slide_md=slide_md,
+            title=title
+          )
+          if task_name:
+            result["video_task_name"] = task_name
+            result["log"] = _log(state, f"[cloud_tasks] video generation task created: {task_name}")
+          else:
+            result["log"] = _log(state, "[cloud_tasks] video generation task skipped (local or not configured)")
+        except Exception as e:
+          result["log"] = _log(state, f"[cloud_tasks] failed to create task: {str(e)[:100]}")
+
     elif "error" in supabase_result:
       # Supabase未設定の場合もここに入る（警告のみ、継続）
       result["log"] = _log(state, f"[supabase] {supabase_result['error']}")
@@ -1312,18 +1336,13 @@ def render_video(state: State) -> Dict:
 # 条件分岐: 動画生成
 # -------------------
 def route_after_save(state: State) -> str:
-    """保存後の分岐: 動画生成フラグで判定"""
-    from app.core.config import VIDEO_ENABLED
+    """保存後の分岐: Cloud Run Job で動画生成を実行するため、常にENDを返す
 
-    # エラーがある場合はスキップ
-    if state.get("error"):
-        return END
-
-    # フラグがONの場合は動画生成へ
-    if VIDEO_ENABLED:
-        return "generate_narration"
-
-    # フラグがOFFの場合は終了（PDF生成のみ）
+    NOTE: LangGraph Cloud ではブロッキング処理（Playwright, MoviePy）が
+    実行できないため、動画生成は Cloud Run Job にオフロードする。
+    Cloud Tasks へのジョブ投入は save_and_render_slidev ノード内で行う。
+    """
+    # 動画生成は Cloud Run Job で実行するため、常にENDを返す
     return END
 
 # -------------------

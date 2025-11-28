@@ -46,3 +46,6 @@ pytest-cov>=7.0.0
 moviepy>=1.0.3         # 動画生成（画像+音声合成）
 pillow>=10.0.0         # 画像処理
 playwright>=1.49.0     # HTML→PNG変換（スライド画像生成）
+
+# ---Cloud Tasks（動画生成ジョブ投入）---
+google-cloud-tasks>=2.16.0
