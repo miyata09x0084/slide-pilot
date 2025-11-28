@@ -59,10 +59,8 @@ class Settings:
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     TAVILY_API_KEY: Optional[str] = os.getenv("TAVILY_API_KEY")
 
-    # スライド設定
-    SLIDE_FORMAT: str = os.getenv("SLIDE_FORMAT", "").lower().strip()
-    MARP_THEME: str = os.getenv("MARP_THEME", "default")
-    MARP_PAGINATE: str = os.getenv("MARP_PAGINATE", "true")
+    # PDF生成廃止: Slidev CLI のブロッキング処理を回避するため、MD保存のみに変更
+    # 動画生成はFastAPI経由で実行（render.py）
 
     def __init__(self):
         """必要最小限のディレクトリを作成"""

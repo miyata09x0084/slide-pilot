@@ -21,7 +21,7 @@ from langchain_core.runnables import RunnableConfig
 
 # ローカルモジュール
 from app.config import settings
-from app.core.config import TAVILY_API_KEY, SLIDE_FORMAT, MARP_THEME, MARP_PAGINATE
+from app.core.config import TAVILY_API_KEY
 from app.core.llm import llm
 from app.core.supabase import save_slide_to_supabase
 from app.core.storage import upload_to_storage
@@ -710,7 +710,7 @@ def route_after_eval_slidev(state: State) -> str:
 # -------------------
 @traceable(run_name="f_save_and_render_slidev")
 def save_and_render_slidev(state: State) -> Dict:
-  """Slidev形式のスライドを保存してPDF生成"""
+  """Slidev形式のスライドを保存（PDF生成廃止、MD保存のみ）"""
   if state.get("error"):
     return {}
 
@@ -733,66 +733,18 @@ def save_and_render_slidev(state: State) -> Dict:
   except Exception:
     file_stem = _slugify_en(title) or "ai-latest-info"
 
-  # 一時ディレクトリ作成（Cloud Runでも動作）
-  temp_dir = Path(tempfile.mkdtemp())
-  slide_md_path = temp_dir / f"{file_stem}_slidev.md"
-  slide_md_path.write_text(slide_md, encoding="utf-8")
-
-  # Slidev PDF生成
-  slidev = shutil.which("slidev")
-  pdf_file = temp_dir / f"{file_stem}_slidev.pdf"
-  log_msg = ""
-
-  if slidev and SLIDE_FORMAT == "pdf":
-    try:
-      subprocess.run(
-        ["slidev", "export", str(slide_md_path),
-         "--output", str(pdf_file),
-         "--format", "pdf",
-         "--timeout", "60000"],  # 60秒タイムアウト
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=90  # プロセス全体のタイムアウト
-      )
-      log_msg = f"[slidev] generated PDF -> {pdf_file.name}"
-    except subprocess.TimeoutExpired:
-      log_msg = f"[slidev] PDF generation timeout (90s) - MD saved at {slide_md_path.name}"
-    except subprocess.CalledProcessError as e:
-      error_msg = e.stderr.decode() if e.stderr else str(e)
-      log_msg = f"[slidev] export failed: {error_msg[:100]} - MD saved"
-  else:
-    if not slidev:
-      log_msg = "[slidev] slidev-cli not found – skipped rendering (left .md)."
-    else:
-      log_msg = f"[slidev] rendering skipped (SLIDE_FORMAT={SLIDE_FORMAT}, only pdf supported)."
-
   # ──────────────────────────────────────────────────────────────────────────
   # Supabase Storage & DB保存（オプショナル、失敗しても継続）
-  # Issue #29: Supabase Storage移行
+  # PDF生成廃止: MD保存のみ（ブロッキング処理回避）
   # ──────────────────────────────────────────────────────────────────────────
 
-  # 実行コンテキストからuser_idを取得（Read-Only）
   user_id = state.get("user_id", "anonymous")
   topic = state.get("topic", "AI最新情報")
-
-  # Supabase Storageにアップロード
-  pdf_url = None
   md_url = None
+  log_msg = ""
 
   try:
-    # PDFファイルをアップロード
-    if slidev and SLIDE_FORMAT == "pdf" and pdf_file.exists():
-      storage_path = f"{user_id}/{file_stem}_slidev.pdf"
-      pdf_url = upload_to_storage(
-        bucket="slide-files",
-        file_path=storage_path,
-        file_data=pdf_file.read_bytes(),
-        content_type="application/pdf"
-      )
-      log_msg += f" | PDF uploaded to Supabase Storage"
-
-    # Markdownファイルもアップロード（プレビュー用）
+    # Markdownファイルをアップロード
     md_storage_path = f"{user_id}/{file_stem}_slidev.md"
     md_url = upload_to_storage(
       bucket="slide-files",
@@ -800,18 +752,15 @@ def save_and_render_slidev(state: State) -> Dict:
       file_data=slide_md.encode("utf-8"),
       content_type="text/markdown"
     )
-    log_msg += f" | MD uploaded to Supabase Storage"
-
-    # 一時ファイル削除
-    shutil.rmtree(temp_dir)
-    log_msg += f" | Temp files cleaned"
+    log_msg = f"[save_slidev] MD uploaded to {md_url}"
 
   except Exception as e:
-    log_msg += f" | Storage upload failed: {str(e)}"
+    log_msg = f"[save_slidev] Storage upload failed: {str(e)}"
 
   # Supabase DBにメタデータ保存
   result = {
-    "slide_path": pdf_url or md_url,
+    "slide_path": md_url,
+    "md_url": md_url,
     "log": _log(state, log_msg)
   }
 
@@ -821,20 +770,16 @@ def save_and_render_slidev(state: State) -> Dict:
       title=title,
       topic=topic,
       slide_md=slide_md,
-      pdf_url=pdf_url  # StorageのURL
+      pdf_url=None  # PDF廃止
     )
 
     if "slide_id" in supabase_result:
       result["slide_id"] = supabase_result["slide_id"]
-      result["pdf_url"] = pdf_url
-      result["md_url"] = md_url
       result["log"] = _log(state, f"[supabase] saved slide_id={supabase_result['slide_id']}")
     elif "error" in supabase_result:
-      # Supabase未設定の場合もここに入る（警告のみ、継続）
       result["log"] = _log(state, f"[supabase] {supabase_result['error']}")
 
   except Exception as e:
-    # Supabase保存失敗してもワークフローは継続（クリティカルエラーではない）
     result["log"] = _log(state, f"[supabase] save failed (non-critical): {str(e)[:100]}")
 
   return result
@@ -1094,171 +1039,20 @@ def generate_narration(state: State) -> Dict:
         }
 
 # -------------------
-# Node H: 動画レンダリング（MoviePy + SlideRenderer）
+# Node H: 動画レンダリング（FastAPI経由で実行）
+# ブロッキング処理はFastAPIサーバー側の /api/render/video で実行
 # -------------------
-def _render_video_blocking(
-    slides_json: List[Dict[str, Any]],
-    audio_files: List[str],
-    title: str,
-    user_id: str,
-    slide_id: str,
-    log_entries: List[str]
-) -> Dict:
-    """
-    動画レンダリングのブロッキング処理（別スレッドで実行される）
-
-    LangGraph ASGIサーバーのイベントループをブロックしないよう、
-    この関数は asyncio.to_thread() 経由で呼び出される。
-    """
-    print("[DEBUG] _render_video_blocking: START")
-    print(f"[DEBUG] slides_json count: {len(slides_json)}")
-    print(f"[DEBUG] audio_files count: {len(audio_files)}")
-
-    print("[DEBUG] Importing moviepy...")
-    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
-    print("[DEBUG] moviepy imported OK")
-
-    print("[DEBUG] Importing SlideRenderer...")
-    from app.core.slide_renderer import SlideRenderer
-    print("[DEBUG] SlideRenderer imported OK")
-
-    print("[DEBUG] Importing get_slug_prompt...")
-    from app.prompts.slide_prompts import get_slug_prompt
-    print("[DEBUG] get_slug_prompt imported OK")
-
-    print("[DEBUG] Importing upload_to_storage...")
-    from app.core.storage import upload_to_storage
-    print("[DEBUG] upload_to_storage imported OK")
-
-    print("[DEBUG] Importing update_slide_video_url...")
-    from app.core.supabase import update_slide_video_url
-    print("[DEBUG] update_slide_video_url imported OK")
-
-    # 一時ディレクトリ作成
-    print("[DEBUG] Creating temp directory...")
-    temp_dir = Path(tempfile.mkdtemp())
-    print(f"[DEBUG] temp_dir created: {temp_dir}")
-
-    try:
-        # 1. スライドファイル名の英語表記を生成
-        slug_prompt = get_slug_prompt(title=title)
-
-        try:
-            emsg = llm.invoke(slug_prompt)
-            file_stem = _slugify_en(emsg.content.strip()) or _slugify_en(title)
-        except Exception:
-            file_stem = _slugify_en(title) or "ai-slide"
-
-        # 2. SlideRenderer で PNG 画像生成（HTML/CSS + Playwright）
-        png_dir = temp_dir / "slides_png"
-
-        print(f"[video] Rendering slides with SlideRenderer:")
-        print(f"  slides_json count: {len(slides_json)}")
-        print(f"  Output dir: {png_dir}")
-
-        renderer = SlideRenderer()
-        png_files = renderer.render_all(slides_json, png_dir)
-
-        print(f"[video] SlideRenderer result:")
-        print(f"  PNG files generated: {len(png_files)}")
-
-        if not png_files:
-            return {
-                "error": "No PNG files generated by SlideRenderer",
-                "log": log_entries + ["[video] ERROR: SlideRenderer produced no images"]
-            }
-
-        # 音声ファイル数とPNGファイル数が一致しない場合の警告
-        audio_files_local = list(audio_files)  # ミュータブルコピー
-        if len(png_files) != len(audio_files_local):
-            print(f"[video] WARNING: PNG count ({len(png_files)}) != audio count ({len(audio_files_local)})")
-            min_count = min(len(png_files), len(audio_files_local))
-            png_files = png_files[:min_count]
-            audio_files_local = audio_files_local[:min_count]
-
-        # 3. MoviePyで画像+音声を合成
-        clips = []
-
-        for i, (png_path, audio_path) in enumerate(zip(png_files, audio_files_local)):
-            try:
-                img_clip = ImageClip(str(png_path))
-                audio_clip = AudioFileClip(audio_path)
-                video_clip = img_clip.with_duration(audio_clip.duration).with_audio(audio_clip)
-                clips.append(video_clip)
-            except Exception as e:
-                print(f"[video] WARNING: Failed to process slide {i}: {str(e)[:100]}")
-                continue
-
-        if not clips:
-            return {
-                "error": "No video clips created",
-                "log": log_entries + ["[video] ERROR: all clips failed"]
-            }
-
-        # 4. 全スライドを結合
-        final_video = concatenate_videoclips(clips, method="compose")
-        video_path = temp_dir / f"{file_stem}_video.mp4"
-
-        final_video.write_videofile(
-            str(video_path),
-            fps=2,
-            codec="libx264",
-            audio_codec="aac",
-            bitrate="2000k",
-            preset="ultrafast"
-        )
-
-        # 5. Supabase Storageにアップロード
-        video_url = None
-        try:
-            storage_path = f"{user_id}/{file_stem}_video.mp4"
-            video_url = upload_to_storage(
-                bucket="slide-files",
-                file_path=storage_path,
-                file_data=video_path.read_bytes(),
-                content_type="video/mp4"
-            )
-            log_msg = f"[video] rendered {len(clips)} slides → MP4 ({video_path.stat().st_size / 1024 / 1024:.1f}MB, {final_video.duration:.1f}sec)"
-            log_msg += f" | uploaded to {video_url}"
-        except Exception as e:
-            log_msg = f"[video] rendered locally but upload failed: {str(e)[:100]}"
-            video_url = str(video_path)
-
-        # 6. Supabase DBにvideo_urlを保存
-        if video_url and slide_id:
-            try:
-                update_result = update_slide_video_url(slide_id, video_url)
-                if "success" in update_result:
-                    log_msg += f" | DB updated (slide_id={slide_id})"
-                elif "error" in update_result:
-                    log_msg += f" | DB update failed: {update_result['error'][:50]}"
-            except Exception as e:
-                log_msg += f" | DB update exception: {str(e)[:50]}"
-
-        # 7. クリーンアップ
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-        return {
-            "video_url": video_url,
-            "log": log_entries + [log_msg]
-        }
-
-    except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        return {
-            "error": f"video_render_error: {str(e)}",
-            "log": log_entries + [f"[video] EXCEPTION {str(e)[:100]}"]
-        }
-
-
 @traceable(run_name="h_render_video")
 def render_video(state: State) -> Dict:
-    """PNG画像 + 音声 → MP4動画生成（HTML/CSS + Playwrightベース）
+    """PNG画像 + 音声 → MP4動画生成（FastAPI経由で実行）
 
-    NOTE: ブロッキング処理を含むため、langgraph devは --allow-blocking で起動すること。
-    本番環境では BG_JOB_ISOLATED_LOOPS=true を設定する。
+    ブロッキング処理をFastAPIサーバー側で実行し、
+    LangGraphはHTTP呼び出しのみを行うことでイベントループのブロックを回避する。
     """
-    print("[DEBUG] render_video: START")
+    import httpx
+    import os
+
+    print("[DEBUG] render_video: START (FastAPI delegation)")
 
     if state.get("error"):
         print("[DEBUG] render_video: error in state, returning early")
@@ -1270,7 +1064,6 @@ def render_video(state: State) -> Dict:
     title = state.get("title", "AIスライド")
     user_id = state.get("user_id", "anonymous")
     slide_id = state.get("slide_id", "")
-    log_entries = state.get("log", [])
 
     print(f"[DEBUG] render_video: audio_files={len(audio_files)}, slides_json={len(slides_json)}")
 
@@ -1288,24 +1081,54 @@ def render_video(state: State) -> Dict:
             "log": _log(state, "[video] ERROR: no slides_json data")
         }
 
-    # ブロッキング処理を直接呼び出し
-    print("[DEBUG] render_video: calling _render_video_blocking...")
-    result = _render_video_blocking(
-        slides_json,
-        audio_files,
-        title,
-        user_id,
-        slide_id,
-        log_entries
-    )
-    print(f"[DEBUG] render_video: completed, result keys: {result.keys() if result else 'None'}")
+    # FastAPI経由で動画生成（非ブロッキング）
+    fastapi_url = os.getenv("FASTAPI_URL", "http://localhost:8001")
+    print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video")
 
-    # ナレーション用一時ディレクトリのクリーンアップ
-    if temp_narration_dir:
-        shutil.rmtree(temp_narration_dir, ignore_errors=True)
+    try:
+        with httpx.Client(timeout=300) as client:  # 5分タイムアウト
+            response = client.post(
+                f"{fastapi_url}/api/render/video",
+                json={
+                    "slides_json": slides_json,
+                    "audio_files": audio_files,
+                    "title": title,
+                    "user_id": user_id,
+                    "slide_id": slide_id
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
 
-    print("[DEBUG] render_video: END")
-    return result
+        print(f"[DEBUG] render_video: FastAPI response received, video_url={result.get('video_url', 'N/A')[:50]}")
+
+        # ナレーション用一時ディレクトリのクリーンアップ
+        if temp_narration_dir:
+            shutil.rmtree(temp_narration_dir, ignore_errors=True)
+
+        return {
+            "video_url": result.get("video_url", ""),
+            "log": _log(state, f"[video] completed via FastAPI: {result.get('video_url', '')[:80]}")
+        }
+
+    except httpx.TimeoutException:
+        print("[DEBUG] render_video: TIMEOUT")
+        return {
+            "error": "Video rendering timeout (5min)",
+            "log": _log(state, "[video] TIMEOUT after 5 minutes")
+        }
+    except httpx.HTTPStatusError as e:
+        print(f"[DEBUG] render_video: HTTP error {e.response.status_code}")
+        return {
+            "error": f"video_render_error: HTTP {e.response.status_code}",
+            "log": _log(state, f"[video] FastAPI error: {e.response.text[:100]}")
+        }
+    except Exception as e:
+        print(f"[DEBUG] render_video: ERROR {e}")
+        return {
+            "error": f"video_render_error: {str(e)}",
+            "log": _log(state, f"[video] ERROR: {str(e)[:100]}")
+        }
 
 
 # -------------------
