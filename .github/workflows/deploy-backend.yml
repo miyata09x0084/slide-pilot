@@ -83,6 +83,21 @@ jobs:
             --set-secrets="$SECRETS" \
             --set-env-vars="$ENV_VARS"
 
+      - name: Update VIDEO_JOB_URL with deployed service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe slidepilot-api \
+            --region=asia-northeast1 \
+            --format='value(status.url)')
+
+          # VIDEO_JOB_URL を動的に設定（動画生成エンドポイント）
+          VIDEO_JOB_URL="${SERVICE_URL}/api/video/generate"
+
+          echo "🎬 Setting VIDEO_JOB_URL=${VIDEO_JOB_URL}"
+
+          gcloud run services update slidepilot-api \
+            --region=asia-northeast1 \
+            --update-env-vars="VIDEO_JOB_URL=${VIDEO_JOB_URL}"
+
       - name: Verify deployment
         run: |
           SERVICE_URL=$(gcloud run services describe slidepilot-api \
