@@ -41,7 +41,7 @@ class SlideRenderer:
         png_paths = []
 
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
             page = browser.new_page(viewport=self.VIEWPORT)
 
             for i, slide in enumerate(slides):
@@ -77,7 +77,7 @@ class SlideRenderer:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
             page = browser.new_page(viewport=self.VIEWPORT)
 
             html_content = self._generate_html(slide)
