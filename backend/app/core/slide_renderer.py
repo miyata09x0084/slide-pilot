@@ -42,7 +42,9 @@ class SlideRenderer:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
-            page = browser.new_page(viewport=self.VIEWPORT)
+            context = browser.new_context(viewport=self.VIEWPORT)
+            context.set_default_timeout(60000)  # ページ操作も60秒（CDN読み込み対応）
+            page = context.new_page()
 
             for i, slide in enumerate(slides):
                 html_content = self._generate_html(slide)
@@ -78,7 +80,9 @@ class SlideRenderer:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
-            page = browser.new_page(viewport=self.VIEWPORT)
+            context = browser.new_context(viewport=self.VIEWPORT)
+            context.set_default_timeout(60000)  # ページ操作も60秒（CDN読み込み対応）
+            page = context.new_page()
 
             html_content = self._generate_html(slide)
             page.set_content(html_content)
