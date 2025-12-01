@@ -91,6 +91,7 @@ def generate_slides(
         slide_id = result.get("slide_id")  # Supabase slide ID (Issue #24)
         pdf_url = result.get("pdf_url")    # Supabase公開URL (Issue #24)
         video_url = result.get("video_url")  # Supabase動画URL (Video Narration Feature)
+        video_job_id = result.get("video_job_id")  # Cloud Run Job ID (非同期動画生成)
         # score = result.get("score", 0.0)
         # passed = result.get("passed", False)
 
@@ -108,7 +109,8 @@ def generate_slides(
             "slide_path": api_url,
             "slide_id": slide_id,
             "pdf_url": pdf_url,
-            "video_url": video_url
+            "video_url": video_url,
+            "video_job_id": video_job_id  # Cloud Run Job ID（非同期動画生成用）
         }, ensure_ascii=False)
 
     except Exception as e:

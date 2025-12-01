@@ -165,3 +165,119 @@ def update_slide_video_url(slide_id: str, video_url: str) -> Dict:
 
     except Exception as e:
         return {"error": f"Supabase update failed: {str(e)}"}
+
+
+# ============================================================
+# Video Jobs（非同期動画生成ジョブ管理）
+# ============================================================
+
+def create_video_job(
+    slide_id: str,
+    user_id: str,
+    slides_json: List[Dict],
+    audio_files: List[str],
+    title: str
+) -> Dict:
+    """動画生成ジョブを作成
+
+    Args:
+        slide_id: スライドID（UUID）
+        user_id: ユーザー識別子
+        slides_json: スライドデータ（JSON）
+        audio_files: 音声ファイルURLリスト
+        title: スライドタイトル
+
+    Returns:
+        成功時: {"job_id": str}
+        失敗時: {"error": str}
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+
+    try:
+        import json
+        data = {
+            "slide_id": slide_id,
+            "user_id": user_id,
+            "status": "pending",
+            "input_data": json.dumps({
+                "slides_json": slides_json,
+                "audio_files": audio_files,
+                "title": title
+            })
+        }
+
+        response = client.table("video_jobs").insert(data).execute()
+
+        if response.data and len(response.data) > 0:
+            return {"job_id": response.data[0]["id"]}
+        else:
+            return {"error": "Failed to create video job"}
+
+    except Exception as e:
+        return {"error": f"Supabase insert failed: {str(e)}"}
+
+
+def get_video_job(job_id: str) -> Optional[Dict]:
+    """動画生成ジョブを取得
+
+    Args:
+        job_id: ジョブID（UUID）
+
+    Returns:
+        ジョブデータ or None
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        response = client.table("video_jobs").select("*").eq("id", job_id).execute()
+
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"[supabase] Failed to get video job {job_id}: {e}")
+        return None
+
+
+def update_video_job(job_id: str, status: str, video_url: Optional[str] = None, error_message: Optional[str] = None) -> Dict:
+    """動画生成ジョブのステータスを更新
+
+    Args:
+        job_id: ジョブID（UUID）
+        status: ステータス（pending, processing, completed, failed）
+        video_url: 動画URL（completed時）
+        error_message: エラーメッセージ（failed時）
+
+    Returns:
+        成功時: {"success": True}
+        失敗時: {"error": str}
+    """
+    client = get_supabase_client()
+    if not client:
+        return {"error": "Supabase not configured"}
+
+    try:
+        update_data: Dict = {"status": status}
+        if video_url:
+            update_data["video_url"] = video_url
+        if error_message:
+            update_data["error_message"] = error_message
+
+        response = (
+            client.table("video_jobs")
+            .update(update_data)
+            .eq("id", job_id)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            return {"success": True}
+        else:
+            return {"error": "Failed to update video job"}
+
+    except Exception as e:
+        return {"error": f"Supabase update failed: {str(e)}"}

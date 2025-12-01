@@ -41,3 +41,9 @@ export const slideDataAtom = atom<SlideData>({
   key: 'reactAgent/slideData',
   default: {},
 });
+
+// 動画ポーリング中フラグ（Cloud Run Job の非同期動画生成を待機中）
+export const isPollingVideoAtom = atom<boolean>({
+  key: 'reactAgent/isPollingVideo',
+  default: false,
+});

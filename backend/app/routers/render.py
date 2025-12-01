@@ -180,7 +180,7 @@ def _render_video_blocking(
 @router.post("/render/video", response_model=VideoRenderResponse)
 async def render_video(request: VideoRenderRequest):
     """
-    動画生成エンドポイント
+    動画生成エンドポイント（同期版 - 後方互換性のため残す）
 
     asyncio.to_thread()でブロッキング処理を別スレッドで実行し、
     FastAPIのイベントループをブロックしない。
@@ -213,3 +213,283 @@ async def render_video(request: VideoRenderRequest):
     except Exception as e:
         print(f"[render] Unhandled error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# 非同期動画生成（Cloud Run Job版）
+# ============================================================
+
+class AsyncVideoRenderRequest(BaseModel):
+    """非同期動画レンダリングリクエスト"""
+    slides_json: List[Dict[str, Any]]
+    audio_files: List[str]
+    title: str
+    user_id: str
+    slide_id: str  # 必須
+
+
+class AsyncVideoRenderResponse(BaseModel):
+    """非同期動画レンダリングレスポンス"""
+    job_id: str
+    status: str
+
+
+class VideoJobStatusResponse(BaseModel):
+    """動画ジョブステータスレスポンス"""
+    job_id: str
+    status: str
+    video_url: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+def _download_audio_file(url: str, dest_path: Path) -> bool:
+    """URLから音声ファイルをダウンロード
+
+    Args:
+        url: 音声ファイルのURL（Supabase Storage公開URL）
+        dest_path: 保存先パス
+
+    Returns:
+        成功: True、失敗: False
+    """
+    import requests
+
+    try:
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        dest_path.write_bytes(response.content)
+        return True
+    except Exception as e:
+        print(f"[local-job] Failed to download audio: {e}")
+        return False
+
+
+def _run_video_job_local(job_id: str):
+    """
+    ローカル環境用：video_render_job.pyと同等の処理をスレッドで実行
+
+    Cloud Run Jobの代わりにバックグラウンドスレッドで動画生成を行う。
+    音声ファイルはSupabase Storage URLからダウンロードする。
+    """
+    import json
+    from app.core.supabase import get_video_job, update_video_job, update_slide_video_url
+    from app.core.storage import upload_to_storage
+    from app.core.slide_renderer import SlideRenderer
+    import tempfile
+    from pathlib import Path
+
+    print(f"[local-job] Starting video render job: {job_id}")
+
+    # 1. ジョブデータを取得
+    job = get_video_job(job_id)
+    if not job:
+        print(f"[local-job] ERROR: Job not found: {job_id}")
+        return
+
+    if job["status"] != "pending":
+        print(f"[local-job] WARNING: Job status is {job['status']}, skipping")
+        return
+
+    # 2. ステータスを processing に更新
+    update_video_job(job_id, "processing")
+
+    temp_dir = Path(tempfile.mkdtemp())
+
+    try:
+        # 3. 入力データをパース
+        input_data = json.loads(job["input_data"]) if isinstance(job["input_data"], str) else job["input_data"]
+        slides_json = input_data["slides_json"]
+        audio_urls = input_data["audio_files"]  # 今はSupabase Storage URL
+        title = input_data["title"]
+        user_id = job["user_id"]
+        slide_id = job["slide_id"]
+
+        print(f"[local-job] Processing: {len(slides_json)} slides, {len(audio_urls)} audio files")
+
+        # 4. 音声ファイルをダウンロード（URLの場合）
+        audio_dir = temp_dir / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_files = []
+
+        for i, audio_url in enumerate(audio_urls):
+            if audio_url.startswith("http"):
+                # URLからダウンロード
+                local_path = audio_dir / f"narration_{i:03d}.mp3"
+                print(f"[local-job] Downloading audio {i}: {audio_url[:80]}...")
+                if not _download_audio_file(audio_url, local_path):
+                    raise Exception(f"Failed to download audio file {i}")
+                audio_files.append(str(local_path))
+            else:
+                # ローカルパス（後方互換性）
+                audio_files.append(audio_url)
+
+        print(f"[local-job] Downloaded {len(audio_files)} audio files")
+
+        # 4. PNG画像生成
+        png_dir = temp_dir / "slides_png"
+        renderer = SlideRenderer()
+        png_files = renderer.render_all(slides_json, png_dir)
+        print(f"[local-job] Generated {len(png_files)} PNG files")
+
+        if not png_files:
+            raise Exception("SlideRenderer produced no images")
+
+        # 5. 音声ファイル数とPNGファイル数を合わせる
+        if len(png_files) != len(audio_files):
+            print(f"[local-job] WARNING: PNG count ({len(png_files)}) != audio count ({len(audio_files)})")
+            min_count = min(len(png_files), len(audio_files))
+            png_files = png_files[:min_count]
+            audio_files = audio_files[:min_count]
+
+        # 6. MoviePyで動画生成
+        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+
+        clips = []
+        for i, (png_path, audio_path) in enumerate(zip(png_files, audio_files)):
+            try:
+                img_clip = ImageClip(str(png_path))
+                audio_clip = AudioFileClip(audio_path)
+                video_clip = img_clip.with_duration(audio_clip.duration).with_audio(audio_clip)
+                clips.append(video_clip)
+                print(f"[local-job] Processed clip {i+1}/{len(png_files)}")
+            except Exception as e:
+                print(f"[local-job] WARNING: Failed to process slide {i}: {str(e)[:100]}")
+                continue
+
+        if not clips:
+            raise Exception("All clips failed to process")
+
+        # 7. 動画を結合・エンコード
+        print(f"[local-job] Concatenating {len(clips)} video clips")
+        final_video = concatenate_videoclips(clips, method="compose")
+
+        file_stem = _slugify_en(title)
+        video_path = temp_dir / f"{file_stem}_video.mp4"
+
+        final_video.write_videofile(
+            str(video_path),
+            fps=2,
+            codec="libx264",
+            audio_codec="aac",
+            bitrate="2000k",
+            preset="ultrafast"
+        )
+        print(f"[local-job] Video written to {video_path}")
+
+        # 8. Supabase Storageにアップロード
+        storage_path = f"{user_id}/{file_stem}_video.mp4"
+        video_url = upload_to_storage(
+            bucket="slide-files",
+            file_path=storage_path,
+            file_data=video_path.read_bytes(),
+            content_type="video/mp4"
+        )
+        print(f"[local-job] Uploaded to {video_url}")
+
+        # 9. slidesテーブルのvideo_urlを更新
+        if slide_id:
+            update_slide_video_url(slide_id, video_url)
+            print(f"[local-job] Updated slide {slide_id} with video_url")
+
+        # 10. ジョブステータスを completed に更新
+        update_video_job(job_id, "completed", video_url=video_url)
+        print(f"[local-job] Job completed successfully: {video_url}")
+
+    except Exception as e:
+        error_msg = str(e)[:500]
+        print(f"[local-job] ERROR: {error_msg}")
+        update_video_job(job_id, "failed", error_message=error_msg)
+
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@router.post("/render/video/async", response_model=AsyncVideoRenderResponse)
+async def render_video_async(request: AsyncVideoRenderRequest):
+    """
+    非同期動画生成エンドポイント
+
+    - 本番環境（Cloud Run）: Cloud Run Jobをトリガー
+    - ローカル環境（LOCAL_VIDEO_JOB=true）: バックグラウンドスレッドで実行
+
+    クライアントは /video/status/{job_id} でステータスを確認する。
+    """
+    from app.core.supabase import create_video_job
+    import subprocess
+    import os
+    import threading
+
+    print(f"[render] Received async video render request: {request.title}")
+
+    # 1. video_jobsテーブルにジョブを作成
+    result = create_video_job(
+        slide_id=request.slide_id,
+        user_id=request.user_id,
+        slides_json=request.slides_json,
+        audio_files=request.audio_files,
+        title=request.title
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    job_id = result["job_id"]
+    print(f"[render] Created video job: {job_id}")
+
+    # 2. ジョブ実行方法の分岐
+    use_local_job = os.environ.get("LOCAL_VIDEO_JOB", "").lower() == "true"
+
+    if use_local_job:
+        # ローカル環境: バックグラウンドスレッドで実行
+        print(f"[render] Running job locally in background thread: {job_id}")
+        thread = threading.Thread(target=_run_video_job_local, args=(job_id,), daemon=True)
+        thread.start()
+    else:
+        # 本番環境: Cloud Run Jobをトリガー
+        try:
+            region = os.environ.get("GCP_REGION", "asia-northeast1")
+            job_name = "slidepilot-video-job"
+
+            cmd = [
+                "gcloud", "run", "jobs", "execute", job_name,
+                f"--region={region}",
+                f"--update-env-vars=JOB_ID={job_id}",
+                "--async"
+            ]
+
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            print(f"[render] Triggered Cloud Run Job: {job_name} with JOB_ID={job_id}")
+
+        except Exception as e:
+            print(f"[render] WARNING: Failed to trigger Cloud Run Job: {e}")
+
+    return AsyncVideoRenderResponse(
+        job_id=job_id,
+        status="pending"
+    )
+
+
+@router.get("/video/status/{job_id}", response_model=VideoJobStatusResponse)
+async def get_video_status(job_id: str):
+    """
+    動画生成ジョブのステータスを取得
+
+    クライアントはこのエンドポイントをポーリングして完了を待つ。
+    """
+    from app.core.supabase import get_video_job
+
+    job = get_video_job(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return VideoJobStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        video_url=job.get("video_url"),
+        error_message=job.get("error_message")
+    )

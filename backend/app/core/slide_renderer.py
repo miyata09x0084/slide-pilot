@@ -43,13 +43,13 @@ class SlideRenderer:
         with sync_playwright() as p:
             browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
             context = browser.new_context(viewport=self.VIEWPORT)
-            context.set_default_timeout(60000)  # ページ操作も60秒（CDN読み込み対応）
+            context.set_default_timeout(60000)  # ページ操作も60秒
             page = context.new_page()
 
             for i, slide in enumerate(slides):
                 html_content = self._generate_html(slide)
                 page.set_content(html_content)
-                page.wait_for_load_state('networkidle')
+                page.wait_for_load_state('domcontentloaded')
 
                 # mermaidスライドの場合、SVGレンダリング完了を待機
                 if slide.get('type') == 'mermaid':
@@ -104,15 +104,13 @@ class SlideRenderer:
         return template_fn(slide)
 
     def _base_style(self) -> str:
-        """共通CSSスタイル"""
+        """共通CSSスタイル（CDN依存なし - ローカルフォント使用）"""
         return '''
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             width: 1920px;
             height: 1080px;
-            font-family: 'Noto Sans JP', sans-serif;
+            font-family: 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
@@ -226,13 +224,19 @@ li::before {{ content: none; }}
 </div></body></html>'''
 
     def _mermaid_template(self, slide: Dict) -> str:
-        """Mermaid図スライドテンプレート"""
+        """Mermaid図スライドテンプレート（インラインJS埋め込み - set_content対応）"""
         heading = html.escape(slide.get('heading', '図解'))
         mermaid_code = slide.get('mermaid_code', '')
 
+        # ローカルのmermaid.jsファイルを読み込んでインライン埋め込み
+        # Playwrightのset_content()ではfile://プロトコルが使えないため
+        static_dir = Path(__file__).parent.parent / 'static'
+        mermaid_js_path = static_dir / 'mermaid.min.js'
+        mermaid_js_content = mermaid_js_path.read_text(encoding='utf-8') if mermaid_js_path.exists() else ''
+
         return f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>{mermaid_js_content}</script>
 <style>{self._base_style()}
 .slide {{ justify-content: flex-start; padding: 60px; }}
 h2 {{ text-align: center; margin-bottom: 20px; font-size: 52px; }}
