@@ -124,7 +124,7 @@ class SlideRenderer:
         h2 { font-size: 48px; margin-bottom: 30px; font-weight: 700; }
         ul { font-size: 36px; line-height: 2; list-style: none; }
         li { margin-bottom: 10px; }
-        li::before { content: "• "; color: rgba(255,255,255,0.7); }
+        li::before { content: "- "; color: rgba(255,255,255,0.7); }
         strong, b { font-weight: 700; }
         '''
 
@@ -184,11 +184,11 @@ h2 {{ margin-bottom: 30px; }}
     <h2>{heading}</h2>
     <div class="conversation">
         <div class="message teacher">
-            <div class="role">👨‍🏫 先生</div>
+            <div class="role">先生</div>
             <div class="text">{teacher}</div>
         </div>
         <div class="message student">
-            <div class="role">🧑‍🎓 生徒</div>
+            <div class="role">生徒</div>
             <div class="text">{student}</div>
         </div>
     </div>
