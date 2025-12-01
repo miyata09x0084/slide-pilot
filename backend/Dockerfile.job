@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────────────────────
+# Cloud Run Job: 動画レンダリング
+#
+# 用途:
+# - 非同期動画生成（最大24時間実行可能）
+# - LangGraphからトリガーされ、バックグラウンドで動画を生成
+#
+# 環境変数:
+# - JOB_ID: 処理対象のジョブID（video_jobsテーブル）
+# ──────────────────────────────────────────────────────────────
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Chromium依存パッケージ + 日本語フォント + FFmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    fonts-noto-cjk \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python依存関係
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Playwrightブラウザインストール
+RUN playwright install chromium
+
+# アプリケーションコード
+COPY ./app /app/app
+COPY ./jobs /app/jobs
+
+# 環境変数
+ENV PYTHONUNBUFFERED=1
+
+# Cloud Run Jobとして実行
+CMD ["python", "/app/jobs/video_render_job.py"]

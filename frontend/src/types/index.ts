@@ -57,6 +57,18 @@ export interface SlideData {
   slide_id?: string;
   pdf_url?: string;
   video_url?: string;
+  video_job_id?: string;  // Cloud Run Job ID（非同期動画生成用）
+}
+
+// ============================================================================
+// Video Job Status
+// ============================================================================
+
+export interface VideoJobStatus {
+  job_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  video_url?: string;
+  error_message?: string;
 }
 
 // ============================================================================

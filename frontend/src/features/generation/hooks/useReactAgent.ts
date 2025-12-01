@@ -2,8 +2,9 @@
 // SSEストリーミングでメッセージ送受信と思考過程を取得
 // Recoilでグローバル状態管理（ページ間で状態共有）
 // React Queryでキャッシュ無効化（動画生成完了時）
+// Cloud Run Jobでの非同期動画生成ステータスポーリング
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { useRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
@@ -18,6 +19,7 @@ import {
 } from '../store/reactAgentAtoms';
 import { createThread } from '../api/create-thread';
 import { findAssistantByGraphId } from '../api/get-assistants';
+import { getVideoStatus } from '../api/get-video-status';
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 
@@ -32,6 +34,7 @@ export function useReactAgent() {
   const [error, setError] = useRecoilState(errorAtom);
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
   const [cachedAssistantId, setCachedAssistantId] = useState<string | null>(null);
+  const [isPollingVideo, setIsPollingVideo] = useState(false);
 
   // React Queryのクライアント（キャッシュ無効化用）
   const queryClient = useQueryClient();
@@ -39,6 +42,81 @@ export function useReactAgent() {
   // 動画生成中フラグ（ローカル変数で管理）
   // @ts-ignore - Used in closure but TypeScript doesn't detect it
   let _isGeneratingVideo = false;
+
+  // ポーリング用のref
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // コンポーネントアンマウント時にポーリングを停止
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // 動画ジョブステータスをポーリング
+  const pollVideoStatus = useCallback(async (jobId: string) => {
+    setIsPollingVideo(true);
+    setThinkingSteps(prev => [...prev, {
+      type: 'action',
+      content: '動画生成中（バックグラウンド処理）...'
+    }]);
+
+    const poll = async () => {
+      try {
+        const status = await getVideoStatus(jobId);
+
+        if (status.status === 'completed' && status.video_url) {
+          // 完了
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setIsPollingVideo(false);
+
+          setSlideData(prev => ({
+            ...prev,
+            video_url: status.video_url
+          }));
+
+          setThinkingSteps(prev => [...prev, {
+            type: 'observation',
+            content: '動画生成完了'
+          }]);
+
+          // 動画一覧のキャッシュを無効化
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          if (user.email) {
+            queryClient.invalidateQueries({
+              queryKey: slidesKeys.list(user.email, 20),
+            });
+          }
+        } else if (status.status === 'failed') {
+          // 失敗
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setIsPollingVideo(false);
+
+          setThinkingSteps(prev => [...prev, {
+            type: 'observation',
+            content: `動画生成エラー: ${status.error_message || '不明なエラー'}`
+          }]);
+        }
+        // pending/processing の場合は継続
+      } catch (e) {
+        console.warn('Video status poll error:', e);
+      }
+    };
+
+    // 即座に1回実行
+    await poll();
+
+    // 5秒間隔でポーリング
+    pollingIntervalRef.current = setInterval(poll, 5000);
+  }, [setSlideData, setThinkingSteps, queryClient]);
 
   // スレッド作成
   const createThreadHandler = useCallback(async () => {
@@ -194,21 +272,27 @@ export function useReactAgent() {
                             title: result.title || '動画',
                             slide_id: result.slide_id,     // Supabase ID（Issue #24）
                             pdf_url: result.pdf_url,       // Supabase公開URL（Issue #24）
-                            video_url: result.video_url    // 動画URL
+                            video_url: result.video_url,   // 動画URL（同期版）
+                            video_job_id: result.video_job_id  // Cloud Run Job ID（非同期版）
                           });
 
-                          // 完了メッセージを追加
-                          setThinkingSteps(prev => [...prev, {
-                            type: 'observation',
-                            content: '動画生成完了'
-                          }]);
+                          // 非同期動画生成の場合はポーリング開始
+                          if (result.video_job_id && !result.video_url) {
+                            pollVideoStatus(result.video_job_id);
+                          } else {
+                            // 同期版: 完了メッセージを追加
+                            setThinkingSteps(prev => [...prev, {
+                              type: 'observation',
+                              content: '動画生成完了'
+                            }]);
 
-                          // 動画一覧のキャッシュを無効化（新しい動画を反映）
-                          const user = JSON.parse(localStorage.getItem('user') || '{}');
-                          if (user.email) {
-                            queryClient.invalidateQueries({
-                              queryKey: slidesKeys.list(user.email, 20),
-                            });
+                            // 動画一覧のキャッシュを無効化（新しい動画を反映）
+                            const user = JSON.parse(localStorage.getItem('user') || '{}');
+                            if (user.email) {
+                              queryClient.invalidateQueries({
+                                queryKey: slidesKeys.list(user.email, 20),
+                              });
+                            }
                           }
                         }
                       } catch (e) {
@@ -297,12 +381,18 @@ export function useReactAgent() {
     setThreadId(null);
     setError(null);
     setSlideData({});
+    setIsPollingVideo(false);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
   }, [setMessages, setThinkingSteps, setIsThinking, setThreadId, setError, setSlideData]);
 
   return {
     messages,
     thinkingSteps,
     isThinking,
+    isPollingVideo,  // 動画生成ポーリング中フラグ
     threadId,
     error,
     slideData,

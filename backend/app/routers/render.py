@@ -180,7 +180,7 @@ def _render_video_blocking(
 @router.post("/render/video", response_model=VideoRenderResponse)
 async def render_video(request: VideoRenderRequest):
     """
-    動画生成エンドポイント
+    動画生成エンドポイント（同期版 - 後方互換性のため残す）
 
     asyncio.to_thread()でブロッキング処理を別スレッドで実行し、
     FastAPIのイベントループをブロックしない。
@@ -213,3 +213,112 @@ async def render_video(request: VideoRenderRequest):
     except Exception as e:
         print(f"[render] Unhandled error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# 非同期動画生成（Cloud Run Job版）
+# ============================================================
+
+class AsyncVideoRenderRequest(BaseModel):
+    """非同期動画レンダリングリクエスト"""
+    slides_json: List[Dict[str, Any]]
+    audio_files: List[str]
+    title: str
+    user_id: str
+    slide_id: str  # 必須
+
+
+class AsyncVideoRenderResponse(BaseModel):
+    """非同期動画レンダリングレスポンス"""
+    job_id: str
+    status: str
+
+
+class VideoJobStatusResponse(BaseModel):
+    """動画ジョブステータスレスポンス"""
+    job_id: str
+    status: str
+    video_url: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+@router.post("/render/video/async", response_model=AsyncVideoRenderResponse)
+async def render_video_async(request: AsyncVideoRenderRequest):
+    """
+    非同期動画生成エンドポイント
+
+    Cloud Run Jobをトリガーし、job_idを即座に返す。
+    クライアントは /video/status/{job_id} でステータスを確認する。
+    """
+    from app.core.supabase import create_video_job
+    import subprocess
+    import os
+
+    print(f"[render] Received async video render request: {request.title}")
+
+    # 1. video_jobsテーブルにジョブを作成
+    result = create_video_job(
+        slide_id=request.slide_id,
+        user_id=request.user_id,
+        slides_json=request.slides_json,
+        audio_files=request.audio_files,
+        title=request.title
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    job_id = result["job_id"]
+    print(f"[render] Created video job: {job_id}")
+
+    # 2. Cloud Run Jobをトリガー（非同期）
+    try:
+        project_id = os.environ.get("GCP_PROJECT_ID", "slide-pilot-474305")
+        region = os.environ.get("GCP_REGION", "asia-northeast1")
+        job_name = "slidepilot-video-job"
+
+        # gcloud run jobs execute コマンドを非同期で実行
+        cmd = [
+            "gcloud", "run", "jobs", "execute", job_name,
+            f"--region={region}",
+            f"--update-env-vars=JOB_ID={job_id}",
+            "--async"
+        ]
+
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        print(f"[render] Triggered Cloud Run Job: {job_name} with JOB_ID={job_id}")
+
+    except Exception as e:
+        print(f"[render] WARNING: Failed to trigger Cloud Run Job: {e}")
+        # ジョブトリガー失敗してもエラーにはしない（ジョブはpending状態のまま）
+
+    return AsyncVideoRenderResponse(
+        job_id=job_id,
+        status="pending"
+    )
+
+
+@router.get("/video/status/{job_id}", response_model=VideoJobStatusResponse)
+async def get_video_status(job_id: str):
+    """
+    動画生成ジョブのステータスを取得
+
+    クライアントはこのエンドポイントをポーリングして完了を待つ。
+    """
+    from app.core.supabase import get_video_job
+
+    job = get_video_job(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return VideoJobStatusResponse(
+        job_id=job_id,
+        status=job["status"],
+        video_url=job.get("video_url"),
+        error_message=job.get("error_message")
+    )

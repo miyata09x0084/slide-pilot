@@ -126,7 +126,8 @@ class State(TypedDict, total=False):
   slides_json: List[Dict[str, Any]]             # スライドデータ（HTML生成用）
   narration_scripts: List[str]                  # ナレーション台本
   audio_files: List[str]                        # 音声ファイルパス
-  video_url: str                                # Supabase動画URL
+  video_url: str                                # Supabase動画URL（同期版で使用）
+  video_job_id: str                             # Cloud Run Job ID（非同期版で使用）
   _temp_narration_dir: str                      # 一時ディレクトリ（内部用）
 
   # ══════════════════════════════════════════════════════════
@@ -1039,20 +1040,21 @@ def generate_narration(state: State) -> Dict:
         }
 
 # -------------------
-# Node H: 動画レンダリング（FastAPI経由で実行）
-# ブロッキング処理はFastAPIサーバー側の /api/render/video で実行
+# Node H: 動画レンダリング（Cloud Run Job 非同期版）
+# Cloud Run Jobをトリガーし、job_idを返す。実際の動画生成はバックグラウンドで実行。
 # -------------------
 @traceable(run_name="h_render_video")
 def render_video(state: State) -> Dict:
-    """PNG画像 + 音声 → MP4動画生成（FastAPI経由で実行）
+    """PNG画像 + 音声 → MP4動画生成（Cloud Run Job 非同期版）
 
-    ブロッキング処理をFastAPIサーバー側で実行し、
-    LangGraphはHTTP呼び出しのみを行うことでイベントループのブロックを回避する。
+    Cloud Run Jobをトリガーし、video_job_idを返す。
+    実際の動画生成はバックグラウンドで実行され、タイムアウトしない。
+    クライアントは /api/video/status/{job_id} でステータスをポーリングする。
     """
     import httpx
     import os
 
-    print("[DEBUG] render_video: START (FastAPI delegation)")
+    print("[DEBUG] render_video: START (Cloud Run Job async)")
 
     if state.get("error"):
         print("[DEBUG] render_video: error in state, returning early")
@@ -1081,14 +1083,21 @@ def render_video(state: State) -> Dict:
             "log": _log(state, "[video] ERROR: no slides_json data")
         }
 
-    # FastAPI経由で動画生成（非ブロッキング）
+    if not slide_id:
+        print("[DEBUG] render_video: no slide_id (required for async)")
+        return {
+            "error": "No slide_id for async video rendering",
+            "log": _log(state, "[video] ERROR: slide_id is required for async rendering")
+        }
+
+    # FastAPI経由で非同期動画生成ジョブをトリガー
     fastapi_url = os.getenv("FASTAPI_URL", "http://localhost:8001")
-    print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video")
+    print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video/async")
 
     try:
-        with httpx.Client(timeout=300) as client:  # 5分タイムアウト
+        with httpx.Client(timeout=30) as client:  # ジョブ作成は30秒で十分
             response = client.post(
-                f"{fastapi_url}/api/render/video",
+                f"{fastapi_url}/api/render/video/async",
                 json={
                     "slides_json": slides_json,
                     "audio_files": audio_files,
@@ -1100,33 +1109,34 @@ def render_video(state: State) -> Dict:
             response.raise_for_status()
             result = response.json()
 
-        print(f"[DEBUG] render_video: FastAPI response received, video_url={result.get('video_url', 'N/A')[:50]}")
+        job_id = result.get("job_id", "")
+        print(f"[DEBUG] render_video: async job created, job_id={job_id}")
 
         # ナレーション用一時ディレクトリのクリーンアップ
         if temp_narration_dir:
             shutil.rmtree(temp_narration_dir, ignore_errors=True)
 
         return {
-            "video_url": result.get("video_url", ""),
-            "log": _log(state, f"[video] completed via FastAPI: {result.get('video_url', '')[:80]}")
+            "video_job_id": job_id,
+            "log": _log(state, f"[video] async job created: {job_id}")
         }
 
     except httpx.TimeoutException:
-        print("[DEBUG] render_video: TIMEOUT")
+        print("[DEBUG] render_video: TIMEOUT creating job")
         return {
-            "error": "Video rendering timeout (5min)",
-            "log": _log(state, "[video] TIMEOUT after 5 minutes")
+            "error": "Video job creation timeout",
+            "log": _log(state, "[video] TIMEOUT creating async job")
         }
     except httpx.HTTPStatusError as e:
         print(f"[DEBUG] render_video: HTTP error {e.response.status_code}")
         return {
-            "error": f"video_render_error: HTTP {e.response.status_code}",
+            "error": f"video_job_error: HTTP {e.response.status_code}",
             "log": _log(state, f"[video] FastAPI error: {e.response.text[:100]}")
         }
     except Exception as e:
         print(f"[DEBUG] render_video: ERROR {e}")
         return {
-            "error": f"video_render_error: {str(e)}",
+            "error": f"video_job_error: {str(e)}",
             "log": _log(state, f"[video] ERROR: {str(e)[:100]}")
         }
 

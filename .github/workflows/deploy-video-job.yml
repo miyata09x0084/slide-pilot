@@ -1,0 +1,92 @@
+name: Deploy Video Render Job to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/jobs/**'
+      - 'backend/app/core/slide_renderer.py'
+      - 'backend/Dockerfile.job'
+      - '.github/workflows/deploy-video-job.yml'
+
+jobs:
+  deploy:
+    name: Build and Deploy Video Render Job
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+
+      - name: Build and push container image
+        working-directory: backend
+        run: |
+          PROJECT_ID="slide-pilot-474305"
+          IMAGE_NAME="asia-northeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/slidepilot-video-job"
+          IMAGE_TAG="${{ github.sha }}"
+
+          docker build -f Dockerfile.job -t "${IMAGE_NAME}:${IMAGE_TAG}" -t "${IMAGE_NAME}:latest" .
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${IMAGE_NAME}:latest"
+
+      - name: Install yq for schema parsing
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Deploy Cloud Run Job
+        run: |
+          PROJECT_ID="slide-pilot-474305"
+          JOB_NAME="slidepilot-video-job"
+          REGION="asia-northeast1"
+          SCHEMA_FILE="backend/.env.schema.yml"
+          IMAGE_NAME="asia-northeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${JOB_NAME}"
+
+          # Generate --set-secrets flag from schema
+          SECRETS=$(yq eval '.secrets[] | .name' "$SCHEMA_FILE" | while read -r name; do
+            secret_id=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            echo "${name}=${secret_id}:latest"
+          done | paste -sd ",")
+
+          # Check if job exists
+          if gcloud run jobs describe "$JOB_NAME" --region="$REGION" &>/dev/null; then
+            echo "Updating existing job..."
+            gcloud run jobs update "$JOB_NAME" \
+              --image="${IMAGE_NAME}:${{ github.sha }}" \
+              --region="$REGION" \
+              --memory=4Gi \
+              --cpu=2 \
+              --task-timeout=3600 \
+              --max-retries=1 \
+              --set-secrets="$SECRETS"
+          else
+            echo "Creating new job..."
+            gcloud run jobs create "$JOB_NAME" \
+              --image="${IMAGE_NAME}:${{ github.sha }}" \
+              --region="$REGION" \
+              --memory=4Gi \
+              --cpu=2 \
+              --task-timeout=3600 \
+              --max-retries=1 \
+              --set-secrets="$SECRETS"
+          fi
+
+          echo "✅ Job deployed: ${JOB_NAME}"
