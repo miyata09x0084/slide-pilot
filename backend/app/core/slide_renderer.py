@@ -43,7 +43,7 @@ class SlideRenderer:
         with sync_playwright() as p:
             browser = p.chromium.launch(timeout=60000)  # 60秒（Cloud Run環境対応）
             context = browser.new_context(viewport=self.VIEWPORT)
-            context.set_default_timeout(60000)  # ページ操作も60秒（CDN読み込み対応）
+            context.set_default_timeout(60000)  # ページ操作も60秒
             page = context.new_page()
 
             for i, slide in enumerate(slides):
@@ -224,18 +224,19 @@ li::before {{ content: none; }}
 </div></body></html>'''
 
     def _mermaid_template(self, slide: Dict) -> str:
-        """Mermaid図スライドテンプレート（CDN依存なし - ローカルファイル使用）"""
+        """Mermaid図スライドテンプレート（インラインJS埋め込み - set_content対応）"""
         heading = html.escape(slide.get('heading', '図解'))
         mermaid_code = slide.get('mermaid_code', '')
 
-        # ローカルのmermaid.jsファイルパスを取得
-        # slide_renderer.py は backend/app/core/ にあるので、parent.parent で backend/app/ へ
+        # ローカルのmermaid.jsファイルを読み込んでインライン埋め込み
+        # Playwrightのset_content()ではfile://プロトコルが使えないため
         static_dir = Path(__file__).parent.parent / 'static'
         mermaid_js_path = static_dir / 'mermaid.min.js'
+        mermaid_js_content = mermaid_js_path.read_text(encoding='utf-8') if mermaid_js_path.exists() else ''
 
         return f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<script src="file://{mermaid_js_path}"></script>
+<script>{mermaid_js_content}</script>
 <style>{self._base_style()}
 .slide {{ justify-content: flex-start; padding: 60px; }}
 h2 {{ text-align: center; margin-bottom: 20px; font-size: 52px; }}
