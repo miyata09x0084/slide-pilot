@@ -1050,9 +1050,14 @@ def render_video(state: State) -> Dict:
     Cloud Run Jobをトリガーし、video_job_idを返す。
     実際の動画生成はバックグラウンドで実行され、タイムアウトしない。
     クライアントは /api/video/status/{job_id} でステータスをポーリングする。
+
+    重要: 音声ファイルはSupabase Storageにアップロードしてから渡す。
+    ローカルの一時ファイルパスは非同期ジョブ実行時に存在しないため。
     """
     import httpx
     import os
+    from pathlib import Path
+    from app.core.storage import upload_to_storage
 
     print("[DEBUG] render_video: START (Cloud Run Job async)")
 
@@ -1090,6 +1095,39 @@ def render_video(state: State) -> Dict:
             "log": _log(state, "[video] ERROR: slide_id is required for async rendering")
         }
 
+    # 音声ファイルをSupabase Storageにアップロード
+    # 非同期ジョブはローカルの一時ファイルにアクセスできないため
+    print("[DEBUG] render_video: uploading audio files to Supabase Storage")
+    audio_urls = []
+    try:
+        for i, audio_path in enumerate(audio_files):
+            audio_file = Path(audio_path)
+            if not audio_file.exists():
+                print(f"[DEBUG] render_video: audio file not found: {audio_path}")
+                return {
+                    "error": f"Audio file not found: {audio_path}",
+                    "log": _log(state, f"[video] ERROR: audio file not found: {audio_path}")
+                }
+
+            # Supabase Storageにアップロード
+            storage_path = f"{user_id}/narration/{slide_id}/narration_{i:03d}.mp3"
+            audio_url = upload_to_storage(
+                bucket="slide-files",
+                file_path=storage_path,
+                file_data=audio_file.read_bytes(),
+                content_type="audio/mpeg"
+            )
+            audio_urls.append(audio_url)
+            print(f"[DEBUG] render_video: uploaded audio {i} -> {audio_url}")
+
+        print(f"[DEBUG] render_video: uploaded {len(audio_urls)} audio files")
+    except Exception as e:
+        print(f"[DEBUG] render_video: audio upload failed: {e}")
+        return {
+            "error": f"Audio upload failed: {str(e)}",
+            "log": _log(state, f"[video] ERROR: audio upload failed: {str(e)[:100]}")
+        }
+
     # FastAPI経由で非同期動画生成ジョブをトリガー
     fastapi_url = os.getenv("FASTAPI_URL", "http://localhost:8001")
     print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video/async")
@@ -1100,7 +1138,7 @@ def render_video(state: State) -> Dict:
                 f"{fastapi_url}/api/render/video/async",
                 json={
                     "slides_json": slides_json,
-                    "audio_files": audio_files,
+                    "audio_files": audio_urls,  # ローカルパスではなくSupabase URLを渡す
                     "title": title,
                     "user_id": user_id,
                     "slide_id": slide_id

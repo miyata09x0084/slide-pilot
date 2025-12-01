@@ -242,11 +242,34 @@ class VideoJobStatusResponse(BaseModel):
     error_message: Optional[str] = None
 
 
+def _download_audio_file(url: str, dest_path: Path) -> bool:
+    """URLから音声ファイルをダウンロード
+
+    Args:
+        url: 音声ファイルのURL（Supabase Storage公開URL）
+        dest_path: 保存先パス
+
+    Returns:
+        成功: True、失敗: False
+    """
+    import requests
+
+    try:
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        dest_path.write_bytes(response.content)
+        return True
+    except Exception as e:
+        print(f"[local-job] Failed to download audio: {e}")
+        return False
+
+
 def _run_video_job_local(job_id: str):
     """
     ローカル環境用：video_render_job.pyと同等の処理をスレッドで実行
 
     Cloud Run Jobの代わりにバックグラウンドスレッドで動画生成を行う。
+    音声ファイルはSupabase Storage URLからダウンロードする。
     """
     import json
     from app.core.supabase import get_video_job, update_video_job, update_slide_video_url
@@ -276,12 +299,31 @@ def _run_video_job_local(job_id: str):
         # 3. 入力データをパース
         input_data = json.loads(job["input_data"]) if isinstance(job["input_data"], str) else job["input_data"]
         slides_json = input_data["slides_json"]
-        audio_files = input_data["audio_files"]
+        audio_urls = input_data["audio_files"]  # 今はSupabase Storage URL
         title = input_data["title"]
         user_id = job["user_id"]
         slide_id = job["slide_id"]
 
-        print(f"[local-job] Processing: {len(slides_json)} slides, {len(audio_files)} audio files")
+        print(f"[local-job] Processing: {len(slides_json)} slides, {len(audio_urls)} audio files")
+
+        # 4. 音声ファイルをダウンロード（URLの場合）
+        audio_dir = temp_dir / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_files = []
+
+        for i, audio_url in enumerate(audio_urls):
+            if audio_url.startswith("http"):
+                # URLからダウンロード
+                local_path = audio_dir / f"narration_{i:03d}.mp3"
+                print(f"[local-job] Downloading audio {i}: {audio_url[:80]}...")
+                if not _download_audio_file(audio_url, local_path):
+                    raise Exception(f"Failed to download audio file {i}")
+                audio_files.append(str(local_path))
+            else:
+                # ローカルパス（後方互換性）
+                audio_files.append(audio_url)
+
+        print(f"[local-job] Downloaded {len(audio_files)} audio files")
 
         # 4. PNG画像生成
         png_dir = temp_dir / "slides_png"

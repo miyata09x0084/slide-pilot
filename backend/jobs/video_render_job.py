@@ -14,6 +14,7 @@ import sys
 import json
 import tempfile
 import shutil
+import requests
 from pathlib import Path
 
 # backend/app をモジュールパスに追加
@@ -25,6 +26,26 @@ load_dotenv()
 from app.core.supabase import get_video_job, update_video_job, update_slide_video_url
 from app.core.storage import upload_to_storage
 from app.core.slide_renderer import SlideRenderer
+
+
+def download_audio_file(url: str, dest_path: Path) -> bool:
+    """URLから音声ファイルをダウンロード
+
+    Args:
+        url: 音声ファイルのURL（Supabase Storage公開URL）
+        dest_path: 保存先パス
+
+    Returns:
+        成功: True、失敗: False
+    """
+    try:
+        response = requests.get(url, timeout=120)
+        response.raise_for_status()
+        dest_path.write_bytes(response.content)
+        return True
+    except Exception as e:
+        print(f"[job] Failed to download audio: {e}")
+        return False
 
 
 def main():
@@ -55,14 +76,33 @@ def main():
         # 3. 入力データをパース
         input_data = json.loads(job["input_data"])
         slides_json = input_data["slides_json"]
-        audio_files = input_data["audio_files"]
+        audio_urls = input_data["audio_files"]  # Supabase Storage URL
         title = input_data["title"]
         user_id = job["user_id"]
         slide_id = job["slide_id"]
 
-        print(f"[job] Processing: {len(slides_json)} slides, {len(audio_files)} audio files")
+        print(f"[job] Processing: {len(slides_json)} slides, {len(audio_urls)} audio files")
 
-        # 4. PNG画像生成
+        # 4. 音声ファイルをダウンロード（URLの場合）
+        audio_dir = temp_dir / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_files = []
+
+        for i, audio_url in enumerate(audio_urls):
+            if audio_url.startswith("http"):
+                # URLからダウンロード
+                local_path = audio_dir / f"narration_{i:03d}.mp3"
+                print(f"[job] Downloading audio {i}: {audio_url[:80]}...")
+                if not download_audio_file(audio_url, local_path):
+                    raise Exception(f"Failed to download audio file {i}")
+                audio_files.append(str(local_path))
+            else:
+                # ローカルパス（後方互換性）
+                audio_files.append(audio_url)
+
+        print(f"[job] Downloaded {len(audio_files)} audio files")
+
+        # 5. PNG画像生成
         png_dir = temp_dir / "slides_png"
         renderer = SlideRenderer()
         png_files = renderer.render_all(slides_json, png_dir)
@@ -71,14 +111,14 @@ def main():
         if not png_files:
             raise Exception("SlideRenderer produced no images")
 
-        # 5. 音声ファイル数とPNGファイル数を合わせる
+        # 6. 音声ファイル数とPNGファイル数を合わせる
         if len(png_files) != len(audio_files):
             print(f"[job] WARNING: PNG count ({len(png_files)}) != audio count ({len(audio_files)})")
             min_count = min(len(png_files), len(audio_files))
             png_files = png_files[:min_count]
             audio_files = audio_files[:min_count]
 
-        # 6. MoviePyで動画生成
+        # 7. MoviePyで動画生成
         from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
 
         clips = []
@@ -96,7 +136,7 @@ def main():
         if not clips:
             raise Exception("All clips failed to process")
 
-        # 7. 動画を結合・エンコード
+        # 8. 動画を結合・エンコード
         print(f"[job] Concatenating {len(clips)} video clips")
         final_video = concatenate_videoclips(clips, method="compose")
 
@@ -122,7 +162,7 @@ def main():
         )
         print(f"[job] Video written to {video_path}")
 
-        # 8. Supabase Storageにアップロード
+        # 9. Supabase Storageにアップロード
         storage_path = f"{user_id}/{file_stem}_video.mp4"
         video_url = upload_to_storage(
             bucket="slide-files",
@@ -132,12 +172,12 @@ def main():
         )
         print(f"[job] Uploaded to {video_url}")
 
-        # 9. slidesテーブルのvideo_urlを更新
+        # 10. slidesテーブルのvideo_urlを更新
         if slide_id:
             update_slide_video_url(slide_id, video_url)
             print(f"[job] Updated slide {slide_id} with video_url")
 
-        # 10. ジョブステータスを completed に更新
+        # 11. ジョブステータスを completed に更新
         update_video_job(job_id, "completed", video_url=video_url)
         print(f"[job] Job completed successfully: {video_url}")
 
