@@ -229,7 +229,8 @@ li::before {{ content: none; }}
         mermaid_code = slide.get('mermaid_code', '')
 
         # ローカルのmermaid.jsファイルパスを取得
-        static_dir = Path(__file__).parent / 'static'
+        # slide_renderer.py は backend/app/core/ にあるので、parent.parent で backend/app/ へ
+        static_dir = Path(__file__).parent.parent / 'static'
         mermaid_js_path = static_dir / 'mermaid.min.js'
 
         return f'''<!DOCTYPE html>

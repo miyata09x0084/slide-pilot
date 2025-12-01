@@ -16,6 +16,7 @@ import {
   threadIdAtom,
   errorAtom,
   slideDataAtom,
+  isPollingVideoAtom,
 } from '../store/reactAgentAtoms';
 import { createThread } from '../api/create-thread';
 import { findAssistantByGraphId } from '../api/get-assistants';
@@ -34,7 +35,7 @@ export function useReactAgent() {
   const [error, setError] = useRecoilState(errorAtom);
   const [slideData, setSlideData] = useRecoilState(slideDataAtom);
   const [cachedAssistantId, setCachedAssistantId] = useState<string | null>(null);
-  const [isPollingVideo, setIsPollingVideo] = useState(false);
+  const [isPollingVideo, setIsPollingVideo] = useRecoilState(isPollingVideoAtom);
 
   // React Queryのクライアント（キャッシュ無効化用）
   const queryClient = useQueryClient();
