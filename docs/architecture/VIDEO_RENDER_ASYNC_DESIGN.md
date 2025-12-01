@@ -175,6 +175,48 @@ gcloud run jobs create slidepilot-video-job \
 
 ---
 
+## ローカル開発
+
+### 環境変数
+
+```bash
+# backend/.env に追加
+LOCAL_VIDEO_JOB=true  # ローカル環境でバックグラウンドスレッド実行
+```
+
+### 動作モード
+
+| 環境変数 | 動作 |
+|---------|------|
+| `LOCAL_VIDEO_JOB=true` | バックグラウンドスレッドで即座に実行 |
+| 未設定 or `false` | Cloud Run Job をトリガー（本番用） |
+
+### ローカルテスト手順
+
+```bash
+# 1. FastAPIサーバー起動
+cd backend/app
+LOCAL_VIDEO_JOB=true python3 main.py
+
+# 2. LangGraphサーバー起動
+python3.11 -m langgraph_cli dev --host 0.0.0.0 --port 2024
+
+# 3. フロントエンド起動
+cd frontend
+npm run dev
+
+# 4. ブラウザでテスト → 動画生成が非同期で実行される
+```
+
+### 単体テスト（ジョブ処理のみ）
+
+```bash
+cd backend
+JOB_ID=<job_id> python jobs/video_render_job.py
+```
+
+---
+
 ## 使用方法
 
 1. Supabaseで `video_jobs` テーブルを作成（SQLは `migrations/002_create_video_jobs.sql`）
