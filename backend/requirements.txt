@@ -26,6 +26,9 @@ google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 google-api-python-client==2.108.0
 
+# ---Cloud Run Jobs API---
+google-cloud-run>=0.10.0
+
 # ---PDF Processing (Issue #17)---
 pypdf>=3.17.0
 langchain-community>=0.3.0

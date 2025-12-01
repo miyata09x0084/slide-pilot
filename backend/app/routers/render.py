@@ -415,7 +415,7 @@ async def render_video_async(request: AsyncVideoRenderRequest):
     クライアントは /video/status/{job_id} でステータスを確認する。
     """
     from app.core.supabase import create_video_job
-    import subprocess
+    from app.core.cloud_run import trigger_video_job
     import os
     import threading
 
@@ -445,27 +445,13 @@ async def render_video_async(request: AsyncVideoRenderRequest):
         thread = threading.Thread(target=_run_video_job_local, args=(job_id,), daemon=True)
         thread.start()
     else:
-        # 本番環境: Cloud Run Jobをトリガー
-        try:
-            region = os.environ.get("GCP_REGION", "asia-northeast1")
-            job_name = "slidepilot-video-job"
+        # 本番環境: Cloud Run JobをAPIでトリガー
+        success = trigger_video_job(job_id)
 
-            cmd = [
-                "gcloud", "run", "jobs", "execute", job_name,
-                f"--region={region}",
-                f"--update-env-vars=JOB_ID={job_id}",
-                "--async"
-            ]
-
-            subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            print(f"[render] Triggered Cloud Run Job: {job_name} with JOB_ID={job_id}")
-
-        except Exception as e:
-            print(f"[render] WARNING: Failed to trigger Cloud Run Job: {e}")
+        if success:
+            print(f"[render] Triggered Cloud Run Job with JOB_ID={job_id}")
+        else:
+            print(f"[render] WARNING: Failed to trigger Cloud Run Job for {job_id}")
 
     return AsyncVideoRenderResponse(
         job_id=job_id,
