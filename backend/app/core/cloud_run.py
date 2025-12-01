@@ -53,7 +53,7 @@ def trigger_video_job(job_id: str) -> bool:
         )
 
         operation = client.run_job(request=request)
-        print(f"[cloud_run] Triggered job execution: {operation.name}")
+        print(f"[cloud_run] Triggered job execution for job_id: {job_id}")
         return True
 
     except google_exceptions.NotFound:
