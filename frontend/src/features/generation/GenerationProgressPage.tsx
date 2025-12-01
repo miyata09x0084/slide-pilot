@@ -15,7 +15,7 @@ export default function GenerationProgressPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { pdfPath, pdfFile, autoStart } = (location.state as { pdfPath?: string; pdfFile?: File; autoStart?: boolean }) || {};
-  const { isThinking, slideData, error, createThread, sendMessage } = useReactAgent();
+  const { isThinking, isPollingVideo, slideData, error, createThread, sendMessage } = useReactAgent();
   const hasRedirected = useRef(false);
   const hasStarted = useRef(false);
   const [status, setStatus] = useState<ProcessingStatus>('uploading');
@@ -61,8 +61,9 @@ export default function GenerationProgressPage() {
 
   // 動画生成完了時に詳細ページへ自動遷移
   useEffect(() => {
-    // slide_idまたはpathがあれば完了とみなす
-    if ((slideData.slide_id || slideData.path) && !hasRedirected.current && !isThinking) {
+    // slide_idまたはpathがあり、思考中でなく、ポーリング中でもない場合にリダイレクト
+    // isPollingVideo=trueの間は動画レンダリング中なので待機する
+    if ((slideData.slide_id || slideData.path) && !hasRedirected.current && !isThinking && !isPollingVideo) {
       hasRedirected.current = true;
 
       // slide_idがあればSlideDetailPageへ、なければダッシュボードへ
@@ -75,7 +76,7 @@ export default function GenerationProgressPage() {
         }
       }, 2000);
     }
-  }, [slideData, isThinking, navigate]);
+  }, [slideData, isThinking, isPollingVideo, navigate]);
 
   return (
     <div style={{
@@ -169,8 +170,35 @@ export default function GenerationProgressPage() {
             </p>
           </div>
 
+          {/* 動画レンダリング中の表示 */}
+          {isPollingVideo && (
+            <div style={{
+              marginTop: '24px',
+              padding: '16px',
+              background: '#fff3cd',
+              borderRadius: '8px',
+              border: '1px solid #ffc107',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#856404',
+                marginBottom: '8px'
+              }}>
+                🎬 動画をレンダリング中...
+              </div>
+              <div style={{
+                fontSize: '13px',
+                color: '#856404'
+              }}>
+                しばらくお待ちください（1〜2分）
+              </div>
+            </div>
+          )}
+
           {/* 完了メッセージ */}
-          {slideData.slide_id && !isThinking && (
+          {slideData.slide_id && !isThinking && !isPollingVideo && (
             <div style={{
               marginTop: '24px',
               padding: '16px',
