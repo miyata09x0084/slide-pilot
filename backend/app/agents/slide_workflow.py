@@ -76,6 +76,7 @@ class State(TypedDict, total=False):
   # 実行コンテキスト（Read-Only、ノードで変更禁止）
   # ══════════════════════════════════════════════════════════
   user_id: str                                  # ユーザー識別子（デフォルト: "anonymous"）
+  auth_token: str                               # JWTトークン（内部API呼び出し用、"Bearer xxx"形式）
 
   # ══════════════════════════════════════════════════════════
   # 入力
@@ -1132,6 +1133,10 @@ def render_video(state: State) -> Dict:
     fastapi_url = os.getenv("FASTAPI_URL", "http://localhost:8001")
     print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video/async")
 
+    # JWTトークンを取得（内部API認証用）
+    auth_token = state.get("auth_token", "")
+    headers = {"Authorization": auth_token} if auth_token else {}
+
     try:
         with httpx.Client(timeout=30) as client:  # ジョブ作成は30秒で十分
             response = client.post(
@@ -1142,7 +1147,8 @@ def render_video(state: State) -> Dict:
                     "title": title,
                     "user_id": user_id,
                     "slide_id": slide_id
-                }
+                },
+                headers=headers
             )
             response.raise_for_status()
             result = response.json()

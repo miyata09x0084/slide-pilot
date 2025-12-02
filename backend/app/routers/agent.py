@@ -172,13 +172,20 @@ async def stream_run(
         body = await request.json()
 
         # ──────────────────────────────────────────────────────────────
-        # user_id を input に注入（Issue: Supabase Auth統合）
+        # user_id と auth_token を input に注入（Issue: Supabase Auth統合）
         # LangGraph MessagesState の拡張フィールドとして渡す
         # JWT検証済みのauthenticated_user_idを使用（改ざん不可）
+        # auth_tokenは内部API呼び出し（render/video等）に転送するため保持
         # ──────────────────────────────────────────────────────────────
         if "input" not in body:
             body["input"] = {}
         body["input"]["user_id"] = authenticated_user_id
+
+        # JWTトークンを取得してLangGraph Stateに注入（内部API呼び出し用）
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            body["input"]["auth_token"] = auth_header  # "Bearer xxx" 形式で保持
+
         print(f"[agent] Injected authenticated_user_id={authenticated_user_id} into input (from JWT)")
 
         # 認証ヘッダー準備
