@@ -17,7 +17,7 @@ router = APIRouter()
 @router.post("/upload-pdf")
 async def upload_pdf(
     file: UploadFile = File(...),
-    user_id: str = Depends(verify_token),
+    authenticated_user_id: str = Depends(verify_token),
     max_file_size: int = Depends(get_max_file_size)
 ):
     """
@@ -27,7 +27,7 @@ async def upload_pdf(
 
     Args:
         file: アップロードされたPDFファイル
-        user_id: JWT検証で取得したユーザーID（UUID）
+        authenticated_user_id: JWT検証で取得したユーザーID（UUID）
         max_file_size: アップロード上限サイズ
 
     Returns:
@@ -64,7 +64,7 @@ async def upload_pdf(
     unique_name = f"{uuid.uuid4()}.pdf"
 
     # Supabase Storageにアップロード
-    storage_path = f"{user_id}/{unique_name}"
+    storage_path = f"{authenticated_user_id}/{unique_name}"
 
     try:
         signed_url = upload_to_storage(

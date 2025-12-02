@@ -10,13 +10,13 @@ router = APIRouter()
 
 
 @router.get("/auth/me")
-async def get_current_user(user_id: str = Depends(verify_token)):
+async def get_current_user(authenticated_user_id: str = Depends(verify_token)):
     """現在の認証ユーザー情報を取得（JWT検証テスト用）
 
     Args:
-        user_id: JWT検証で取得したユーザーID
+        authenticated_user_id: JWT検証で取得したユーザーID
 
     Returns:
-        {"user_id": str}
+        {"authenticated_user_id": str}
     """
-    return {"user_id": user_id}
+    return {"authenticated_user_id": authenticated_user_id}

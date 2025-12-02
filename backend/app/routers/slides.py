@@ -54,7 +54,7 @@ async def get_samples() -> Dict[str, Any]:
 
 @router.get("/slides")
 async def list_slides(
-    user_id: str = Depends(verify_token),
+    authenticated_user_id: str = Depends(verify_token),
     limit: int = 20
 ) -> Dict[str, Any]:
     """認証ユーザーのスライド一覧を取得
@@ -63,7 +63,7 @@ async def list_slides(
     RLS: Supabase が自動的に user_id でフィルタ
 
     Args:
-        user_id: JWT検証で取得したユーザーID
+        authenticated_user_id: JWT検証で取得したユーザーID
         limit: 取得件数上限
 
     Returns:
@@ -73,14 +73,14 @@ async def list_slides(
     if not client:
         return {"slides": [], "message": "Supabase未設定"}
 
-    slides = get_slides_by_user(user_id, limit)
+    slides = get_slides_by_user(authenticated_user_id, limit)
     return {"slides": slides, "message": f"{len(slides)}件のスライドを取得しました"}
 
 
 @router.get("/slides/{slide_id}/markdown")
 async def get_slide_markdown(
     slide_id: str,
-    user_id: str = Depends(verify_token)
+    authenticated_user_id: str = Depends(verify_token)
 ) -> Dict[str, Any]:
     """スライドのMarkdownを取得（認証必須、RLSで保護）
 
@@ -90,7 +90,7 @@ async def get_slide_markdown(
 
     Args:
         slide_id: スライドID（UUID）
-        user_id: JWT検証で取得したユーザーID
+        authenticated_user_id: JWT検証で取得したユーザーID
 
     Returns:
         {
@@ -109,7 +109,7 @@ async def get_slide_markdown(
     is_sample = slide.get("user_id") == SAMPLE_USER_ID
 
     # RLS + 念のためユーザーID照合（サンプルスライドは除外）
-    if not is_sample and slide.get("user_id") != user_id:
+    if not is_sample and slide.get("user_id") != authenticated_user_id:
         raise HTTPException(status_code=403, detail="アクセス権限がありません")
 
     return {
