@@ -6,14 +6,19 @@ asyncio.to_thread()でブロッキング処理を別スレッドで実行し、
 LangGraphはHTTP呼び出しのみを行う。
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from pydantic import BaseModel
+from app.auth.middleware import verify_token, optional_verify_token
 from typing import List, Dict, Any, Optional
 import asyncio
 import tempfile
 import shutil
 from pathlib import Path
 import re
+import os
+
+# 内部API認証用シークレット
+INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
 
 router = APIRouter(tags=["render"])
 
@@ -178,14 +183,38 @@ def _render_video_blocking(
 
 
 @router.post("/render/video", response_model=VideoRenderResponse)
-async def render_video(request: VideoRenderRequest):
+async def render_video(
+    request: VideoRenderRequest,
+    authenticated_user_id: str = Depends(optional_verify_token),
+    x_internal_secret: Optional[str] = Header(None, alias="X-Internal-Secret")
+):
     """
     動画生成エンドポイント（同期版 - 後方互換性のため残す）
+
+    認証: JWT または 内部APIシークレット
 
     asyncio.to_thread()でブロッキング処理を別スレッドで実行し、
     FastAPIのイベントループをブロックしない。
     """
     print(f"[render] Received video render request: {request.title}")
+
+    # 認証チェック: JWT or 内部APIシークレット
+    if authenticated_user_id != "anonymous":
+        # JWT認証済み: user_id一致チェック
+        if request.user_id != authenticated_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only render videos for your own account"
+            )
+    elif INTERNAL_API_SECRET and x_internal_secret == INTERNAL_API_SECRET:
+        # 内部API認証: リクエストボディのuser_idを信頼
+        print(f"[render] Internal API auth: using request.user_id={request.user_id}")
+    else:
+        # 認証なし
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated"
+        )
 
     try:
         result = await asyncio.to_thread(
@@ -405,9 +434,15 @@ def _run_video_job_local(job_id: str):
 
 
 @router.post("/render/video/async", response_model=AsyncVideoRenderResponse)
-async def render_video_async(request: AsyncVideoRenderRequest):
+async def render_video_async(
+    request: AsyncVideoRenderRequest,
+    authenticated_user_id: str = Depends(optional_verify_token),
+    x_internal_secret: Optional[str] = Header(None, alias="X-Internal-Secret")
+):
     """
     非同期動画生成エンドポイント
+
+    認証: JWT または 内部APIシークレット
 
     - 本番環境（Cloud Run）: Cloud Run Jobをトリガー
     - ローカル環境（LOCAL_VIDEO_JOB=true）: バックグラウンドスレッドで実行
@@ -416,10 +451,27 @@ async def render_video_async(request: AsyncVideoRenderRequest):
     """
     from app.core.supabase import create_video_job
     from app.core.cloud_run import trigger_video_job
-    import os
     import threading
 
     print(f"[render] Received async video render request: {request.title}")
+
+    # 認証チェック: JWT or 内部APIシークレット
+    if authenticated_user_id != "anonymous":
+        # JWT認証済み: user_id一致チェック
+        if request.user_id != authenticated_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only render videos for your own account"
+            )
+    elif INTERNAL_API_SECRET and x_internal_secret == INTERNAL_API_SECRET:
+        # 内部API認証: リクエストボディのuser_idを信頼
+        print(f"[render] Internal API auth: using request.user_id={request.user_id}")
+    else:
+        # 認証なし
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated"
+        )
 
     # 1. video_jobsテーブルにジョブを作成
     result = create_video_job(
@@ -460,9 +512,14 @@ async def render_video_async(request: AsyncVideoRenderRequest):
 
 
 @router.get("/video/status/{job_id}", response_model=VideoJobStatusResponse)
-async def get_video_status(job_id: str):
+async def get_video_status(
+    job_id: str,
+    authenticated_user_id: str = Depends(verify_token)
+):
     """
     動画生成ジョブのステータスを取得
+
+    認証: 必須（JWT）
 
     クライアントはこのエンドポイントをポーリングして完了を待つ。
     """
@@ -472,6 +529,13 @@ async def get_video_status(job_id: str):
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # job所有者検証を追加
+    if job["user_id"] != authenticated_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own jobs"
+        )
 
     return VideoJobStatusResponse(
         job_id=job_id,

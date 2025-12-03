@@ -17,7 +17,7 @@ router = APIRouter()
 @router.post("/upload-pdf")
 async def upload_pdf(
     file: UploadFile = File(...),
-    user_id: str = Depends(verify_token),
+    authenticated_user_id: str = Depends(verify_token),
     max_file_size: int = Depends(get_max_file_size)
 ):
     """
@@ -27,7 +27,7 @@ async def upload_pdf(
 
     Args:
         file: アップロードされたPDFファイル
-        user_id: JWT検証で取得したユーザーID（UUID）
+        authenticated_user_id: JWT検証で取得したユーザーID（UUID）
         max_file_size: アップロード上限サイズ
 
     Returns:
@@ -64,7 +64,7 @@ async def upload_pdf(
     unique_name = f"{uuid.uuid4()}.pdf"
 
     # Supabase Storageにアップロード
-    storage_path = f"{user_id}/{unique_name}"
+    storage_path = f"{authenticated_user_id}/{unique_name}"
 
     try:
         signed_url = upload_to_storage(
@@ -87,13 +87,27 @@ async def upload_pdf(
 
 
 @router.delete("/uploads/{user_id}/{filename}")
-async def delete_upload(user_id: str, filename: str):
+async def delete_upload(
+    user_id: str,
+    filename: str,
+    authenticated_user_id: str = Depends(verify_token)
+):
     """Supabase Storageからアップロードファイルを削除
 
+    認証: 必須（JWT）
+
     Args:
-        user_id: ユーザーID
+        user_id: ユーザーID（path parameter）
         filename: ファイル名
+        authenticated_user_id: JWT検証で取得したユーザーID
     """
+    # 認証済みユーザーIDとpath parameterのユーザーIDが一致するか検証
+    if user_id != authenticated_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="他のユーザーのファイルは削除できません"
+        )
+
     from app.core.storage import delete_from_storage
 
     storage_path = f"{user_id}/{filename}"

@@ -150,7 +150,7 @@ async def search_assistants(request: Request):
 async def stream_run(
     thread_id: str,
     request: Request,
-    user_id: str = Depends(optional_verify_token)
+    authenticated_user_id: str = Depends(optional_verify_token)
 ):
     """
     LangGraphエージェントをストリーミング実行
@@ -163,7 +163,7 @@ async def stream_run(
     Args:
         thread_id: LangGraphスレッドID
         request: リクエストボディ（assistant_id, input, stream_mode含む）
-        user_id: JWT検証で取得したユーザーID（オプショナル、デフォルト: "anonymous"）
+        authenticated_user_id: JWT検証で取得したユーザーID（オプショナル、デフォルト: "anonymous"）
 
     Returns:
         StreamingResponse: SSEストリーム
@@ -172,14 +172,21 @@ async def stream_run(
         body = await request.json()
 
         # ──────────────────────────────────────────────────────────────
-        # user_id を input に注入（Issue: Supabase Auth統合）
+        # user_id と auth_token を input に注入（Issue: Supabase Auth統合）
         # LangGraph MessagesState の拡張フィールドとして渡す
-        # JWT検証済みのuser_idを使用（改ざん不可）
+        # JWT検証済みのauthenticated_user_idを使用（改ざん不可）
+        # auth_tokenは内部API呼び出し（render/video等）に転送するため保持
         # ──────────────────────────────────────────────────────────────
         if "input" not in body:
             body["input"] = {}
-        body["input"]["user_id"] = user_id
-        print(f"[agent] Injected user_id={user_id} into input (from JWT)")
+        body["input"]["user_id"] = authenticated_user_id
+
+        # JWTトークンを取得してLangGraph Stateに注入（内部API呼び出し用）
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            body["input"]["auth_token"] = auth_header  # "Bearer xxx" 形式で保持
+
+        print(f"[agent] Injected authenticated_user_id={authenticated_user_id} into input (from JWT)")
 
         # 認証ヘッダー準備
         headers = {}

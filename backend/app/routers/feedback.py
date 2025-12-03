@@ -36,7 +36,7 @@ class FeedbackResponse(BaseModel):
 @router.post("/feedback", response_model=FeedbackResponse)
 async def submit_feedback(
     request: FeedbackRequest,
-    user_id: str = Depends(verify_token),
+    authenticated_user_id: str = Depends(verify_token),
     feedback_dir: Path = Depends(get_feedback_dir)
 ):
     """
@@ -54,7 +54,7 @@ async def submit_feedback(
         # フィードバックデータ
         feedback_data = {
             "slide_id": request.slide_id,
-            "user_id": user_id,
+            "user_id": authenticated_user_id,
             "rating": request.rating,
             "comment": request.comment,
             "created_at": now.isoformat()
@@ -81,7 +81,7 @@ async def submit_feedback(
 @router.get("/feedback/{slide_id}")
 async def get_feedback(
     slide_id: str,
-    user_id: str = Depends(verify_token),
+    authenticated_user_id: str = Depends(verify_token),
     feedback_dir: Path = Depends(get_feedback_dir)
 ):
     """
