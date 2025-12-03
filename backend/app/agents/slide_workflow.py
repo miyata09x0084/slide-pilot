@@ -1133,9 +1133,9 @@ def render_video(state: State) -> Dict:
     fastapi_url = os.getenv("FASTAPI_URL", "http://localhost:8001")
     print(f"[DEBUG] render_video: calling FastAPI at {fastapi_url}/api/render/video/async")
 
-    # JWTトークンを取得（内部API認証用）
-    auth_token = state.get("auth_token", "")
-    headers = {"Authorization": auth_token} if auth_token else {}
+    # 内部API認証用ヘッダー
+    internal_secret = os.getenv("INTERNAL_API_SECRET", "")
+    headers = {"X-Internal-Secret": internal_secret} if internal_secret else {}
 
     try:
         with httpx.Client(timeout=30) as client:  # ジョブ作成は30秒で十分
