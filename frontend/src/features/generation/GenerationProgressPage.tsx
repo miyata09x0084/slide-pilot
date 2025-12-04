@@ -20,30 +20,32 @@ export default function GenerationProgressPage() {
   const hasStarted = useRef(false);
   const [status, setStatus] = useState<ProcessingStatus>('uploading');
 
-  // PDF自動開始処理（アップロード完了時）
+  // PDF自動開始処理（アップロードとスレッド作成を並列実行）
   useEffect(() => {
     if (!autoStart || hasStarted.current) return;
     hasStarted.current = true;
 
     (async () => {
       try {
-        // Phase 1: PDFアップロード（ファイルオブジェクトが渡された場合）
-        let finalPath = pdfPath;
-        if (pdfFile && !pdfPath) {
-          setStatus('uploading');
-          const uploadResult = await uploadPdf({
-            file: pdfFile,
-          });
-          finalPath = uploadResult.path;
-        }
+        // Phase 1 & 2: PDFアップロードとスレッド作成を並列実行
+        setStatus('uploading');
 
+        // 並列実行するタスクを準備
+        const uploadPromise = pdfFile && !pdfPath
+          ? uploadPdf({ file: pdfFile })
+          : Promise.resolve({ path: pdfPath });
+        const threadPromise = createThread();
+
+        // 両方を同時に実行（約200-400ms短縮）
+        const [uploadResult, tid] = await Promise.all([
+          uploadPromise,
+          threadPromise
+        ]);
+
+        const finalPath = uploadResult?.path;
         if (!finalPath) {
           throw new Error('PDFパスが取得できませんでした');
         }
-
-        // Phase 2: スレッド作成
-        setStatus('creating_thread');
-        const tid = await createThread();
 
         // Phase 3: スライド生成開始（LangGraphは動画ではなくスライドツールのみ対応）
         setStatus('generating');
