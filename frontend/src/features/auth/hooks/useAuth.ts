@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 export function useAuth() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // セッション復元（Supabase が自動管理）
   useEffect(() => {
@@ -62,16 +63,30 @@ export function useAuth() {
   };
 
   const loginWithGoogle = async (googleCredential: string) => {
-    // Google JWT を Supabase に渡して検証
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: googleCredential,
-    });
+    setAuthError(null);
+    try {
+      // Google JWT を Supabase に渡して検証
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: googleCredential,
+      });
 
-    if (error) {
-      console.error('[useAuth] Supabase Auth failed:', error);
-      throw error;
+      if (error) {
+        console.error('[useAuth] Supabase Auth failed:', error);
+        setAuthError('ログインに失敗しました。しばらくしてから再度お試しください。');
+        throw error;
+      }
+    } catch (e) {
+      console.error('[useAuth] Login error:', e);
+      if (!authError) {
+        setAuthError('認証サービスに接続できません。ネットワーク接続を確認してください。');
+      }
+      throw e;
     }
+  };
+
+  const clearAuthError = () => {
+    setAuthError(null);
   };
 
   const logout = async () => {
@@ -82,9 +97,11 @@ export function useAuth() {
   return {
     user,
     loading,
+    authError,
     login, // リダイレクト型（フォールバック用）
     loginWithGoogle, // Google JWT 検証型（メイン）
     logout,
+    clearAuthError,
     isAuthenticated: !!user,
   };
 }
