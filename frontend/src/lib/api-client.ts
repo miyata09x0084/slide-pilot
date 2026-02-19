@@ -3,11 +3,12 @@
  * Centralized Axios instance with interceptors for authentication and error handling
  *
  * Issue: Supabase Auth統合（JWT自動送信）
+ * Perf: セッションキャッシュを使用し、リクエストごとの非同期getSession()を排除
  */
 
 import axios from 'axios';
 import { env } from '@/config/env';
-import { supabase } from './supabase';
+import { getCachedAccessToken } from './auth-session';
 
 // Create Axios instance
 export const api = axios.create({
@@ -18,15 +19,14 @@ export const api = axios.create({
   withCredentials: false,
 });
 
-// Request interceptor - Add JWT authentication headers
+// Request interceptor - Add JWT authentication headers (synchronous)
 api.interceptors.request.use(
-  async (config) => {
-    // Supabase Session から JWT 取得
-    const { data: { session } } = await supabase.auth.getSession();
+  (config) => {
+    // メモリキャッシュから同期的にトークン取得（非同期getSession不要）
+    const accessToken = getCachedAccessToken();
 
-    // JWT が存在する場合は Authorization ヘッダーに追加
-    if (session?.access_token) {
-      config.headers['Authorization'] = `Bearer ${session.access_token}`;
+    if (accessToken) {
+      config.headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
     return config;
