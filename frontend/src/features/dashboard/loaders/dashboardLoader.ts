@@ -1,31 +1,29 @@
 /**
  * dashboardLoader - React Router Loader with React Query prefetch
- * ページ遷移前にスライド履歴をReact Queryキャッシュにプリフェッチ
+ * ルート遷移をブロックせずにバックグラウンドでプリフェッチを開始する
+ *
+ * 設計: prefetchQueryをawaitしない（fire-and-forget）ことで、
+ * loaderがルート遷移を即座に完了させる。データはReact Queryの
+ * キャッシュ経由でコンポーネントに届く。
  */
 
 import { QueryClient } from '@tanstack/react-query';
 import { getSlides } from '../api/get-slides';
+import { getCachedAccessToken } from '@/lib/auth-session';
 
 export const createDashboardLoader = (queryClient: QueryClient) => {
-  return async () => {
-    // localStorageからユーザー情報取得（認証確認のみ）
-    const savedUser = localStorage.getItem('user');
-    if (!savedUser) return null;
+  return () => {
+    // 未認証の場合はプリフェッチをスキップ（無駄な401リクエストを防止）
+    // 認証ガードは ProtectedLayout (AuthGuard) が担当する
+    if (!getCachedAccessToken()) return null;
 
-    try {
-      // React Queryキャッシュにプリフェッチ
-      // prefetchQueryはエラーを無視するため、APIエラー時もnullを返す
-      // user_idはJWTから自動取得されるため不要
-      await queryClient.prefetchQuery({
-        queryKey: ['slides', 20],
-        queryFn: () => getSlides({ limit: 20 }),
-      });
+    // キャッシュが新鮮ならリクエストを発火しない（staleTime内）
+    // キャッシュが古い or 未取得なら、バックグラウンドでfetch開始
+    queryClient.prefetchQuery({
+      queryKey: ['slides', 20],
+      queryFn: () => getSlides({ limit: 20 }),
+    });
 
-      return null; // Loaderからデータを返さない（キャッシュのみ使用）
-    } catch (err) {
-      // JSONパースエラーの場合のみここでキャッチ
-      console.error('Failed to parse user data:', err);
-      return null;
-    }
+    return null;
   };
 };

@@ -159,6 +159,12 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     color: "rgba(255, 255, 255, 0.9)",
   },
+  skeletonCard: {
+    background: "#e5e7eb",
+    borderRadius: "12px",
+    minHeight: "200px",
+    animation: "pulse 1.5s ease-in-out infinite",
+  },
 };
 
 // レスポンシブ対応のCSS
@@ -191,6 +197,11 @@ const responsiveStyles = `
       gap: 24px !important;
     }
   }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+  }
 `;
 
 export default function DashboardPage() {
@@ -199,14 +210,14 @@ export default function DashboardPage() {
   const { resetChat } = useReactAgent();
 
   // React Queryでスライド履歴を取得（JWTから自動的にuser_idを取得）
-  const { data } = useSlides(
+  const { data, isLoading: isSlidesLoading } = useSlides(
     { limit: 20 },
     { enabled: !!user }
   );
   const slides = data?.slides || [];
 
   // サンプルスライドを取得
-  const { data: samplesData } = useSamples({ enabled: !!user });
+  const { data: samplesData, isLoading: isSamplesLoading } = useSamples({ enabled: !!user });
   const samples = samplesData?.samples || [];
 
   const [showAll, setShowAll] = useState(false);
@@ -315,8 +326,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* サンプルセクション */}
-      {samples.length > 0 && (
+      {/* サンプルセクション（ローディング中はスケルトン表示） */}
+      {isSamplesLoading && (
+        <div className="dashboard-grid" style={styles.gridContainer}>
+          <div style={{ ...styles.heroBanner, opacity: 0.5, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        </div>
+      )}
+      {!isSamplesLoading && samples.length > 0 && (
         <div className="dashboard-grid" style={styles.gridContainer}>
           <div style={styles.heroBanner}>
             <div style={styles.heroBannerIcon}>🎬</div>
@@ -358,8 +374,14 @@ export default function DashboardPage() {
           className="card-default"
         />
 
-        {/* 空状態 */}
-        {displayedSlides.length === 0 ? (
+        {/* ローディング中はスケルトンカード表示 */}
+        {isSlidesLoading ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={styles.skeletonCard} />
+            ))}
+          </>
+        ) : displayedSlides.length === 0 ? (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>🎬</div>
             <div style={styles.emptyText}>まだ動画がありません</div>

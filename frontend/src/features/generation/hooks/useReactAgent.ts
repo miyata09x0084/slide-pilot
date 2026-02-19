@@ -22,7 +22,7 @@ import { createThread } from '../api/create-thread';
 import { findAssistantByGraphId } from '../api/get-assistants';
 import { getVideoStatus } from '../api/get-video-status';
 import { env } from '@/config/env';
-import { supabase } from '@/lib/supabase';
+import { getCachedAccessToken } from '@/lib/auth-session';
 
 // SSE用のAPI URL（fetchで直接呼び出す）
 const API_BASE_URL = `${env.API_URL}/agent`;
@@ -179,17 +179,15 @@ export function useReactAgent() {
       // メッセージ履歴を構築（現在のメッセージ含む）
       const allMessages = [...messages, userMessage];
 
-      // ──────────────────────────────────────────────────────────────
-      // JWT取得（Issue #24: Supabase統合）
-      // ──────────────────────────────────────────────────────────────
-      const { data: { session } } = await supabase.auth.getSession();
+      // メモリキャッシュから同期的にJWT取得
+      const accessToken = getCachedAccessToken();
 
       // SSEストリーミング開始
       const response = await fetch(`${API_BASE_URL}/threads/${activeThreadId}/runs/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
         },
         body: JSON.stringify({
           assistant_id: assistantId,
