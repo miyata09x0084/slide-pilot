@@ -17,6 +17,14 @@ export default defineConfig({
         entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
         chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
         assetFileNames: `assets/[name]-[hash].[ext]`,
+        manualChunks: {
+          // React core（ほぼ全ページで使用、キャッシュ効率最大化）
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Supabase SDK（認証・DB、サイズ大）
+          'vendor-supabase': ['@supabase/supabase-js'],
+          // 状態管理・データ取得
+          'vendor-state': ['recoil', '@tanstack/react-query', 'axios'],
+        },
       },
     },
   },

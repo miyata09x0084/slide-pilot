@@ -1,17 +1,16 @@
 /**
  * Router Configuration
  * Defines all application routes using React Router v7
- * Phase 5: File-based routing structure with app/routes/
- * Phase 5.1: React Query prefetch loaders integration
+ *
+ * コード分割戦略:
+ * - ダッシュボード（/）: 静的import（初期表示に必須）
+ * - ログイン・生成・スライド詳細: lazy import（別チャンクに分割）
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { queryClient } from '@/lib/react-query';
-import { LoginRoute } from './routes/login';
-import { DashboardRoute } from './routes';
 import { ProtectedLayout } from './routes/app/root';
-import { GenerateRoute } from './routes/app/generate';
-import { SlidesRoute } from './routes/app/slides';
+import { DashboardRoute } from './routes';
 
 // Loaderファクトリー関数をimport
 import { createDashboardLoader } from '@/features/dashboard/loaders/dashboardLoader';
@@ -20,7 +19,10 @@ import { createSlideDetailLoader } from '@/features/slide/loaders/slideDetailLoa
 export const router = createBrowserRouter([
   {
     path: '/login',
-    element: <LoginRoute />,
+    lazy: async () => {
+      const { LoginRoute } = await import('./routes/login');
+      return { Component: LoginRoute };
+    },
   },
   {
     element: <ProtectedLayout />,
@@ -28,17 +30,22 @@ export const router = createBrowserRouter([
       {
         path: '/',
         element: <DashboardRoute />,
-        loader: createDashboardLoader(queryClient), // プリフェッチ追加
+        loader: createDashboardLoader(queryClient),
       },
       {
-        path: '/generate/:threadId?',  // threadIdをオプショナルに
-        element: <GenerateRoute />,
-        // このページはSSEストリーミングのためプリフェッチ不要
+        path: '/generate/:threadId?',
+        lazy: async () => {
+          const { GenerateRoute } = await import('./routes/app/generate');
+          return { Component: GenerateRoute };
+        },
       },
       {
         path: '/slides/:slideId',
-        element: <SlidesRoute />,
-        loader: createSlideDetailLoader(queryClient), // プリフェッチ追加
+        lazy: async () => {
+          const { SlidesRoute } = await import('./routes/app/slides');
+          return { Component: SlidesRoute };
+        },
+        loader: createSlideDetailLoader(queryClient),
       },
     ],
   },
