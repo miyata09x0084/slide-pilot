@@ -1,6 +1,9 @@
 /**
  * auth-session.ts のテスト
  * セッションキャッシュの初期化、トークン取得、クリーンアップを検証
+ *
+ * 注意: auth-session.tsはSupabase SDKを動的importするため、
+ * initAuthSessionCache()後にvi.waitForでPromise解決を待つ必要がある
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -51,6 +54,16 @@ function createMockJwt(expInSeconds: number): string {
   return `${header}.${payload}.fake-signature`;
 }
 
+/**
+ * 動的importの解決を待つヘルパー
+ * initAuthSessionCache()内のimport('./supabase').then(...)が解決するまで待機
+ */
+async function waitForSupabaseInit() {
+  await vi.waitFor(() => {
+    if (!authStateCallback) throw new Error('not yet');
+  });
+}
+
 describe('auth-session', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -76,20 +89,21 @@ describe('auth-session', () => {
   });
 
   describe('initAuthSessionCache', () => {
-    it('onAuthStateChangeのINITIAL_SESSIONでトークンがセットされる', () => {
+    it('動的import解決後にトークンがセットされる', async () => {
       const token = createMockJwt(3600);
       mockSession = { access_token: token };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
 
-      // INITIAL_SESSIONが同期的に発火するため即座に取得可能
       expect(getCachedAccessToken()).toBe(token);
     });
 
-    it('セッションがnullの場合はトークンがnullのまま', () => {
+    it('セッションがnullの場合はトークンがnullのまま', async () => {
       mockSession = null;
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
 
       expect(getCachedAccessToken()).toBeNull();
     });
@@ -100,17 +114,19 @@ describe('auth-session', () => {
 
       initAuthSessionCache();
       initAuthSessionCache();
+      await waitForSupabaseInit();
 
       expect(supabase.auth.onAuthStateChange).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('トークン更新', () => {
-    it('onAuthStateChangeで新しいトークンに更新される', () => {
+    it('onAuthStateChangeで新しいトークンに更新される', async () => {
       const oldToken = createMockJwt(3600);
       mockSession = { access_token: oldToken };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
       expect(getCachedAccessToken()).toBe(oldToken);
 
       // トークンリフレッシュをシミュレート
@@ -120,10 +136,11 @@ describe('auth-session', () => {
       expect(getCachedAccessToken()).toBe(newToken);
     });
 
-    it('ログアウト時にトークンがクリアされる', () => {
+    it('ログアウト時にトークンがクリアされる', async () => {
       mockSession = { access_token: createMockJwt(3600) };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
       expect(getCachedAccessToken()).not.toBeNull();
 
       // ログアウトをシミュレート
@@ -136,10 +153,11 @@ describe('auth-session', () => {
   describe('トークン期限チェック', () => {
     it('有効期限が十分にあるトークンはそのまま返す', async () => {
       const { supabase } = await import('@/lib/supabase');
-      const token = createMockJwt(3600); // 1時間後に期限切れ
+      const token = createMockJwt(3600);
       mockSession = { access_token: token };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
 
       const result = getCachedAccessToken();
       expect(result).toBe(token);
@@ -149,23 +167,25 @@ describe('auth-session', () => {
 
     it('期限切れ間近のトークンはバックグラウンドリフレッシュを発火する', async () => {
       const { supabase } = await import('@/lib/supabase');
-      const token = createMockJwt(30); // 30秒後に期限切れ（閾値60秒未満）
+      const token = createMockJwt(30);
       mockSession = { access_token: token };
 
       initAuthSessionCache();
-      vi.clearAllMocks(); // 初期化呼び出しをリセット
+      await waitForSupabaseInit();
+      vi.clearAllMocks();
 
       const result = getCachedAccessToken();
-      expect(result).toBe(token); // 現在のトークンは返す
-      expect(supabase.auth.getSession).toHaveBeenCalledTimes(1); // リフレッシュ発火
+      expect(result).toBe(token);
+      expect(supabase.auth.getSession).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('destroyAuthSessionCache', () => {
-    it('クリーンアップでリスナーが解除されトークンがクリアされる', () => {
+    it('クリーンアップでリスナーが解除されトークンがクリアされる', async () => {
       mockSession = { access_token: createMockJwt(3600) };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
       expect(getCachedAccessToken()).not.toBeNull();
 
       destroyAuthSessionCache();
@@ -174,14 +194,17 @@ describe('auth-session', () => {
       expect(getCachedAccessToken()).toBeNull();
     });
 
-    it('destroy後に再度initAuthSessionCacheが呼べる', () => {
+    it('destroy後に再度initAuthSessionCacheが呼べる', async () => {
       mockSession = { access_token: createMockJwt(3600) };
 
       initAuthSessionCache();
+      await waitForSupabaseInit();
       destroyAuthSessionCache();
 
+      authStateCallback = null;
       mockSession = { access_token: createMockJwt(7200) };
       initAuthSessionCache();
+      await waitForSupabaseInit();
 
       expect(getCachedAccessToken()).not.toBeNull();
     });
