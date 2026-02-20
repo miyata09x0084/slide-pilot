@@ -4,7 +4,6 @@ Issue #24: ブラウザプレビュー + Supabase履歴管理
 """
 
 from supabase import create_client, Client
-from pathlib import Path
 from typing import Optional, Dict, List
 import os
 from dotenv import load_dotenv
@@ -12,13 +11,24 @@ from dotenv import load_dotenv
 # .envファイルを読み込む
 load_dotenv()
 
+# シングルトン: プロセス内で1つのクライアントを再利用
+_client: Optional[Client] = None
+
 
 def get_supabase_client() -> Optional[Client]:
     """Supabaseクライアントを返す（環境変数未設定時はNone）
 
+    初回呼び出し時にクライアントを生成し、以降はキャッシュを返す。
+    create_client()のHTTPセッション確立コスト（~100-300ms）を初回のみに抑える。
+
     Returns:
         Supabase Client or None（環境変数未設定時）
     """
+    global _client
+
+    if _client is not None:
+        return _client
+
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_KEY")
 
@@ -26,7 +36,8 @@ def get_supabase_client() -> Optional[Client]:
         return None
 
     try:
-        return create_client(url, key)
+        _client = create_client(url, key)
+        return _client
     except Exception as e:
         print(f"[supabase] Failed to create client: {e}")
         return None
