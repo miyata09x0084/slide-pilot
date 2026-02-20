@@ -5,6 +5,7 @@
  * Issue: Google OAuth UI復元
  */
 
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import type { CredentialResponse } from '@react-oauth/google';
@@ -12,7 +13,8 @@ import { useAuth } from './hooks/useAuth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const [showFallback, setShowFallback] = useState(false);
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     if (!credentialResponse.credential) {
@@ -30,13 +32,8 @@ export default function LoginPage() {
   };
 
   const handleGoogleError = () => {
-    console.error('[Google OAuth] Login Failed');
-    console.error('  Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
-    console.error('  Current Origin:', window.location.origin);
-    console.error('  Expected Origin: http://localhost:5173');
-    console.error('  Check Google Cloud Console:');
-    console.error('    - Authorized JavaScript origins should include: http://localhost:5173');
-    console.error('    - Settings may take 5 minutes to several hours to propagate');
+    console.error('[Google OAuth] Popup login failed, showing redirect fallback');
+    setShowFallback(true);
   };
 
   return (
@@ -86,10 +83,34 @@ export default function LoginPage() {
           難しいPDFを、わかりやすい動画に
         </p>
 
-        {/* Google 公式 OAuth UI */}
+        {/* Google 公式 OAuth UI（ポップアップ型） */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
         </div>
+
+        {/* サードパーティCookieブロック時のフォールバック（リダイレクト型） */}
+        {showFallback && (
+          <div style={{ marginTop: '16px' }}>
+            <p style={{ color: '#888', fontSize: '13px', marginBottom: '12px' }}>
+              上のボタンで表示されない場合はこちら
+            </p>
+            <button
+              onClick={login}
+              style={{
+                padding: '10px 24px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#fff',
+                background: '#4285f4',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Googleアカウントでログイン
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
