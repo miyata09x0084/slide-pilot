@@ -136,6 +136,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Claude Code
+.claude/
+
 # IDEs
 .vscode/
 .idea/
