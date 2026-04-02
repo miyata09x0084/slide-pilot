@@ -78,7 +78,7 @@ jobs:
             --memory=2Gi \
             --cpu=2 \
             --timeout=300 \
-            --max-instances=100 \
+            --max-instances=5 \
             --min-instances=1 \
             --set-secrets="$SECRETS" \
             --set-env-vars="$ENV_VARS"
