@@ -81,6 +81,12 @@ def save_slide_to_supabase(
 
         if response.data and len(response.data) > 0:
             slide_record = response.data[0]
+            # キャッシュ無効化: 該当ユーザーの一覧キャッシュをクリア
+            from app.core.cache import cache
+            cache.invalidate(f"slides:{user_id}")
+            # サンプルユーザーの場合はサンプルキャッシュもクリア
+            if user_id == "00000000-0000-0000-0000-000000000000":
+                cache.invalidate("samples")
             return {
                 "slide_id": slide_record["id"],
                 "pdf_url": pdf_url
@@ -251,6 +257,37 @@ def get_video_job(job_id: str) -> Optional[Dict]:
         return None
     except Exception as e:
         print(f"[supabase] Failed to get video job {job_id}: {e}")
+        return None
+
+
+def get_video_job_status(job_id: str) -> Optional[Dict]:
+    """動画生成ジョブのステータスのみ取得（input_data を除外した軽量版）
+
+    ポーリング用途向け。input_data（50-100KB）を転送しない。
+
+    Args:
+        job_id: ジョブID（UUID）
+
+    Returns:
+        ジョブステータスデータ or None
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        response = (
+            client.table("video_jobs")
+            .select("id, status, video_url, error_message, user_id")
+            .eq("id", job_id)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"[supabase] Failed to get video job status {job_id}: {e}")
         return None
 
 

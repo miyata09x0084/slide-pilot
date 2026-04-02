@@ -39,7 +39,7 @@ export const useSamples = (options?: { enabled?: boolean }) => {
       }
       return response.json();
     },
-    staleTime: 5 * 60 * 1000, // 5分キャッシュ
+    staleTime: 30 * 60 * 1000, // 30分キャッシュ（バックエンドTTLキャッシュと併用）
     ...options,
   });
 };
