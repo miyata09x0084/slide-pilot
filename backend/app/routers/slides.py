@@ -6,12 +6,20 @@ Issue #29: Supabase Storage移行
 Issue: Supabase Auth統合
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+import asyncio
+
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from typing import Dict, Any
 
 from app.core.supabase import get_supabase_client, get_slides_by_user, get_slide_by_id
+from app.core.cache import cache
 from app.auth.middleware import verify_token
+
+# キャッシュTTL（秒）
+SAMPLES_TTL = 600     # 10分: 全ユーザー共通、更新稀
+SLIDES_LIST_TTL = 60  # 60秒: ユーザー別一覧
+SLIDE_DETAIL_TTL = 300  # 5分: 個別スライド詳細
 
 router = APIRouter()
 
@@ -33,19 +41,28 @@ async def get_samples() -> Dict[str, Any]:
     Returns:
         {"samples": [...]}
     """
+    cached = cache.get("samples")
+    if cached is not None:
+        return cached
+
     client = get_supabase_client()
     if not client:
         return {"samples": []}
 
-    response = (
-        client.table("slides")
-        .select("id, title, topic, created_at, pdf_url, video_url")
-        .eq("user_id", SAMPLE_USER_ID)
-        .order("created_at", desc=True)
-        .execute()
-    )
+    def _query():
+        return (
+            client.table("slides")
+            .select("id, title, topic, created_at, pdf_url, video_url")
+            .eq("user_id", SAMPLE_USER_ID)
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
 
-    return {"samples": response.data}
+    response = await asyncio.to_thread(_query)
+    result = {"samples": response.data}
+    cache.set("samples", result, SAMPLES_TTL)
+    return result
 
 
 # ──────────────────────────────────────────────────────────────
@@ -55,7 +72,7 @@ async def get_samples() -> Dict[str, Any]:
 @router.get("/slides")
 async def list_slides(
     authenticated_user_id: str = Depends(verify_token),
-    limit: int = 20
+    limit: int = Query(default=20, ge=1, le=100)
 ) -> Dict[str, Any]:
     """認証ユーザーのスライド一覧を取得
 
@@ -69,12 +86,19 @@ async def list_slides(
     Returns:
         {"slides": [...], "message": str}
     """
+    cache_key = f"slides:{authenticated_user_id}:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     client = get_supabase_client()
     if not client:
         return {"slides": [], "message": "Supabase未設定"}
 
-    slides = get_slides_by_user(authenticated_user_id, limit)
-    return {"slides": slides, "message": f"{len(slides)}件のスライドを取得しました"}
+    slides = await asyncio.to_thread(get_slides_by_user, authenticated_user_id, limit)
+    result = {"slides": slides, "message": f"{len(slides)}件のスライドを取得しました"}
+    cache.set(cache_key, result, SLIDES_LIST_TTL)
+    return result
 
 
 @router.get("/slides/{slide_id}/markdown")
@@ -101,7 +125,14 @@ async def get_slide_markdown(
             "pdf_url": str | None
         }
     """
-    slide = get_slide_by_id(slide_id)
+    # キャッシュチェック（認可判定を含む結果はキャッシュしない。生データをキャッシュ）
+    slide_cache_key = f"slide:{slide_id}"
+    slide = cache.get(slide_cache_key)
+    if slide is None:
+        slide = await asyncio.to_thread(get_slide_by_id, slide_id)
+        if slide:
+            cache.set(slide_cache_key, slide, SLIDE_DETAIL_TTL)
+
     if not slide:
         raise HTTPException(status_code=404, detail="スライドが見つかりません")
 
