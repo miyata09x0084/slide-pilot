@@ -14,7 +14,6 @@ import sys
 import json
 import tempfile
 import shutil
-import requests
 from pathlib import Path
 
 # backend/app をモジュールパスに追加
@@ -26,26 +25,7 @@ load_dotenv()
 from app.core.supabase import get_video_job, update_video_job, update_slide_video_url
 from app.core.storage import upload_to_storage
 from app.core.slide_renderer import SlideRenderer
-
-
-def download_audio_file(url: str, dest_path: Path) -> bool:
-    """URLから音声ファイルをダウンロード
-
-    Args:
-        url: 音声ファイルのURL（Supabase Storage公開URL）
-        dest_path: 保存先パス
-
-    Returns:
-        成功: True、失敗: False
-    """
-    try:
-        response = requests.get(url, timeout=120)
-        response.raise_for_status()
-        dest_path.write_bytes(response.content)
-        return True
-    except Exception as e:
-        print(f"[job] Failed to download audio: {e}")
-        return False
+from app.core.video_compose import slugify_title, align_audio_and_images, download_audio_file, compose_video
 
 
 def main():
@@ -112,54 +92,13 @@ def main():
             raise Exception("SlideRenderer produced no images")
 
         # 6. 音声ファイル数とPNGファイル数を合わせる
-        if len(png_files) != len(audio_files):
-            print(f"[job] WARNING: PNG count ({len(png_files)}) != audio count ({len(audio_files)})")
-            min_count = min(len(png_files), len(audio_files))
-            png_files = png_files[:min_count]
-            audio_files = audio_files[:min_count]
+        png_files, audio_files = align_audio_and_images(png_files, audio_files)
 
-        # 7. MoviePyで動画生成
-        from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
-
-        clips = []
-        for i, (png_path, audio_path) in enumerate(zip(png_files, audio_files)):
-            try:
-                img_clip = ImageClip(str(png_path))
-                audio_clip = AudioFileClip(audio_path)
-                video_clip = img_clip.with_duration(audio_clip.duration).with_audio(audio_clip)
-                clips.append(video_clip)
-                print(f"[job] Processed clip {i+1}/{len(png_files)}")
-            except Exception as e:
-                print(f"[job] WARNING: Failed to process slide {i}: {str(e)[:100]}")
-                continue
-
-        if not clips:
-            raise Exception("All clips failed to process")
-
-        # 8. 動画を結合・エンコード
-        print(f"[job] Concatenating {len(clips)} video clips")
-        final_video = concatenate_videoclips(clips, method="compose")
-
-        # ファイル名を生成
-        import re
-        def slugify(text: str) -> str:
-            slug = text.lower()
-            slug = re.sub(r'[^a-z0-9\s-]', '', slug)
-            slug = re.sub(r'[\s_]+', '-', slug)
-            slug = re.sub(r'-+', '-', slug).strip('-')
-            return slug or "ai-slide"
-
-        file_stem = slugify(title)
+        # 7-8. MoviePyで合成して書き出し
+        file_stem = slugify_title(title)
         video_path = temp_dir / f"{file_stem}_video.mp4"
-
-        final_video.write_videofile(
-            str(video_path),
-            fps=2,
-            codec="libx264",
-            audio_codec="aac",
-            bitrate="2000k",
-            preset="ultrafast"
-        )
+        if compose_video(png_files, audio_files, video_path, log_prefix="job") is None:
+            raise Exception("All clips failed to process")
         print(f"[job] Video written to {video_path}")
 
         # 9. Supabase Storageにアップロード

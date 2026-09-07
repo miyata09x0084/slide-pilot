@@ -110,11 +110,6 @@ class State(TypedDict, total=False):
   attempts: int                                 # リトライ回数 (最大3)
 
   # ══════════════════════════════════════════════════════════
-  # 図解生成 (Node D.5) - Issue #25
-  # ══════════════════════════════════════════════════════════
-  diagrams: Dict[str, Any]                      # 生成された図解のメタデータ
-
-  # ══════════════════════════════════════════════════════════
   # 出力 (Node F)
   # ══════════════════════════════════════════════════════════
   slide_path: str                               # ローカルファイルパス
@@ -414,7 +409,7 @@ def generate_toc(state: State) -> Dict:
     except Exception as e:
       toc = _strip_bullets(msg.content.splitlines())
       toc = toc[:8] or ["はじめに", "背景", "実装手順", "評価と改善", "公開・運用", "まとめ"]
-    return {"toc": toc, "error": "", "log": _log(state, f"[toc] {toc}")}
+    return {"toc": toc, "log": _log(state, f"[toc] {toc}")}
   except Exception as e:
     return {"error": f"toc_error: {e}", "log": _log(state, f"[toc] EXCEPTION {e}")}
 
@@ -581,7 +576,6 @@ class: text-center
       return {
         "slide_md": slide_md,
         "title": ja_title,
-        "error": "",
         "log": _log(state, f"[slides_slidev_pdf] generated ({len(slide_md)} chars) from {len(chunk_texts)} chunks with mechanical structure control")
       }
 
@@ -597,7 +591,6 @@ class: text-center
       return {
         "slide_md": slide_md,
         "title": ja_title,
-        "error": "",
         "log": _log(state, f"[slides_slidev] generated ({len(slide_md)} chars, 6 vendors)")
       }
 
@@ -634,16 +627,6 @@ class: text-center
       "error": f"slides_slidev_error: {e}",
       "log": _log(state, f"[slides_slidev] EXCEPTION {e} - using fallback")
     }
-
-# -------------------
-# Node D.5: Mermaid図解生成（Issue #25）
-# -------------------
-@traceable(run_name="d5_generate_diagrams")
-# generate_diagrams ノードは廃止（LLMがプロンプトから独自の図を生成するため不要）
-# Issue #25: テンプレート図の強制挿入を削除し、LLMによる独自図生成に移行
-def generate_diagrams(state: State) -> Dict:
-    """[DEPRECATED] このノードは使用されていません"""
-    return {"log": _log(state, "[diagrams] deprecated - skipped")}
 
 # -------------------
 # Node E: 評価
@@ -703,6 +686,13 @@ def evaluate_slides_slidev(state: State) -> Dict:
 
 def route_after_eval_slidev(state: State) -> str:
     """評価結果に基づいてリトライまたは完了を判定"""
+    # 上流ノード(collect_info等)のエラーは握りつぶさず保持される設計に変更した。
+    # エラー時はリトライせず保存パス("ok")へ抜ける:
+    #   save_and_render_slidev がガードで {} を返し → route_after_save が error を見て END。
+    # この早期分岐がないと、evaluate がエラーで {} を返し passed=False のまま
+    # 無限リトライ(recursion_limitまでループ)になるため必須。
+    if state.get("error"):
+        return "ok"
     if (state.get("attempts") or 0) >= MAX_ATTEMPTS:
         return "ok"
     return "ok" if state.get("passed") else "retry"
@@ -1205,7 +1195,6 @@ graph_builder.add_node("collect_info", collect_info)
 graph_builder.add_node("generate_key_points", generate_key_points)
 graph_builder.add_node("generate_toc", generate_toc)
 graph_builder.add_node("write_slides_slidev", write_slides_slidev)
-graph_builder.add_node("generate_diagrams", generate_diagrams)
 graph_builder.add_node("save_and_render_slidev", save_and_render_slidev)
 graph_builder.add_node("evaluate_slides_slidev", evaluate_slides_slidev)
 graph_builder.add_node("generate_narration", generate_narration)

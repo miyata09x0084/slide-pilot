@@ -23,7 +23,11 @@ os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Tavily
-TAVILY_API_KEY = _get_env("TAVILY_API_KEY")
+# NOTE: Tavily検索は text入力時のみ使用する。PDF/YouTube入力やテストでは不要なため、
+#       モジュールimport時に fail-fast させず、未設定は None を許容する
+#       （新しい統合設定 app/config.py:60 と同じ方針）。
+#       実際にTavilyを呼び出す時点でガードし、明確なエラーを出す（utils.py: tavily_search 参照）。
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # PDF生成廃止: Slidev CLI のブロッキング処理を回避するため、MD保存のみに変更
 # 動画生成はFastAPI経由で実行（render.py）

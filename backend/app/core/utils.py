@@ -451,6 +451,14 @@ def tavily_search(
   include_domains: Optional[List[str]] = None,
   time_range: str = "month", # day/week/month/year
   ) -> Dict:
+  # TAVILY_API_KEY 未設定時は境界で明確に落とす。
+  #   core/config.py の fail-fast 解除により TAVILY_API_KEY は None になり得る。
+  #   None のまま投げると Tavily が 401 を返し、raise_for_status() が原因不明の例外になるため、
+  #   ここで actionable なメッセージを送出する。collect_info の try/except が捕捉し state["error"] に入る。
+  if not TAVILY_API_KEY:
+    raise RuntimeError(
+      "TAVILY_API_KEY が未設定です。text入力での情報収集には Tavily API キーが必要です（backend/.env を確認してください）。"
+    )
   endpoint = "https://api.tavily.com/search"
   payload = {
     "api_key": TAVILY_API_KEY,
